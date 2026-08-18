@@ -1,0 +1,139 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "spring-boot-2-7-autoconfiguration",
+  "title": "Spring Boot 2.7 自动装配源码解析",
+  "primaryVersion": "Spring Boot 2.7.18",
+  "sourceRef": "v2.7.18",
+  "lab": {
+    "module": "labs/spring-boot-lab",
+    "mainClass": "io.github.javasourceatlas.spring.boot.autoconfigure.SpringBootAutoConfigurationDebugLab",
+    "sourcePath": "labs/spring-boot-lab/src/main/java/io/github/javasourceatlas/spring/boot/autoconfigure/SpringBootAutoConfigurationDebugLab.java"
+  },
+  "compatibleVersions": [
+    "Spring Boot 2.7.x",
+    "Spring Boot 3.x（概念连续，候选资源与运行基线有差异）"
+  ],
+  "source": {
+    "repository": "https://github.com/spring-projects/spring-boot",
+    "className": "org.springframework.boot.SpringApplication",
+    "sourcePath": "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/SpringApplication.java"
+  },
+  "relatedSources": [
+    {
+      "className": "org.springframework.boot.autoconfigure.EnableAutoConfiguration",
+      "sourcePath": "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/EnableAutoConfiguration.java"
+    },
+    {
+      "className": "org.springframework.boot.autoconfigure.AutoConfiguration",
+      "sourcePath": "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/AutoConfiguration.java"
+    },
+    {
+      "className": "org.springframework.boot.autoconfigure.AutoConfigurationImportSelector",
+      "sourcePath": "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/AutoConfigurationImportSelector.java"
+    },
+    {
+      "className": "org.springframework.boot.context.annotation.ImportCandidates",
+      "sourcePath": "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/context/annotation/ImportCandidates.java"
+    },
+    {
+      "className": "org.springframework.boot.autoconfigure.condition.SpringBootCondition",
+      "sourcePath": "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/condition/SpringBootCondition.java"
+    },
+    {
+      "className": "org.springframework.boot.autoconfigure.condition.OnBeanCondition",
+      "sourcePath": "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/condition/OnBeanCondition.java"
+    },
+    {
+      "className": "org.springframework.boot.autoconfigure.condition.ConditionEvaluationReport",
+      "sourcePath": "spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/condition/ConditionEvaluationReport.java"
+    },
+    {
+      "className": "org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor",
+      "sourcePath": "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/context/properties/ConfigurationPropertiesBindingPostProcessor.java"
+    },
+    {
+      "className": "org.springframework.boot.context.properties.bind.Binder",
+      "sourcePath": "spring-boot-project/spring-boot/src/main/java/org/springframework/boot/context/properties/bind/Binder.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "SpringApplication.run(String...)",
+      "document": "/spring/boot-autoconfigure/springapplication-run",
+      "purpose": "编排 Environment、ApplicationContext、refresh、Runner 与失败清理"
+    },
+    {
+      "method": "SpringApplication.prepareEnvironment(...)",
+      "document": "/spring/boot-autoconfigure/springapplication-run",
+      "purpose": "准备属性源、profiles、配置属性视图并发布环境就绪回调"
+    },
+    {
+      "method": "AutoConfigurationImportSelector.getAutoConfigurationEntry(AnnotationMetadata)",
+      "document": "/spring/boot-autoconfigure/enable-autoconfiguration-import",
+      "purpose": "执行候选加载、去重、排除、快速过滤与导入事件发布"
+    },
+    {
+      "method": "AutoConfigurationImportSelector.getCandidateConfigurations(...)",
+      "document": "/spring/boot-autoconfigure/enable-autoconfiguration-import",
+      "purpose": "在 2.7 中合并 spring.factories 兼容来源与 AutoConfiguration.imports"
+    },
+    {
+      "method": "AutoConfigurationImportSelector.ConfigurationClassFilter.filter(List<String>)",
+      "document": "/spring/boot-autoconfigure/enable-autoconfiguration-import",
+      "purpose": "用自动配置元数据和导入过滤器批量剔除明显不匹配候选"
+    },
+    {
+      "method": "SpringBootCondition.matches(ConditionContext,AnnotatedTypeMetadata)",
+      "document": "/spring/boot-autoconfigure/condition-binding",
+      "purpose": "取得 ConditionOutcome、记录条件报告并返回最终匹配结果"
+    },
+    {
+      "method": "ConfigurationPropertiesBindingPostProcessor.postProcessBeforeInitialization(Object,String)",
+      "document": "/spring/boot-autoconfigure/condition-binding",
+      "purpose": "在 JavaBean 初始化回调前触发 ConfigurationProperties Binder"
+    },
+    {
+      "method": "OnBeanCondition.getMatchOutcome(ConditionContext,AnnotatedTypeMetadata)",
+      "document": "/spring/boot-autoconfigure/condition-binding",
+      "purpose": "依据当前 BeanDefinition 可见范围决定默认 Bean 是否回退"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "SpringApplication.run(String...)",
+      "scenario": "观察 Boot 应用从参数到 ready 的完整生命周期",
+      "variables": ["args", "bootstrapContext", "environment", "context", "timeTakenToStartup"]
+    },
+    {
+      "method": "SpringApplication.prepareEnvironment(...)",
+      "scenario": "核对条件与 Binder 实际读取的属性源和最终值",
+      "variables": ["environment", "propertySources", "applicationArguments", "activeProfiles"]
+    },
+    {
+      "method": "AutoConfigurationImportSelector.getAutoConfigurationEntry(...)",
+      "scenario": "观察候选列表经过去重、显式排除和快速过滤后的变化",
+      "variables": ["configurations", "exclusions", "annotationMetadata"]
+    },
+    {
+      "method": "AutoConfigurationImportSelector.ConfigurationClassFilter.filter(...)",
+      "scenario": "观察导入过滤器利用元数据批量排除候选",
+      "variables": ["candidates", "match", "skipped", "result"]
+    },
+    {
+      "method": "SpringBootCondition.matches(...)",
+      "scenario": "区分类级与方法级条件，并核对报告中的匹配原因",
+      "variables": ["classOrMethodName", "metadata", "outcome", "context"]
+    },
+    {
+      "method": "ConfigurationPropertiesBindingPostProcessor.postProcessBeforeInitialization(...)",
+      "scenario": "观察 AtlasFeatureProperties 从字段默认值变为 Environment 绑定值",
+      "variables": ["bean", "beanName", "binder"]
+    },
+    {
+      "method": "OnBeanCondition.getMatchOutcome(...)",
+      "scenario": "比较默认服务创建与用户服务存在时的回退路径",
+      "variables": ["metadata", "beanFactory", "matchResult", "outcome"]
+    }
+  ]
+}

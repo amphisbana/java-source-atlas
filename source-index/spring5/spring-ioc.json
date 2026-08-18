@@ -1,0 +1,229 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "spring-framework-5-3-ioc",
+  "title": "Spring Framework 5.3 IOC 源码解析",
+  "primaryVersion": "Spring Framework 5.3.39",
+  "sourceRef": "v5.3.39",
+  "lab": {
+    "module": "labs/spring-framework-lab",
+    "mainClass": "io.github.javasourceatlas.spring.ioc.SpringIocDebugLab",
+    "sourcePath": "labs/spring-framework-lab/src/main/java/io/github/javasourceatlas/spring/ioc/SpringIocDebugLab.java"
+  },
+  "compatibleVersions": [
+    "Spring Framework 5.3.x",
+    "Spring Framework 6.x（概念兼容，内部实现需复核）"
+  ],
+  "source": {
+    "repository": "https://github.com/spring-projects/spring-framework",
+    "className": "org.springframework.context.support.AbstractApplicationContext",
+    "sourcePath": "spring-context/src/main/java/org/springframework/context/support/AbstractApplicationContext.java"
+  },
+  "relatedSources": [
+    {
+      "className": "org.springframework.beans.factory.support.DefaultListableBeanFactory",
+      "sourcePath": "spring-beans/src/main/java/org/springframework/beans/factory/support/DefaultListableBeanFactory.java"
+    },
+    {
+      "className": "org.springframework.beans.factory.support.AbstractBeanFactory",
+      "sourcePath": "spring-beans/src/main/java/org/springframework/beans/factory/support/AbstractBeanFactory.java"
+    },
+    {
+      "className": "org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory",
+      "sourcePath": "spring-beans/src/main/java/org/springframework/beans/factory/support/AbstractAutowireCapableBeanFactory.java"
+    },
+    {
+      "className": "org.springframework.beans.factory.support.DefaultSingletonBeanRegistry",
+      "sourcePath": "spring-beans/src/main/java/org/springframework/beans/factory/support/DefaultSingletonBeanRegistry.java"
+    },
+    {
+      "className": "org.springframework.context.support.PostProcessorRegistrationDelegate",
+      "sourcePath": "spring-context/src/main/java/org/springframework/context/support/PostProcessorRegistrationDelegate.java"
+    },
+    {
+      "className": "org.springframework.beans.factory.support.FactoryBeanRegistrySupport",
+      "sourcePath": "spring-beans/src/main/java/org/springframework/beans/factory/support/FactoryBeanRegistrySupport.java"
+    },
+    {
+      "className": "org.springframework.beans.factory.support.DisposableBeanAdapter",
+      "sourcePath": "spring-beans/src/main/java/org/springframework/beans/factory/support/DisposableBeanAdapter.java"
+    },
+    {
+      "className": "org.springframework.context.support.ApplicationContextAwareProcessor",
+      "sourcePath": "spring-context/src/main/java/org/springframework/context/support/ApplicationContextAwareProcessor.java"
+    },
+    {
+      "className": "org.springframework.context.annotation.ConfigurationClassPostProcessor",
+      "sourcePath": "spring-context/src/main/java/org/springframework/context/annotation/ConfigurationClassPostProcessor.java"
+    },
+    {
+      "className": "org.springframework.context.annotation.ConfigurationClassParser",
+      "sourcePath": "spring-context/src/main/java/org/springframework/context/annotation/ConfigurationClassParser.java"
+    },
+    {
+      "className": "org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader",
+      "sourcePath": "spring-context/src/main/java/org/springframework/context/annotation/ConfigurationClassBeanDefinitionReader.java"
+    },
+    {
+      "className": "org.springframework.context.annotation.ConfigurationClassEnhancer",
+      "sourcePath": "spring-context/src/main/java/org/springframework/context/annotation/ConfigurationClassEnhancer.java"
+    },
+    {
+      "className": "org.springframework.beans.factory.config.DependencyDescriptor",
+      "sourcePath": "spring-beans/src/main/java/org/springframework/beans/factory/config/DependencyDescriptor.java"
+    },
+    {
+      "className": "org.springframework.beans.factory.support.GenericTypeAwareAutowireCandidateResolver",
+      "sourcePath": "spring-beans/src/main/java/org/springframework/beans/factory/support/GenericTypeAwareAutowireCandidateResolver.java"
+    },
+    {
+      "className": "org.springframework.beans.factory.annotation.QualifierAnnotationAutowireCandidateResolver",
+      "sourcePath": "spring-beans/src/main/java/org/springframework/beans/factory/annotation/QualifierAnnotationAutowireCandidateResolver.java"
+    },
+    {
+      "className": "org.springframework.context.annotation.ContextAnnotationAutowireCandidateResolver",
+      "sourcePath": "spring-context/src/main/java/org/springframework/context/annotation/ContextAnnotationAutowireCandidateResolver.java"
+    },
+    {
+      "className": "org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor",
+      "sourcePath": "spring-beans/src/main/java/org/springframework/beans/factory/annotation/AutowiredAnnotationBeanPostProcessor.java"
+    },
+    {
+      "className": "org.springframework.beans.factory.support.ConstructorResolver",
+      "sourcePath": "spring-beans/src/main/java/org/springframework/beans/factory/support/ConstructorResolver.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "AbstractApplicationContext.refresh()",
+      "document": "/spring/ioc/refresh",
+      "purpose": "编排上下文准备、工厂扩展、单例预实例化与刷新完成"
+    },
+    {
+      "method": "AbstractBeanFactory.doGetBean(String,Class,Object[],boolean)",
+      "document": "/spring/ioc/bean-creation",
+      "purpose": "处理名称、缓存、父工厂、作用域和 FactoryBean 适配"
+    },
+    {
+      "method": "AbstractAutowireCapableBeanFactory.doCreateBean(String,RootBeanDefinition,Object[])",
+      "document": "/spring/ioc/bean-creation#docreatebean-的五段生命周期",
+      "purpose": "实例化、提前暴露、属性填充、初始化和销毁登记"
+    },
+    {
+      "method": "DefaultSingletonBeanRegistry.getSingleton(String,boolean)",
+      "document": "/spring/ioc/circular-dependency",
+      "purpose": "读取完整单例或按需生成早期引用"
+    },
+    {
+      "method": "PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(...)",
+      "document": "/spring/ioc/extension-points",
+      "purpose": "执行定义注册和工厂级后处理器"
+    },
+    {
+      "method": "FactoryBeanRegistrySupport.getObjectFromFactoryBean(...)",
+      "document": "/spring/ioc/extension-points#factorybean-名称有两种取值语义",
+      "purpose": "取得 FactoryBean 产品，并在满足单例条件时缓存"
+    },
+    {
+      "method": "ConfigurationClassPostProcessor.processConfigBeanDefinitions(BeanDefinitionRegistry)",
+      "document": "/spring/ioc/configuration-class#processconfigbeandefinitions-为什么要循环",
+      "purpose": "循环发现配置候选，驱动 parser 构模与 reader 回写 Registry",
+      "sourceClass": "org.springframework.context.annotation.ConfigurationClassPostProcessor"
+    },
+    {
+      "method": "ConfigurationClassParser.doProcessConfigurationClass(ConfigurationClass,SourceClass)",
+      "document": "/spring/ioc/configuration-class#doprocessconfigurationclass-的主要顺序",
+      "purpose": "按顺序处理扫描、Import、条件、BeanMethod、接口与父类",
+      "sourceClass": "org.springframework.context.annotation.ConfigurationClassParser"
+    },
+    {
+      "method": "ConfigurationClassBeanDefinitionReader.loadBeanDefinitions(Set)",
+      "document": "/spring/ioc/configuration-class#reader-怎样把模型写回-registry",
+      "purpose": "把配置模型中的导入配置、BeanMethod、资源和 Registrar 产物写回定义注册表",
+      "sourceClass": "org.springframework.context.annotation.ConfigurationClassBeanDefinitionReader"
+    },
+    {
+      "method": "ConfigurationClassEnhancer.BeanMethodInterceptor.intercept(...)",
+      "document": "/spring/ioc/configuration-class#full-配置",
+      "purpose": "区分容器工厂方法调用与配置类自调用，并让 full 配置复用容器 Bean",
+      "sourceClass": "org.springframework.context.annotation.ConfigurationClassEnhancer"
+    },
+    {
+      "method": "DefaultListableBeanFactory.resolveDependency(DependencyDescriptor,String,Set,TypeConverter)",
+      "document": "/spring/ioc/dependency-resolution#resolvedependency-先处理特殊包装",
+      "purpose": "识别 Optional、ObjectProvider、Lazy 与普通依赖解析入口",
+      "sourceClass": "org.springframework.beans.factory.support.DefaultListableBeanFactory"
+    },
+    {
+      "method": "DefaultListableBeanFactory.doResolveDependency(DependencyDescriptor,String,Set,TypeConverter)",
+      "document": "/spring/ioc/dependency-resolution#doresolvedependency-的主线",
+      "purpose": "处理快捷值、建议值、名称匹配、多值分流、候选收集和唯一性裁决",
+      "sourceClass": "org.springframework.beans.factory.support.DefaultListableBeanFactory"
+    },
+    {
+      "method": "DefaultListableBeanFactory.findAutowireCandidates(String,Class,DependencyDescriptor)",
+      "document": "/spring/ioc/dependency-resolution#findautowirecandidates-先找名字-再逐个校验资格",
+      "purpose": "从类型候选名出发，按自动装配资格、泛型与限定符建立候选集合",
+      "sourceClass": "org.springframework.beans.factory.support.DefaultListableBeanFactory"
+    },
+    {
+      "method": "GenericTypeAwareAutowireCandidateResolver.checkGenericTypeMatch(BeanDefinitionHolder,DependencyDescriptor)",
+      "document": "/spring/ioc/dependency-resolution#泛型过滤发生在候选资格阶段",
+      "purpose": "用 ResolvableType 比较注入点泛型与候选定义的目标类型",
+      "sourceClass": "org.springframework.beans.factory.support.GenericTypeAwareAutowireCandidateResolver"
+    },
+    {
+      "method": "QualifierAnnotationAutowireCandidateResolver.checkQualifiers(BeanDefinitionHolder,Annotation[])",
+      "document": "/spring/ioc/dependency-resolution#qualifier-是资格过滤-不是最后排序",
+      "purpose": "校验候选定义名称、Qualifier 元数据与注入点限定条件",
+      "sourceClass": "org.springframework.beans.factory.annotation.QualifierAnnotationAutowireCandidateResolver"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "AbstractApplicationContext.refresh()",
+      "scenario": "观察容器启动的完整阶段和失败清理",
+      "variables": ["active", "closed", "beanFactory", "earlyApplicationEvents"]
+    },
+    {
+      "method": "DefaultListableBeanFactory.preInstantiateSingletons()",
+      "scenario": "观察非懒单例如何进入 getBean 创建链",
+      "variables": ["beanName", "bd", "isFactoryBean"]
+    },
+    {
+      "method": "AbstractBeanFactory.doGetBean(...)",
+      "scenario": "观察名称转换、缓存命中、scope 与 FactoryBean 产品适配",
+      "variables": ["name", "beanName", "sharedInstance", "mbd", "scope"]
+    },
+    {
+      "method": "AbstractAutowireCapableBeanFactory.doCreateBean(...)",
+      "scenario": "观察实例化、注入、初始化和早期引用协调",
+      "variables": ["beanName", "mbd", "bean", "earlySingletonExposure", "exposedObject"]
+    },
+    {
+      "method": "DefaultSingletonBeanRegistry.getSingleton(String,boolean)",
+      "scenario": "观察 Setter 单例循环依赖的三级缓存迁移",
+      "variables": ["singletonObject", "earlySingletonObjects", "singletonFactories", "allowEarlyReference"]
+    },
+    {
+      "method": "SpringIocDeepDiveScenarios.observeFullAndLiteConfiguration()",
+      "scenario": "对比 full 配置 CGLIB 拦截与 lite 配置普通 Java 自调用的对象身份",
+      "variables": ["managed", "client.getDependency()", "fullDependencyCreations", "liteDependencyCreations"]
+    },
+    {
+      "method": "SpringIocDeepDiveScenarios.observeConfigurationClassExpansion()",
+      "scenario": "观察 ComponentScan、直接 Import、立即与延迟选择器怎样扩展 Registry，并确认条件定义被跳过",
+      "variables": ["candidateNames", "configClasses", "alreadyParsed", "registry.beanDefinitionCount"]
+    },
+    {
+      "method": "SpringIocDeepDiveScenarios.observeDependencyResolution()",
+      "scenario": "观察 Primary、Qualifier、泛型、集合、Optional、Provider 与 Lazy 的候选解析结果",
+      "variables": ["descriptor.resolvableType", "candidateNames", "matchingBeans", "autowiredBeanName"]
+    },
+    {
+      "method": "SpringIocDeepDiveScenarios.observeAmbiguousDependencyFailure()",
+      "scenario": "观察两个等价单值候选无法裁决时抛出 NoUniqueBeanDefinitionException",
+      "variables": ["descriptor", "candidates", "primaryCandidate", "exception.mostSpecificCause"]
+    }
+  ]
+}

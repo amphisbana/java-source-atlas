@@ -1,0 +1,137 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-java-util-concurrent-concurrenthashmap",
+  "title": "OpenJDK 8 ConcurrentHashMap 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentHashMapDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/ConcurrentHashMapDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.util.concurrent.ConcurrentHashMap",
+    "sourcePath": "jdk/src/share/classes/java/util/concurrent/ConcurrentHashMap.java"
+  },
+  "entryPoints": [
+    {
+      "method": "ConcurrentHashMap.get(Object)",
+      "document": "/jdk/concurrent/concurrenthashmap/#get-为什么不锁桶",
+      "purpose": "无桶首监视器读取和特殊节点查找",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+    },
+    {
+      "method": "ConcurrentHashMap.putVal(K,V,boolean)",
+      "document": "/jdk/concurrent/concurrenthashmap/put-resize#putval-主循环",
+      "purpose": "CAS 空桶、桶首同步、MOVED 分流和树写入",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+    },
+    {
+      "method": "ConcurrentHashMap.initTable()",
+      "document": "/jdk/concurrent/concurrenthashmap/put-resize#inittable-如何避免重复初始化",
+      "purpose": "通过 sizeCtl 协调延迟初始化",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+    },
+    {
+      "method": "ConcurrentHashMap.transfer(Node[],Node[])",
+      "document": "/jdk/concurrent/concurrenthashmap/put-resize#transfer-的协作迁移",
+      "purpose": "分段领取、迁移旧桶并由末位线程发布新表",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+    },
+    {
+      "method": "ConcurrentHashMap.helpTransfer(Node[],Node)",
+      "document": "/jdk/concurrent/concurrenthashmap/put-resize#helptransfer-如何决定是否加入迁移",
+      "purpose": "校验同一轮扩容并登记协作者",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+    },
+    {
+      "method": "ConcurrentHashMap.ForwardingNode.find(int,Object)",
+      "document": "/jdk/concurrent/concurrenthashmap/put-resize#forwardingnode-find-如何连续转发",
+      "purpose": "沿一个或多个转发节点切换到新表查找",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+    },
+    {
+      "method": "ConcurrentHashMap.TreeBin.find(int,Object)",
+      "document": "/jdk/concurrent/concurrenthashmap/put-resize#treebin-find-的读路径",
+      "purpose": "在链表退路与带读计数的树查找之间选择",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+    },
+    {
+      "method": "ConcurrentHashMap.TreeBin.putTreeVal(int,K,V)",
+      "document": "/jdk/concurrent/concurrenthashmap/put-resize#treebin-puttreeval-的写路径",
+      "purpose": "查找已有树节点或链接并平衡新节点",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+    },
+    {
+      "method": "ConcurrentHashMap.Traverser.advance()",
+      "document": "/jdk/concurrent/concurrenthashmap/#traverser-如何避免跨表漏走路径",
+      "purpose": "遍历遇到转发节点时保存并恢复新旧表位置",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+    },
+    {
+      "method": "ConcurrentHashMap.addCount(long,int)",
+      "document": "/jdk/concurrent/concurrenthashmap/count-compute#为什么不用一个-atomiclong-记录-size",
+      "purpose": "分散计数并检查扩容",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+    },
+    {
+      "method": "ConcurrentHashMap.computeIfAbsent(K,Function)",
+      "document": "/jdk/concurrent/concurrenthashmap/count-compute#computeifabsent-的原子语义",
+      "purpose": "缺失键的单键原子计算",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "ConcurrentHashMap.putVal(K,V,boolean)",
+      "scenario": "观察空桶、碰撞桶和 MOVED 分支",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap",
+      "variables": ["tab", "n", "i", "f", "fh", "binCount"]
+    },
+    {
+      "method": "ConcurrentHashMap.transfer(Node[],Node[])",
+      "scenario": "观察区间领取、桶迁移和新表发布",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap",
+      "variables": ["transferIndex", "nextTable", "i", "bound", "f"]
+    },
+    {
+      "method": "ConcurrentHashMap.helpTransfer(Node[],Node)",
+      "scenario": "观察写线程通过 ForwardingNode 登记协作",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap",
+      "variables": ["tab", "f", "nextTab", "sc", "transferIndex"]
+    },
+    {
+      "method": "ConcurrentHashMap.ForwardingNode.find(int,Object)",
+      "scenario": "观察读取跨越一轮或多轮扩容",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap",
+      "variables": ["tab", "e", "n", "h", "k"]
+    },
+    {
+      "method": "ConcurrentHashMap.TreeBin.find(int,Object)",
+      "scenario": "观察树桶读者计数与链表退路",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap",
+      "variables": ["lockState", "first", "root", "e", "s"]
+    },
+    {
+      "method": "ConcurrentHashMap.TreeBin.putTreeVal(int,K,V)",
+      "scenario": "观察强碰撞键的树搜索、插入和平衡",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap",
+      "variables": ["root", "p", "dir", "searched", "kc"]
+    },
+    {
+      "method": "ConcurrentHashMap.Traverser.advance()",
+      "scenario": "观察遍历器跨新旧表保存和恢复位置",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap",
+      "variables": ["tab", "index", "baseIndex", "baseSize", "stack"]
+    },
+    {
+      "method": "ConcurrentHashMap.addCount(long,int)",
+      "scenario": "观察基础计数和 CounterCell",
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap",
+      "variables": ["baseCount", "counterCells", "s", "sizeCtl"]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+node_modules/
+.gradle/
+.intellijPlatform/
+**/build/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+target/
+**/target/
+.idea/
+*.iml
+.DS_Store

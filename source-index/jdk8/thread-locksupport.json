@@ -1,0 +1,174 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-thread-locksupport",
+  "title": "OpenJDK 8 Thread 与 LockSupport 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLockSupportDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/ThreadLockSupportDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.lang.Thread",
+    "sourcePath": "jdk/src/share/classes/java/lang/Thread.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.util.concurrent.locks.LockSupport",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/locks/LockSupport.java"
+    },
+    {
+      "className": "java.util.concurrent.locks.AbstractQueuedSynchronizer",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/locks/AbstractQueuedSynchronizer.java"
+    },
+    {
+      "className": "java.util.concurrent.FutureTask",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/FutureTask.java"
+    },
+    {
+      "className": "sun.misc.Unsafe",
+      "sourcePath": "jdk/src/share/classes/sun/misc/Unsafe.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "start()",
+      "document": "/jdk/concurrent/thread-locksupport/#start-与-run-不是同一种调用",
+      "purpose": "检查一次启动约束、登记 ThreadGroup 并进入 VM 启动边界"
+    },
+    {
+      "method": "start0()",
+      "document": "/jdk/concurrent/thread-locksupport/thread-state#new-到-run-的源码链",
+      "purpose": "把平台线程启动请求交给 JVM 的 native 实现"
+    },
+    {
+      "method": "run()",
+      "document": "/jdk/concurrent/thread-locksupport/#start-与-run-不是同一种调用",
+      "purpose": "在当前执行线程调用构造时保存的 Runnable target"
+    },
+    {
+      "method": "interrupt()",
+      "document": "/jdk/concurrent/thread-locksupport/interrupt#interrupt-的主路径",
+      "purpose": "向目标线程发布协作式中断请求并唤醒可响应的阻塞点"
+    },
+    {
+      "method": "isInterrupted()",
+      "document": "/jdk/concurrent/thread-locksupport/interrupt#三个名字相近但职责不同的-api",
+      "purpose": "读取指定线程的中断标记但不清除"
+    },
+    {
+      "method": "interrupted()",
+      "document": "/jdk/concurrent/thread-locksupport/interrupt#三个名字相近但职责不同的-api",
+      "purpose": "读取并清除当前执行线程的中断标记"
+    },
+    {
+      "method": "join(long)",
+      "document": "/jdk/concurrent/thread-locksupport/thread-state#jdk-8-的-join-为什么使用-wait-循环",
+      "purpose": "通过 isAlive 条件与 wait 循环有界或无界等待目标线程终止"
+    },
+    {
+      "method": "getState()",
+      "document": "/jdk/concurrent/thread-locksupport/thread-state#getstate-只是瞬时快照",
+      "purpose": "把 JVM 内部线程状态映射为六种公开诊断状态"
+    },
+    {
+      "method": "unpark(Thread)",
+      "document": "/jdk/concurrent/thread-locksupport/park-unpark#unpark-before-park-为什么不会丢通知",
+      "purpose": "让目标线程的一位 permit 变为可用并使已 park 线程有机会返回",
+      "sourceClass": "java.util.concurrent.locks.LockSupport"
+    },
+    {
+      "method": "park(Object)",
+      "document": "/jdk/concurrent/thread-locksupport/park-unpark#blocker-是诊断信息-不是条件",
+      "purpose": "设置 blocker 后消费 permit 或进入无期限等待，返回后清除 blocker",
+      "sourceClass": "java.util.concurrent.locks.LockSupport"
+    },
+    {
+      "method": "parkNanos(Object,long)",
+      "document": "/jdk/concurrent/thread-locksupport/park-unpark#park-的四个常用入口",
+      "purpose": "按相对纳秒上限停放当前线程并允许提前返回",
+      "sourceClass": "java.util.concurrent.locks.LockSupport"
+    },
+    {
+      "method": "parkUntil(Object,long)",
+      "document": "/jdk/concurrent/thread-locksupport/park-unpark#park-的四个常用入口",
+      "purpose": "按绝对毫秒截止时间停放当前线程并允许提前返回",
+      "sourceClass": "java.util.concurrent.locks.LockSupport"
+    },
+    {
+      "method": "getBlocker(Thread)",
+      "document": "/jdk/concurrent/thread-locksupport/park-unpark#blocker-是诊断信息-不是条件",
+      "purpose": "读取目标线程等待期间公开的 blocker 诊断快照",
+      "sourceClass": "java.util.concurrent.locks.LockSupport"
+    },
+    {
+      "method": "parkAndCheckInterrupt()",
+      "document": "/jdk/concurrent/thread-locksupport/park-unpark#aqs-如何在-permit-之上补齐队列协议",
+      "purpose": "AQS 节点 park 后读取并清除中断标记，交由获取模板决定恢复或取消",
+      "sourceClass": "java.util.concurrent.locks.AbstractQueuedSynchronizer"
+    },
+    {
+      "method": "awaitDone(boolean,long)",
+      "document": "/jdk/concurrent/thread-locksupport/park-unpark#futuretask-如何使用-park-unpark",
+      "purpose": "FutureTask 注册 WaitNode 后循环处理终态、中断、超时与 park",
+      "sourceClass": "java.util.concurrent.FutureTask"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "start()",
+      "scenario": "对比直接 run、首次 start 和终止后二次 start",
+      "variables": ["threadStatus", "group", "started", "target"]
+    },
+    {
+      "method": "run()",
+      "scenario": "分别从 main 直接调用与 VM 启动的新线程进入 run",
+      "variables": ["this", "target", "Thread.currentThread()"]
+    },
+    {
+      "method": "interrupt()",
+      "scenario": "中断停在 LockSupport.park 的线程并观察 blocker 与标记",
+      "variables": ["this", "blocker", "interruptLock"]
+    },
+    {
+      "method": "join(long)",
+      "scenario": "观察 isAlive 条件、wait 循环和目标终止后的返回",
+      "variables": ["millis", "base", "now", "isAlive()"]
+    },
+    {
+      "method": "park(Object)",
+      "scenario": "比较预发 permit 的立即返回与 permit 为空时的 WAITING",
+      "variables": ["blocker", "t", "parkBlocker"],
+      "sourceClass": "java.util.concurrent.locks.LockSupport"
+    },
+    {
+      "method": "unpark(Thread)",
+      "scenario": "在线程尚未 park 时连续调用两次，验证 permit 不累计",
+      "variables": ["thread"],
+      "sourceClass": "java.util.concurrent.locks.LockSupport"
+    },
+    {
+      "method": "getBlocker(Thread)",
+      "scenario": "目标线程 WAITING 时读取 blocker，park 返回后再次观察 null",
+      "variables": ["t", "parkBlocker"],
+      "sourceClass": "java.util.concurrent.locks.LockSupport"
+    },
+    {
+      "method": "parkNanos(Object,long)",
+      "scenario": "按剩余时间循环处理伪唤醒直到 deadline 到达",
+      "variables": ["blocker", "nanos", "t"],
+      "sourceClass": "java.util.concurrent.locks.LockSupport"
+    },
+    {
+      "method": "observeOneBitPermit()",
+      "document": "/jdk/concurrent/thread-locksupport/debug-lab#实验三unpark-before-park-与一位-permit",
+      "scenario": "在 Lab 中用有界闩锁稳定复现预发许可和第二次真实等待",
+      "variables": ["enterParks", "releaseSecondPark", "firstParkReturned", "spuriousReturns"],
+      "sourceClass": null
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-java-util-treemap",
+  "title": "OpenJDK 8 TreeMap 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.collection.TreeMapDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/collection/TreeMapDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.util.TreeMap",
+    "sourcePath": "jdk/src/share/classes/java/util/TreeMap.java"
+  },
+  "entryPoints": [
+    {
+      "method": "put(K,V)",
+      "document": "/jdk/collections/treemap/#put-的查找、覆盖与接入",
+      "purpose": "比较查找、覆盖已有键并接入新节点"
+    },
+    {
+      "method": "compare(Object,Object)",
+      "document": "/jdk/collections/treemap/#comparator-与-comparable-两条比较路径",
+      "purpose": "选择 Comparator 或键的自然顺序"
+    },
+    {
+      "method": "fixAfterInsertion(Entry)",
+      "document": "/jdk/collections/treemap/put-balance#fixafterinsertion-的分支表",
+      "purpose": "通过重着色与旋转修复插入后的连续红节点"
+    },
+    {
+      "method": "rotateLeft(Entry)",
+      "document": "/jdk/collections/treemap/put-balance#左旋到底修改了哪些链接",
+      "purpose": "提升右孩子并保持中序顺序，修复右侧局部失衡"
+    },
+    {
+      "method": "rotateRight(Entry)",
+      "document": "/jdk/collections/treemap/put-balance#左旋到底修改了哪些链接",
+      "purpose": "提升左孩子并保持中序顺序，修复左侧局部失衡"
+    },
+    {
+      "method": "deleteEntry(Entry)",
+      "document": "/jdk/collections/treemap/put-balance#删除先把问题压缩到至多一个孩子",
+      "purpose": "处理双孩子后继复制并摘除至多一个孩子的节点"
+    },
+    {
+      "method": "successor(Entry)",
+      "document": "/jdk/collections/treemap/put-balance#删除先把问题压缩到至多一个孩子",
+      "purpose": "寻找双孩子待删节点的中序后继，使真正摘除节点至多保留一个孩子"
+    },
+    {
+      "method": "fixAfterDeletion(Entry)",
+      "document": "/jdk/collections/treemap/put-balance#fixafterdeletion-的四类情况",
+      "purpose": "补偿黑节点删除造成的路径黑高缺失"
+    },
+    {
+      "method": "getCeilingEntry(K)",
+      "document": "/jdk/collections/treemap/navigation-view#getceilingentry-如何保留候选答案",
+      "purpose": "寻找大于或等于查询键的最小映射"
+    },
+    {
+      "method": "getFloorEntry(K)",
+      "document": "/jdk/collections/treemap/navigation-view#getceilingentry-如何保留候选答案",
+      "purpose": "寻找小于或等于查询键的最大映射"
+    },
+    {
+      "method": "NavigableSubMap.inRange(Object)",
+      "document": "/jdk/collections/treemap/navigation-view#submap-是范围视图-不是副本",
+      "purpose": "对后备 TreeMap 的读写实施包含或排他的范围约束"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "put(K,V)",
+      "scenario": "对比自然顺序、显式比较器与覆盖已有键",
+      "variables": ["t", "parent", "cmp", "cpr", "size", "modCount"]
+    },
+    {
+      "method": "fixAfterInsertion(Entry)",
+      "scenario": "递增插入 1 到 8，观察插入 8 的两轮修复",
+      "variables": ["x", "parentOf(x)", "parentOf(parentOf(x))", "y", "root"]
+    },
+    {
+      "method": "rotateLeft(Entry)",
+      "scenario": "观察右右直线分支的根和父链接更新",
+      "variables": ["p", "r", "r.left", "p.parent", "root"]
+    },
+    {
+      "method": "deleteEntry(Entry)",
+      "scenario": "删除同时拥有左右孩子的键 4",
+      "variables": ["p", "s", "replacement", "size", "modCount"]
+    },
+    {
+      "method": "fixAfterDeletion(Entry)",
+      "scenario": "使用三组固定序列覆盖兄弟红、全黑上推、近侄红和远侄红分支",
+      "variables": ["x", "sib", "parentOf(x)", "leftOf(sib)", "rightOf(sib)"]
+    },
+    {
+      "method": "rotateRight(Entry)",
+      "scenario": "序列 3,2,4,5,7,1,6 删除 4，观察近侄红怎样转换为远侄红",
+      "variables": ["p", "l", "l.right", "p.parent", "root"]
+    },
+    {
+      "method": "getCeilingEntry(K)",
+      "scenario": "在 10、20、30、40 中查询不存在的键 25",
+      "variables": ["p", "cmp", "parent", "ch"]
+    },
+    {
+      "method": "NavigableSubMap.inRange(Object)",
+      "scenario": "向区间 [20,40) 内外分别写入键",
+      "variables": ["key", "lo", "hi", "loInclusive", "hiInclusive"]
+    }
+  ]
+}

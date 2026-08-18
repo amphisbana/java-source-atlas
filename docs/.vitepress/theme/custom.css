@@ -1,0 +1,382 @@
+:root {
+  --vp-c-brand-1: #0f766e;
+  --vp-c-brand-2: #0d9488;
+  --vp-c-brand-3: #115e59;
+  --vp-c-brand-soft: rgba(15, 118, 110, 0.12);
+  --vp-c-tip-1: #0f766e;
+  --vp-c-warning-1: #b45309;
+  --vp-c-danger-1: #b42318;
+  --vp-font-family-base: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --atlas-ink: #17202a;
+  --atlas-coral: #c24135;
+  --atlas-gold: #a16207;
+  --atlas-purple: #7c3aed;
+  --atlas-line: #d5dadd;
+  --atlas-surface: #f6f8f7;
+}
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.dark {
+  --atlas-ink: #ecf2f0;
+  --atlas-coral: #f28b7e;
+  --atlas-gold: #facc15;
+  --atlas-purple: #c4b5fd;
+  --atlas-line: #394342;
+  --atlas-surface: #202726;
+}
+
+.VPDoc h1 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  letter-spacing: 0;
+}
+
+.VPDoc h2,
+.VPDoc h3,
+.VPDoc p,
+.VPDoc li,
+.VPNavBarTitle .title {
+  letter-spacing: 0;
+}
+
+/* 窄屏时把宽表格的滚动限制在表格自身，避免整个文档产生横向漂移。 */
+.vp-doc table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.atlas-lead {
+  max-width: 760px;
+  color: var(--vp-c-text-2);
+  font-size: 1.08rem;
+  line-height: 1.8;
+}
+
+.atlas-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 12px 0 18px;
+  border-bottom: 1px solid var(--vp-c-divider);
+  color: var(--vp-c-text-2);
+  font-size: 0.9rem;
+}
+
+.atlas-status strong {
+  color: var(--atlas-ink);
+}
+
+.atlas-tool-entry {
+  margin: 14px 0 28px;
+}
+
+.atlas-tool-entry a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  color: var(--vp-c-brand-1);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.atlas-tool-entry a:hover {
+  color: var(--vp-c-brand-2);
+}
+
+.atlas-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 20px 0 34px;
+  overflow: hidden;
+  border: 1px solid var(--atlas-line);
+  border-radius: 6px;
+  background: var(--atlas-line);
+}
+
+.atlas-entry-grid a {
+  display: grid;
+  min-width: 0;
+  min-height: 132px;
+  align-content: start;
+  gap: 5px;
+  padding: 18px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  text-decoration: none;
+}
+
+.atlas-entry-grid a:hover {
+  background: var(--vp-c-brand-soft);
+}
+
+.atlas-entry-grid span {
+  color: var(--vp-c-text-3);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.atlas-entry-grid strong {
+  color: var(--vp-c-brand-1);
+  font-size: 1rem;
+}
+
+.atlas-entry-grid small {
+  color: var(--vp-c-text-2);
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.topic-list {
+  margin: 20px 0 32px;
+  border-top: 1px solid var(--atlas-line);
+}
+
+.topic-list__row {
+  display: grid;
+  grid-template-columns: 88px minmax(180px, 0.8fr) minmax(260px, 1.5fr) 92px;
+  gap: 16px;
+  align-items: center;
+  min-height: 64px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--atlas-line);
+  color: var(--vp-c-text-1);
+  text-decoration: none;
+}
+
+.topic-list__row:hover {
+  background: var(--vp-c-brand-soft);
+}
+
+.topic-list__area {
+  color: var(--vp-c-text-2);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.topic-list__row strong {
+  min-width: 0;
+}
+
+.topic-list__row code {
+  overflow-wrap: anywhere;
+}
+
+.topic-list__question {
+  color: var(--vp-c-text-2);
+  line-height: 1.6;
+}
+
+.topic-list__action {
+  color: var(--vp-c-brand-1);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-align: right;
+}
+
+.hash-structure {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.7fr) minmax(240px, 2fr);
+  gap: 14px 24px;
+  margin: 24px 0 30px;
+  padding: 22px;
+  overflow-x: auto;
+  border: 1px solid var(--atlas-line);
+  border-radius: 6px;
+  background: var(--atlas-surface);
+}
+
+.hash-structure__label {
+  display: flex;
+  align-items: center;
+  color: var(--vp-c-text-2);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.hash-structure__row {
+  display: flex;
+  align-items: center;
+  min-width: 380px;
+}
+
+.hash-structure__bucket,
+.hash-structure__node {
+  display: grid;
+  place-items: center;
+  min-width: 54px;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--vp-c-brand-1);
+  border-radius: 4px;
+  background: var(--vp-c-bg);
+  color: var(--atlas-ink);
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.82rem;
+}
+
+.hash-structure__bucket {
+  border-color: var(--atlas-coral);
+  color: var(--atlas-coral);
+  font-weight: 700;
+}
+
+.hash-structure__arrow {
+  width: 28px;
+  color: var(--vp-c-text-3);
+  text-align: center;
+}
+
+.hash-structure__tree {
+  display: grid;
+  grid-template-columns: repeat(3, 54px);
+  grid-template-rows: repeat(2, 34px);
+  place-items: center;
+  column-gap: 10px;
+}
+
+.hash-structure__tree .hash-structure__node {
+  min-width: 44px;
+  height: 30px;
+  border-color: var(--atlas-coral);
+  border-radius: 50%;
+}
+
+.hash-structure__tree .hash-structure__node:first-child {
+  grid-column: 2;
+}
+
+.hash-calculator {
+  margin: 24px 0;
+  padding: 20px;
+  border: 1px solid var(--atlas-line);
+  border-radius: 6px;
+  background: var(--atlas-surface);
+}
+
+.hash-calculator__controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(130px, 0.5fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.hash-calculator label {
+  display: grid;
+  gap: 7px;
+  color: var(--vp-c-text-2);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.hash-calculator input,
+.hash-calculator select {
+  width: 100%;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--atlas-line);
+  border-radius: 4px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  font: inherit;
+}
+
+.hash-calculator__result {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--atlas-line);
+  border-radius: 4px;
+  background: var(--atlas-line);
+}
+
+.hash-calculator__metric {
+  min-width: 0;
+  padding: 14px;
+  background: var(--vp-c-bg);
+}
+
+.hash-calculator__metric span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--vp-c-text-3);
+  font-size: 0.78rem;
+}
+
+.hash-calculator__metric strong {
+  color: var(--atlas-ink);
+  font-family: var(--vp-font-family-mono);
+  font-size: 1rem;
+}
+
+.hash-calculator__binary {
+  margin: 14px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--vp-c-text-2);
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.78rem;
+  line-height: 1.7;
+}
+
+@media (max-width: 640px) {
+  .atlas-entry-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .atlas-entry-grid a {
+    min-height: auto;
+  }
+
+  .topic-list__row {
+    grid-template-columns: 84px minmax(0, 1fr);
+    gap: 8px 12px;
+    padding: 14px 2px;
+  }
+
+  .topic-list__question,
+  .topic-list__action {
+    grid-column: 1 / -1;
+  }
+
+  .topic-list__action {
+    text-align: left;
+  }
+
+  .hash-structure {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 14px;
+  }
+
+  .hash-structure__row {
+    min-width: 350px;
+    margin-bottom: 10px;
+  }
+
+  .hash-calculator__controls,
+  .hash-calculator__result {
+    grid-template-columns: 1fr;
+  }
+
+  .jdk-version-comparison-page table:first-of-type th:nth-child(1),
+  .jdk-version-comparison-page table:first-of-type td:nth-child(1) {
+    min-width: 92px;
+  }
+
+  .jdk-version-comparison-page table:first-of-type th:nth-child(2),
+  .jdk-version-comparison-page table:first-of-type td:nth-child(2) {
+    min-width: 230px;
+  }
+
+  .jdk-version-comparison-page table:first-of-type th:nth-child(3),
+  .jdk-version-comparison-page table:first-of-type td:nth-child(3) {
+    min-width: 280px;
+  }
+}

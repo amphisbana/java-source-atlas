@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.github.java-source-atlas</groupId>
+    <artifactId>java-source-atlas</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>Java Source Atlas</name>
+    <description>面向 Java 程序员的源码学习地图</description>
+
+    <modules>
+        <module>labs/jdk-labs</module>
+        <module>labs/spring-framework-lab</module>
+        <module>labs/spring-boot-lab</module>
+    </modules>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>8</maven.compiler.release>
+        <junit.version>5.11.4</junit.version>
+        <exec.mainClass>io.github.javasourceatlas.jdk.collection.HashMapDebugLab</exec.mainClass>
+    </properties>
+</project>

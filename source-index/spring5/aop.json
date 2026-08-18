@@ -1,0 +1,132 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "spring-framework-5-3-aop",
+  "title": "Spring Framework 5.3 AOP 源码解析",
+  "primaryVersion": "Spring Framework 5.3.39",
+  "sourceRef": "v5.3.39",
+  "lab": {
+    "module": "labs/spring-framework-lab",
+    "mainClass": "io.github.javasourceatlas.spring.aop.SpringAopDebugLab",
+    "sourcePath": "labs/spring-framework-lab/src/main/java/io/github/javasourceatlas/spring/aop/SpringAopDebugLab.java"
+  },
+  "compatibleVersions": [
+    "Spring Framework 5.3.x",
+    "Spring Framework 6.x（核心模型兼容，内部实现需按小版本复核）"
+  ],
+  "source": {
+    "repository": "https://github.com/spring-projects/spring-framework",
+    "className": "org.springframework.aop.framework.autoproxy.AbstractAutoProxyCreator",
+    "sourcePath": "spring-aop/src/main/java/org/springframework/aop/framework/autoproxy/AbstractAutoProxyCreator.java"
+  },
+  "relatedSources": [
+    {
+      "className": "org.springframework.aop.framework.autoproxy.AbstractAdvisorAutoProxyCreator",
+      "sourcePath": "spring-aop/src/main/java/org/springframework/aop/framework/autoproxy/AbstractAdvisorAutoProxyCreator.java"
+    },
+    {
+      "className": "org.springframework.aop.aspectj.annotation.AnnotationAwareAspectJAutoProxyCreator",
+      "sourcePath": "spring-aop/src/main/java/org/springframework/aop/aspectj/annotation/AnnotationAwareAspectJAutoProxyCreator.java"
+    },
+    {
+      "className": "org.springframework.aop.framework.ProxyFactory",
+      "sourcePath": "spring-aop/src/main/java/org/springframework/aop/framework/ProxyFactory.java"
+    },
+    {
+      "className": "org.springframework.aop.framework.DefaultAopProxyFactory",
+      "sourcePath": "spring-aop/src/main/java/org/springframework/aop/framework/DefaultAopProxyFactory.java"
+    },
+    {
+      "className": "org.springframework.aop.framework.JdkDynamicAopProxy",
+      "sourcePath": "spring-aop/src/main/java/org/springframework/aop/framework/JdkDynamicAopProxy.java"
+    },
+    {
+      "className": "org.springframework.aop.framework.CglibAopProxy",
+      "sourcePath": "spring-aop/src/main/java/org/springframework/aop/framework/CglibAopProxy.java"
+    },
+    {
+      "className": "org.springframework.aop.framework.DefaultAdvisorChainFactory",
+      "sourcePath": "spring-aop/src/main/java/org/springframework/aop/framework/DefaultAdvisorChainFactory.java"
+    },
+    {
+      "className": "org.springframework.aop.framework.ReflectiveMethodInvocation",
+      "sourcePath": "spring-aop/src/main/java/org/springframework/aop/framework/ReflectiveMethodInvocation.java"
+    },
+    {
+      "className": "org.springframework.aop.framework.AopContext",
+      "sourcePath": "spring-aop/src/main/java/org/springframework/aop/framework/AopContext.java"
+    },
+    {
+      "className": "org.springframework.aop.framework.adapter.DefaultAdvisorAdapterRegistry",
+      "sourcePath": "spring-aop/src/main/java/org/springframework/aop/framework/adapter/DefaultAdvisorAdapterRegistry.java"
+    },
+    {
+      "className": "org.springframework.aop.support.AopUtils",
+      "sourcePath": "spring-aop/src/main/java/org/springframework/aop/support/AopUtils.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "AbstractAutoProxyCreator.postProcessAfterInitialization(Object,String)",
+      "document": "/spring/aop/proxy-creation",
+      "purpose": "在 Bean 常规初始化完成后进入自动代理包装流程"
+    },
+    {
+      "method": "AbstractAutoProxyCreator.wrapIfNecessary(Object,String,Object)",
+      "document": "/spring/aop/proxy-creation",
+      "purpose": "排除基础设施与跳过项，查找适用 Advisor 并决定是否创建代理"
+    },
+    {
+      "method": "DefaultAopProxyFactory.createAopProxy(AdvisedSupport)",
+      "document": "/spring/aop/proxy-creation",
+      "purpose": "根据接口、proxyTargetClass 与目标类型选择 JDK 或 CGLIB 代理"
+    },
+    {
+      "method": "DefaultAdvisorChainFactory.getInterceptorsAndDynamicInterceptionAdvice(Advised,Method,Class)",
+      "document": "/spring/aop/interceptor-chain",
+      "purpose": "按当前方法筛选 Advisor，并把 Advice 适配为有序 MethodInterceptor 链"
+    },
+    {
+      "method": "ReflectiveMethodInvocation.proceed()",
+      "document": "/spring/aop/interceptor-chain",
+      "purpose": "推进链游标、处理运行时匹配，并在末端调用真实目标方法"
+    },
+    {
+      "method": "AopContext.currentProxy()",
+      "document": "/spring/aop/pointcut-self-invocation",
+      "purpose": "取得当前线程调用栈中显式暴露的代理，演示自调用补救及其边界"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "AbstractAutoProxyCreator.wrapIfNecessary(...)",
+      "scenario": "观察 atlasService 是否命中 Advisor 以及为何创建或跳过代理",
+      "variables": ["beanName", "cacheKey", "beanClass", "advisedBeans", "specificInterceptors"]
+    },
+    {
+      "method": "AbstractAdvisorAutoProxyCreator.findEligibleAdvisors(...)",
+      "scenario": "区分候选 Advisor、适用 Advisor 与最终排序结果",
+      "variables": ["candidateAdvisors", "eligibleAdvisors", "beanClass", "beanName"]
+    },
+    {
+      "method": "DefaultAopProxyFactory.createAopProxy(...)",
+      "scenario": "对照 JDK 动态代理与 CGLIB 子类代理选择条件",
+      "variables": ["config", "targetClass", "proxyTargetClass", "proxiedInterfaces"]
+    },
+    {
+      "method": "JdkDynamicAopProxy.invoke(...)",
+      "scenario": "观察外部接口调用如何取得 target、方法链并创建 MethodInvocation",
+      "variables": ["method", "args", "target", "targetClass", "chain", "oldProxy"]
+    },
+    {
+      "method": "ReflectiveMethodInvocation.proceed()",
+      "scenario": "观察两个具名拦截器进入、目标执行与调用栈逆序回卷",
+      "variables": ["currentInterceptorIndex", "interceptorsAndDynamicMethodMatchers", "method", "arguments"]
+    },
+    {
+      "method": "AopContext.setCurrentProxy(...)",
+      "scenario": "比较 this.inner 与 currentProxy.inner 的代理重入差异",
+      "variables": ["proxy", "old", "currentProxy"]
+    }
+  ]
+}

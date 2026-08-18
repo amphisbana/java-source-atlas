@@ -1,0 +1,132 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-java-util-concurrent-futuretask",
+  "title": "OpenJDK 8 FutureTask 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.concurrent.FutureTaskDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/FutureTaskDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.util.concurrent.FutureTask",
+    "sourcePath": "jdk/src/share/classes/java/util/concurrent/FutureTask.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.util.concurrent.RunnableFuture",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/RunnableFuture.java"
+    },
+    {
+      "className": "java.util.concurrent.AbstractExecutorService",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/AbstractExecutorService.java"
+    },
+    {
+      "className": "java.util.concurrent.ScheduledThreadPoolExecutor",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/ScheduledThreadPoolExecutor.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "run()",
+      "document": "/jdk/concurrent/futuretask/state-machine#run-如何只让一个线程执行-callable",
+      "purpose": "通过 runner CAS 取得一次执行权并发布正常或异常结果"
+    },
+    {
+      "method": "set(V)",
+      "document": "/jdk/concurrent/futuretask/state-machine#set-和-setexception-的两阶段发布",
+      "purpose": "以 COMPLETING 中间态写入正常 outcome 并发布 NORMAL"
+    },
+    {
+      "method": "setException(Throwable)",
+      "document": "/jdk/concurrent/futuretask/state-machine#set-和-setexception-的两阶段发布",
+      "purpose": "保存 Callable 抛出的异常并发布 EXCEPTIONAL"
+    },
+    {
+      "method": "get()",
+      "document": "/jdk/concurrent/futuretask/waiters-cancel#get-先读-state-再决定是否等待",
+      "purpose": "等待终态并按正常、异常或取消语义报告结果"
+    },
+    {
+      "method": "awaitDone(boolean,long)",
+      "document": "/jdk/concurrent/futuretask/waiters-cancel#awaitdone-的完整循环",
+      "purpose": "注册 WaitNode，并处理中断、超时、park 和终态重检"
+    },
+    {
+      "method": "finishCompletion()",
+      "document": "/jdk/concurrent/futuretask/waiters-cancel#finishcompletion-如何逐个唤醒等待者",
+      "purpose": "摘除等待栈、逐个 unpark、调用 done 并清理 callable"
+    },
+    {
+      "method": "removeWaiter(WaitNode)",
+      "document": "/jdk/concurrent/futuretask/waiters-cancel#removewaiter-如何清理退出节点",
+      "purpose": "清理因中断或超时退出的等待节点"
+    },
+    {
+      "method": "cancel(boolean)",
+      "document": "/jdk/concurrent/futuretask/waiters-cancel#cancel-false-和-cancel-true-的准确边界",
+      "purpose": "区分直接取消与尝试中断 runner 的两条状态路径"
+    },
+    {
+      "method": "handlePossibleCancellationInterrupt(int)",
+      "document": "/jdk/concurrent/futuretask/waiters-cancel#handlepossiblecancellationinterrupt-防止什么",
+      "purpose": "等待 INTERRUPTING 结束，关闭迟到中断泄漏窗口"
+    },
+    {
+      "method": "done()",
+      "document": "/jdk/concurrent/futuretask/state-machine#done-钩子的时序与约束",
+      "purpose": "在终态发布和等待者唤醒后执行子类完成回调"
+    },
+    {
+      "method": "runAndReset()",
+      "document": "/jdk/concurrent/futuretask/state-machine#runandreset-为何成功后仍是-new",
+      "purpose": "运行 Callable 但不发布正常结果，为周期任务保留 NEW 状态"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "run()",
+      "scenario": "两个线程同时调用 run，观察一次执行权和取消二次检查",
+      "variables": ["state", "runner", "c", "ran", "result"]
+    },
+    {
+      "method": "set(V)",
+      "scenario": "跟踪正常结果的两阶段发布",
+      "variables": ["state", "outcome", "v", "waiters"]
+    },
+    {
+      "method": "setException(Throwable)",
+      "scenario": "让 Callable 抛异常并观察异常结果发布",
+      "variables": ["state", "outcome", "t"]
+    },
+    {
+      "method": "awaitDone(boolean,long)",
+      "scenario": "两个 get 等待者分别创建节点并 park",
+      "variables": ["timed", "nanos", "q", "queued", "state", "waiters"]
+    },
+    {
+      "method": "finishCompletion()",
+      "scenario": "正常完成或取消后摘除整栈并逐个唤醒等待者",
+      "variables": ["q", "q.thread", "q.next", "waiters"]
+    },
+    {
+      "method": "removeWaiter(WaitNode)",
+      "scenario": "定时 get 超时后清理失效节点",
+      "variables": ["node", "pred", "q", "s", "waiters"]
+    },
+    {
+      "method": "cancel(boolean)",
+      "scenario": "比较 cancel false 与 cancel true 对运行中任务的影响",
+      "variables": ["mayInterruptIfRunning", "state", "runner", "t"]
+    },
+    {
+      "method": "runAndReset()",
+      "scenario": "周期式运行成功后保留 NEW，并在异常或取消时结束",
+      "variables": ["state", "runner", "ran", "s"]
+    }
+  ]
+}

@@ -1,0 +1,151 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-java-util-concurrent-forkjoinpool",
+  "title": "OpenJDK 8 ForkJoinPool 与 ForkJoinTask 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.concurrent.ForkJoinPoolDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/ForkJoinPoolDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.util.concurrent.ForkJoinPool",
+    "sourcePath": "jdk/src/share/classes/java/util/concurrent/ForkJoinPool.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.util.concurrent.ForkJoinTask",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/ForkJoinTask.java"
+    },
+    {
+      "className": "java.util.concurrent.ForkJoinWorkerThread",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/ForkJoinWorkerThread.java"
+    },
+    {
+      "className": "java.util.concurrent.RecursiveTask",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/RecursiveTask.java"
+    },
+    {
+      "className": "java.util.concurrent.CountedCompleter",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/CountedCompleter.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "ForkJoinPool.externalPush(ForkJoinTask)",
+      "document": "/jdk/concurrent/forkjoinpool/#外部提交与任务内部-fork-不是同一路径",
+      "purpose": "把普通线程提交的根任务放入共享 submission WorkQueue"
+    },
+    {
+      "method": "ForkJoinPool.WorkQueue.push(ForkJoinTask)",
+      "document": "/jdk/concurrent/forkjoinpool/workqueue-steal#owner-push-到-top",
+      "purpose": "owner 在 top 端发布新 fork 的本地任务"
+    },
+    {
+      "method": "ForkJoinPool.WorkQueue.pop()",
+      "document": "/jdk/concurrent/forkjoinpool/workqueue-steal#默认-owner-从-top-弹出",
+      "purpose": "默认模式下 owner 从 top 减一位置 LIFO 取得任务"
+    },
+    {
+      "method": "ForkJoinPool.WorkQueue.pollAt(int)",
+      "document": "/jdk/concurrent/forkjoinpool/workqueue-steal#stealer-从-base-窃取",
+      "purpose": "stealer 竞争 victim 的 base 槽位并推进 base"
+    },
+    {
+      "method": "ForkJoinTask.fork()",
+      "document": "/jdk/concurrent/forkjoinpool/fork-join#fork-只负责安排-不等待",
+      "purpose": "根据当前线程选择本地 WorkQueue 或 commonPool 外部提交"
+    },
+    {
+      "method": "ForkJoinTask.doExec()",
+      "document": "/jdk/concurrent/forkjoinpool/fork-join#doexec-如何提交完成状态",
+      "purpose": "调用任务 exec 并提交正常或异常终态"
+    },
+    {
+      "method": "ForkJoinTask.doJoin()",
+      "document": "/jdk/concurrent/forkjoinpool/fork-join#dojoin-的完整决策",
+      "purpose": "优先本地撤回执行，再进入 pool 帮助和等待路径"
+    },
+    {
+      "method": "ForkJoinPool.awaitJoin(WorkQueue,ForkJoinTask,long)",
+      "document": "/jdk/concurrent/forkjoinpool/fork-join#awaitjoin-如何先帮助再阻塞",
+      "purpose": "记录 currentJoin，帮助目标完成并在必要时补偿后等待"
+    },
+    {
+      "method": "ForkJoinPool.helpStealer(WorkQueue,ForkJoinTask)",
+      "document": "/jdk/concurrent/forkjoinpool/fork-join#awaitjoin-如何先帮助再阻塞",
+      "purpose": "沿 currentSteal 和 currentJoin 查找并执行目标后代工作"
+    },
+    {
+      "method": "ForkJoinPool.managedBlock(ManagedBlocker)",
+      "document": "/jdk/concurrent/forkjoinpool/managed-blocking#managedblock-的公开循环",
+      "purpose": "在可能阻塞前让 pool 获得补偿机会并反复执行 blocker 协议"
+    },
+    {
+      "method": "ForkJoinPool.tryCompensate(WorkQueue)",
+      "document": "/jdk/concurrent/forkjoinpool/managed-blocking#jdk-8-trycompensate-做什么",
+      "purpose": "选择唤醒空闲 worker、调整活跃计数或创建补偿 worker"
+    },
+    {
+      "method": "ForkJoinPool.commonPool()",
+      "document": "/jdk/concurrent/forkjoinpool/#commonpool-的边界",
+      "purpose": "返回进程级共享 ForkJoinPool"
+    },
+    {
+      "method": "ForkJoinPool.getAsyncMode()",
+      "document": "/jdk/concurrent/forkjoinpool/#asyncmode-改变什么",
+      "purpose": "查询 worker 是否使用本地 FIFO 调度模式"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "ForkJoinPool.externalPush(ForkJoinTask)",
+      "scenario": "从普通线程向自建 pool 提交根任务",
+      "variables": ["task", "r", "q", "q.base", "q.top"]
+    },
+    {
+      "method": "ForkJoinPool.WorkQueue.push(ForkJoinTask)",
+      "scenario": "worker 在 compute 中 fork 右侧子任务",
+      "variables": ["base", "top", "array", "task", "n"]
+    },
+    {
+      "method": "ForkJoinPool.WorkQueue.pop()",
+      "scenario": "默认模式 owner 从 top 取得最新任务",
+      "variables": ["s", "base", "top", "j", "t"]
+    },
+    {
+      "method": "ForkJoinPool.WorkQueue.pollAt(int)",
+      "scenario": "空闲 worker 从 victim base 窃取任务",
+      "variables": ["b", "base", "top", "j", "t", "CAS result"]
+    },
+    {
+      "method": "ForkJoinTask.doJoin()",
+      "scenario": "分别观察本地 tryUnpush 成功和目标已被窃取两条路径",
+      "variables": ["status", "w", "tryUnpush result", "s"]
+    },
+    {
+      "method": "ForkJoinPool.helpStealer(WorkQueue,ForkJoinTask)",
+      "scenario": "joiner 沿依赖链帮助执行被窃取目标的后代",
+      "variables": ["task", "subtask", "j.currentJoin", "v.currentSteal", "v.base", "v.top"]
+    },
+    {
+      "method": "ForkJoinTask.doExec()",
+      "scenario": "正常 RecursiveTask 与抛异常任务分别提交终态",
+      "variables": ["status", "completed", "rex"]
+    },
+    {
+      "method": "ForkJoinPool.managedBlock(ManagedBlocker)",
+      "scenario": "parallelism 一的 worker 进入受控阻塞",
+      "variables": ["t", "p", "w", "blocker.isReleasable()"]
+    },
+    {
+      "method": "ForkJoinPool.tryCompensate(WorkQueue)",
+      "scenario": "观察阻塞前选择唤醒、减活跃计数或创建 worker",
+      "variables": ["ctl", "pc", "ac", "tc", "sp", "canBlock"]
+    }
+  ]
+}

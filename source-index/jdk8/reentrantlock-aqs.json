@@ -1,0 +1,171 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-reentrantlock-aqs",
+  "title": "OpenJDK 8 AQS 与 ReentrantLock 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.lock.ReentrantLockDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/lock/ReentrantLockDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.util.concurrent.locks.AbstractQueuedSynchronizer",
+    "sourcePath": "jdk/src/share/classes/java/util/concurrent/locks/AbstractQueuedSynchronizer.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.util.concurrent.locks.ReentrantLock",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/locks/ReentrantLock.java"
+    },
+    {
+      "className": "java.util.concurrent.CountDownLatch",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/CountDownLatch.java"
+    },
+    {
+      "className": "java.util.concurrent.Semaphore",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/Semaphore.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "ReentrantLock.lock()",
+      "document": "/jdk/concurrent/locks/#非公平锁路径",
+      "purpose": "公平或非公平同步器的公开入口"
+    },
+    {
+      "method": "ReentrantLock.FairSync.tryAcquire(int)",
+      "document": "/jdk/concurrent/locks/#公平锁路径",
+      "purpose": "锁空闲时先检查 hasQueuedPredecessors，再决定是否按队列顺序获取"
+    },
+    {
+      "method": "AbstractQueuedSynchronizer.acquire(int)",
+      "document": "/jdk/concurrent/locks/aqs#acquire-的短路径与慢路径",
+      "purpose": "独占尝试失败后的入队和等待"
+    },
+    {
+      "method": "addWaiter(Node)",
+      "document": "/jdk/concurrent/locks/aqs#addwaiter-与-enq",
+      "purpose": "同步队列快速尾插"
+    },
+    {
+      "method": "acquireQueued(Node,int)",
+      "document": "/jdk/concurrent/locks/aqs#acquire-的短路径与慢路径",
+      "purpose": "队首后继重试、阻塞与中断记录"
+    },
+    {
+      "method": "release(int)",
+      "document": "/jdk/concurrent/locks/aqs#release-流程",
+      "purpose": "完全释放后唤醒有效后继"
+    },
+    {
+      "method": "AbstractQueuedSynchronizer.acquireShared(int)",
+      "document": "/jdk/concurrent/locks/aqs#tryacquireshared-返回值是传播协议",
+      "purpose": "解释共享尝试返回值的符号，并在失败时进入共享慢路径"
+    },
+    {
+      "method": "doAcquireShared(int)",
+      "document": "/jdk/concurrent/locks/aqs#doacquireshared-怎样进入共享队列",
+      "purpose": "以 SHARED 节点入队、park，并在队首后继位置重试共享获取"
+    },
+    {
+      "method": "setHeadAndPropagate(Node,int)",
+      "document": "/jdk/concurrent/locks/aqs#setheadandpropagate-为什么要保守传播",
+      "purpose": "推进 head，并根据资源提示和前后 head 状态继续共享传播"
+    },
+    {
+      "method": "AbstractQueuedSynchronizer.releaseShared(int)",
+      "document": "/jdk/concurrent/locks/aqs#releaseshared-与-doreleaseshared",
+      "purpose": "在同步器确认状态允许传播后进入共享释放循环"
+    },
+    {
+      "method": "doReleaseShared()",
+      "document": "/jdk/concurrent/locks/aqs#releaseshared-与-doreleaseshared",
+      "purpose": "处理 head 的 SIGNAL 或 PROPAGATE，并在 head 改变时继续复查"
+    },
+    {
+      "method": "CountDownLatch.Sync.tryAcquireShared(int)",
+      "document": "/jdk/concurrent/locks/aqs#countdownlatch-怎样把-count-映射到-state",
+      "purpose": "仅在 count 已归零时返回共享获取成功"
+    },
+    {
+      "method": "CountDownLatch.Sync.tryReleaseShared(int)",
+      "document": "/jdk/concurrent/locks/aqs#countdownlatch-怎样把-count-映射到-state",
+      "purpose": "原子递减 count，并且只在本次归零时启动共享传播"
+    },
+    {
+      "method": "Semaphore.Sync.nonfairTryAcquireShared(int)",
+      "document": "/jdk/concurrent/locks/aqs#semaphore-怎样把许可数映射到-state",
+      "purpose": "原子扣减许可，并用 remaining 的符号表达成功与传播可能"
+    },
+    {
+      "method": "Semaphore.Sync.tryReleaseShared(int)",
+      "document": "/jdk/concurrent/locks/aqs#semaphore-怎样把许可数映射到-state",
+      "purpose": "原子增加许可并触发共享释放"
+    },
+    {
+      "method": "ConditionObject.await()",
+      "document": "/jdk/concurrent/locks/condition#await-的完整流程",
+      "purpose": "进入条件队列、完全释放并重新获取"
+    },
+    {
+      "method": "transferForSignal(Node)",
+      "document": "/jdk/concurrent/locks/condition#signal-的转移流程",
+      "purpose": "把条件节点转入同步队列"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "NonfairSync.lock()",
+      "sourceClass": "java.util.concurrent.locks.ReentrantLock",
+      "scenario": "观察非公平快速 CAS",
+      "variables": ["state", "exclusiveOwnerThread"]
+    },
+    {
+      "method": "FairSync.tryAcquire(int)",
+      "sourceClass": "java.util.concurrent.locks.ReentrantLock",
+      "scenario": "让 first 和 second 真实入队，观察公平锁的队列前驱判断",
+      "variables": ["c", "current", "hasQueuedPredecessors()"]
+    },
+    {
+      "method": "acquireQueued(Node,int)",
+      "scenario": "观察前驱检查、park 和唤醒重试",
+      "variables": ["node", "p", "head", "failed", "interrupted"]
+    },
+    {
+      "method": "ConditionObject.await()",
+      "scenario": "观察条件等待和重入状态恢复",
+      "variables": ["node", "savedState", "interruptMode", "firstWaiter"]
+    },
+    {
+      "method": "doAcquireShared(int)",
+      "scenario": "观察 CountDownLatch 或 Semaphore 等待者以 SHARED 节点排队",
+      "variables": ["node", "p", "r", "interrupted"]
+    },
+    {
+      "method": "setHeadAndPropagate(Node,int)",
+      "scenario": "观察共享节点成功后推进 head 并决定是否继续传播",
+      "variables": ["node", "propagate", "h", "s"]
+    },
+    {
+      "method": "doReleaseShared()",
+      "scenario": "观察 SIGNAL 清零、PROPAGATE 设置与 head 改变后的循环",
+      "variables": ["h", "ws", "head", "tail"]
+    },
+    {
+      "method": "Sync.tryReleaseShared(int)",
+      "sourceClass": "java.util.concurrent.CountDownLatch",
+      "scenario": "观察第一次 countDown 返回 false、第二次归零返回 true",
+      "variables": ["c", "nextc", "state"]
+    },
+    {
+      "method": "Sync.nonfairTryAcquireShared(int)",
+      "sourceClass": "java.util.concurrent.Semaphore",
+      "scenario": "一次 release 两个许可后观察等待者依次扣减许可",
+      "variables": ["available", "remaining", "acquires"]
+    }
+  ]
+}

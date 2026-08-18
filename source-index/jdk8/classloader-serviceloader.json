@@ -1,0 +1,180 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-classloader-serviceloader",
+  "title": "OpenJDK 8 ClassLoader 与 ServiceLoader 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.runtime.ClassLoaderServiceLoaderDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/runtime/ClassLoaderServiceLoaderDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.lang.ClassLoader",
+    "sourcePath": "jdk/src/share/classes/java/lang/ClassLoader.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.lang.Class",
+      "sourcePath": "jdk/src/share/classes/java/lang/Class.java"
+    },
+    {
+      "className": "java.net.URLClassLoader",
+      "sourcePath": "jdk/src/share/classes/java/net/URLClassLoader.java"
+    },
+    {
+      "className": "java.util.ServiceLoader",
+      "sourcePath": "jdk/src/share/classes/java/util/ServiceLoader.java"
+    },
+    {
+      "className": "java.lang.Thread",
+      "sourcePath": "jdk/src/share/classes/java/lang/Thread.java"
+    },
+    {
+      "className": "sun.misc.Launcher",
+      "sourcePath": "jdk/src/share/classes/sun/misc/Launcher.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "ClassLoader.loadClass(String,boolean)",
+      "document": "/jdk/runtime/classloader/loading-delegation#loadclass-的四段决策",
+      "purpose": "在类名加载锁内依次执行已加载检查、父委派、本地查找和可选解析"
+    },
+    {
+      "method": "ClassLoader.getClassLoadingLock(String)",
+      "document": "/jdk/runtime/classloader/loading-delegation#getclassloadinglock-保护什么",
+      "purpose": "为同名定义竞争提供加载锁，并允许正确注册的并行加载器按名称拆分锁"
+    },
+    {
+      "method": "ClassLoader.findLoadedClass(String)",
+      "document": "/jdk/runtime/classloader/loading-delegation#第一步为什么先-findloadedclass",
+      "purpose": "查询 JVM 是否已把当前 loader 记录为该 Class 的 initiating loader；返回 Class 的 defining loader 可能不同"
+    },
+    {
+      "method": "ClassLoader.findClass(String)",
+      "document": "/jdk/runtime/classloader/loading-delegation#findclass-才是推荐的扩展点",
+      "purpose": "在父链无法定义目标后，由子类实现本地字节来源查找"
+    },
+    {
+      "method": "ClassLoader.defineClass(String,byte[],int,int,ProtectionDomain)",
+      "document": "/jdk/runtime/classloader/loading-delegation#defineclass-的输入不是普通数据",
+      "purpose": "校验 class 字节并把新类型永久关联到当前定义加载器"
+    },
+    {
+      "method": "ClassLoader.resolveClass(Class)",
+      "document": "/jdk/runtime/classloader/loading-delegation#resolveclass-不执行-static-块",
+      "purpose": "请求链接已加载 Class，但不执行类初始化器"
+    },
+    {
+      "method": "ClassLoader.getResource(String)",
+      "document": "/jdk/runtime/classloader/loading-delegation#类查找和资源查找不能完全类比",
+      "purpose": "按父层优先的资源协议返回第一个可见 URL"
+    },
+    {
+      "method": "ClassLoader.getResources(String)",
+      "document": "/jdk/runtime/classloader/loading-delegation#类查找和资源查找不能完全类比",
+      "purpose": "合并父层与本地查找结果，枚举全部同名资源"
+    },
+    {
+      "method": "URLClassLoader.getAndVerifyPackage(String,Manifest,URL)",
+      "document": "/jdk/runtime/classloader/loading-delegation#sealing-校验不在通用-defineclass-里完成",
+      "purpose": "在读取 JAR Manifest 与 CodeSource 后校验 package seal base，边界早于通用 defineClass"
+    },
+    {
+      "method": "Class.forName(String,boolean,ClassLoader)",
+      "document": "/jdk/runtime/classloader/#先分清五个动作",
+      "purpose": "显式控制取得 Class 时是否请求初始化"
+    },
+    {
+      "method": "ServiceLoader.load(Class)",
+      "document": "/jdk/runtime/classloader/serviceloader-spi#load-为什么先保存-loader",
+      "purpose": "使用当前线程 contextClassLoader 创建惰性服务发现器"
+    },
+    {
+      "method": "ServiceLoader.reload()",
+      "document": "/jdk/runtime/classloader/serviceloader-spi#reload-清理什么",
+      "purpose": "清空当前发现器的 provider 实例缓存并重置查找游标"
+    },
+    {
+      "method": "ServiceLoader.iterator()",
+      "document": "/jdk/runtime/classloader/serviceloader-spi#iterator-如何先读缓存再继续发现",
+      "purpose": "先返回已缓存实例，再由共享 LazyIterator 继续惰性发现"
+    },
+    {
+      "method": "ServiceLoader.LazyIterator.hasNextService()",
+      "document": "/jdk/runtime/classloader/serviceloader-spi#hasnextservice-怎样枚举配置",
+      "purpose": "枚举 META-INF/services 配置 URL 并逐步取得未返回的 provider 名称"
+    },
+    {
+      "method": "ServiceLoader.parse(Class,URL)",
+      "document": "/jdk/runtime/classloader/serviceloader-spi#hasnextservice-怎样枚举配置",
+      "purpose": "以 UTF-8 解析 provider 名称、注释和重复项"
+    },
+    {
+      "method": "ServiceLoader.LazyIterator.nextService()",
+      "document": "/jdk/runtime/classloader/serviceloader-spi#nextservice-在哪里创建-provider",
+      "purpose": "加载 provider Class、校验可赋值性、构造实例并写入缓存"
+    },
+    {
+      "method": "ServiceLoader.loadInstalled(Class)",
+      "document": "/jdk/runtime/classloader/context-module#loadinstalled-的版本语义",
+      "purpose": "在 JDK 8 扩展层或新版平台加载器范围中发现已安装 provider"
+    },
+    {
+      "method": "Thread.getContextClassLoader/setContextClassLoader",
+      "document": "/jdk/runtime/classloader/context-module#tccl-如何反转可见方向",
+      "purpose": "为父层框架显式提供当前调用环境的类与资源可见范围"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "ClassLoader.loadClass(String,boolean)",
+      "scenario": "子加载器先请求父层已有实验类，再请求一个父层不存在的名称",
+      "variables": ["this", "name", "resolve", "parent", "c", "getClassLoadingLock(name)"]
+    },
+    {
+      "method": "ClassLoader.findLoadedClass(String)",
+      "scenario": "隔离加载器定义 LoaderInitiatingFixture 并在父类解析中委派 bootstrap ArrayList",
+      "variables": ["name", "返回 Class", "返回 Class.getClassLoader()", "当前 loader 是否等于 defining loader"]
+    },
+    {
+      "method": "ClassLoader.defineClass(String,byte[],int,int,ProtectionDomain)",
+      "scenario": "两个隔离加载器各自定义同一份 LoaderIdentityFixture 字节",
+      "variables": ["this", "name", "b", "off", "len", "protectionDomain", "c"]
+    },
+    {
+      "method": "Class.forName(String,boolean,ClassLoader)",
+      "scenario": "先以 initialize=false 加载探针，再以 true 触发 static 初始化",
+      "variables": ["className", "initialize", "loader", "初始化标记"]
+    },
+    {
+      "method": "ServiceLoader.load(Class)",
+      "scenario": "切换当前线程 TCCL 后使用默认入口发现 GreetingService",
+      "variables": ["service", "Thread.currentThread().getContextClassLoader()", "configured loader"]
+    },
+    {
+      "method": "ServiceLoader.LazyIterator.hasNextService()",
+      "scenario": "首次迭代包含重复 provider 名称的教学 SPI 配置",
+      "variables": ["fullName", "configs", "pending", "nextName", "returned provider names"]
+    },
+    {
+      "method": "ServiceLoader.parseLine(Class<?>,URL,BufferedReader,int,List<String>)",
+      "scenario": "解析注释、重复 Alpha 和 Beta provider 行",
+      "variables": ["service", "u", "lc", "ln", "names", "providers.containsKey(ln)"]
+    },
+    {
+      "method": "ServiceLoader.LazyIterator.nextService()",
+      "scenario": "第一次 next 创建 AlphaGreetingService 并写入实例缓存",
+      "variables": ["cn", "c", "service", "loader", "provider instance", "providers"]
+    },
+    {
+      "method": "ServiceLoader.reload()",
+      "scenario": "已有 Alpha 和 Beta 缓存后 reload，再推进新 iterator",
+      "variables": ["providers", "lookupIterator", "reload 前实例", "reload 后实例"]
+    }
+  ]
+}

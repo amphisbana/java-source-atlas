@@ -1,0 +1,172 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-java-util-concurrent-threadpoolexecutor",
+  "title": "OpenJDK 8 ThreadPoolExecutor 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.concurrent.ThreadPoolExecutorDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/ThreadPoolExecutorDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.util.concurrent.ThreadPoolExecutor",
+    "sourcePath": "jdk/src/share/classes/java/util/concurrent/ThreadPoolExecutor.java"
+  },
+  "entryPoints": [
+    {
+      "method": "runStateOf(int)",
+      "document": "/jdk/concurrent/threadpoolexecutor/#生命周期状态",
+      "purpose": "从 ctl 高 3 位解出线程池运行状态"
+    },
+    {
+      "method": "workerCountOf(int)",
+      "document": "/jdk/concurrent/threadpoolexecutor/#ctl-为什么合并两个状态",
+      "purpose": "从 ctl 低 29 位解出工作线程数量"
+    },
+    {
+      "method": "ctlOf(int,int)",
+      "document": "/jdk/concurrent/threadpoolexecutor/#ctl-为什么合并两个状态",
+      "purpose": "把 runState 与 workerCount 组合成单个原子快照"
+    },
+    {
+      "method": "execute(Runnable)",
+      "document": "/jdk/concurrent/threadpoolexecutor/#execute-的三步决策",
+      "purpose": "建核心线程、入队复查、扩线程和拒绝的入口"
+    },
+    {
+      "method": "remove(Runnable)",
+      "document": "/jdk/concurrent/threadpoolexecutor/#offer-成功后为什么必须二次检查",
+      "purpose": "关闭并发窗口中移除刚入队任务并重新检查终止条件"
+    },
+    {
+      "method": "addWorker(Runnable,boolean)",
+      "document": "/jdk/concurrent/threadpoolexecutor/worker#addworker-的双层检查",
+      "purpose": "预占 workerCount，并在双层状态检查后创建启动线程"
+    },
+    {
+      "method": "Worker.tryAcquire(int)",
+      "document": "/jdk/concurrent/threadpoolexecutor/worker#worker-为什么继承-aqs",
+      "purpose": "以不可重入 AQS 锁区分空闲和任务执行中的 Worker"
+    },
+    {
+      "method": "runWorker(Worker)",
+      "document": "/jdk/concurrent/threadpoolexecutor/worker#runworker-主循环",
+      "purpose": "持有 Worker 锁运行任务，并调用模板钩子和处理异常"
+    },
+    {
+      "method": "getTask()",
+      "document": "/jdk/concurrent/threadpoolexecutor/worker#gettask-如何决定回收线程",
+      "purpose": "根据状态、超时配置和队列决定阻塞获取或回收 Worker"
+    },
+    {
+      "method": "processWorkerExit(Worker,boolean)",
+      "document": "/jdk/concurrent/threadpoolexecutor/worker#processworkerexit",
+      "purpose": "清理退出 Worker，并在异常退出或队列非空时补充线程"
+    },
+    {
+      "method": "allowCoreThreadTimeOut(boolean)",
+      "document": "/jdk/concurrent/threadpoolexecutor/worker#gettask-如何决定回收线程",
+      "purpose": "切换核心 Worker 的定时等待和回收策略"
+    },
+    {
+      "method": "interruptIdleWorkers(boolean)",
+      "document": "/jdk/concurrent/threadpoolexecutor/shutdown-reject#shutdown-是有序关闭",
+      "purpose": "借助 Worker.tryLock 只中断空闲工作线程"
+    },
+    {
+      "method": "shutdown()",
+      "document": "/jdk/concurrent/threadpoolexecutor/shutdown-reject#shutdown-是有序关闭",
+      "purpose": "推进到 SHUTDOWN 并继续排空关闭前任务"
+    },
+    {
+      "method": "shutdownNow()",
+      "document": "/jdk/concurrent/threadpoolexecutor/shutdown-reject#shutdownnow-是尽力停止",
+      "purpose": "推进到 STOP、中断所有 Worker 并排出等待任务"
+    },
+    {
+      "method": "tryTerminate()",
+      "document": "/jdk/concurrent/threadpoolexecutor/shutdown-reject#tryterminate-如何收口",
+      "purpose": "从 SHUTDOWN 或 STOP 推进到 TIDYING 与 TERMINATED"
+    },
+    {
+      "method": "beforeExecute(Thread,Runnable)",
+      "document": "/jdk/concurrent/threadpoolexecutor/worker#execute-与-submit-的异常差异",
+      "purpose": "任务运行前的模板扩展点"
+    },
+    {
+      "method": "afterExecute(Runnable,Throwable)",
+      "document": "/jdk/concurrent/threadpoolexecutor/worker#execute-与-submit-的异常差异",
+      "purpose": "观察直接任务异常，并按需解包 FutureTask 内部异常"
+    },
+    {
+      "method": "terminated()",
+      "document": "/jdk/concurrent/threadpoolexecutor/worker#terminated-钩子的边界",
+      "purpose": "TIDYING 单一获胜线程执行的最终模板钩子"
+    },
+    {
+      "method": "reject(Runnable)",
+      "document": "/jdk/concurrent/threadpoolexecutor/shutdown-reject#四种内置拒绝策略",
+      "purpose": "把饱和或关闭后的任务交给 RejectedExecutionHandler"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "execute(Runnable)",
+      "scenario": "观察三步提交决策和 offer 后状态复查",
+      "variables": ["c", "recheck", "command", "workQueue"]
+    },
+    {
+      "method": "addWorker(Runnable,boolean)",
+      "scenario": "观察 worker 数量预占、状态双检和启动回滚",
+      "variables": ["rs", "wc", "core", "workerAdded", "workerStarted"]
+    },
+    {
+      "method": "runWorker(Worker)",
+      "scenario": "观察 Worker 锁、中断复查、模板钩子与异常退出",
+      "variables": ["task", "thrown", "completedAbruptly", "w.completedTasks"]
+    },
+    {
+      "method": "getTask()",
+      "scenario": "观察核心超时和正常 Worker 回收",
+      "variables": ["c", "rs", "wc", "timed", "timedOut"]
+    },
+    {
+      "method": "processWorkerExit(Worker,boolean)",
+      "scenario": "观察 execute 异常后的 Worker 替补",
+      "variables": ["completedAbruptly", "c", "min", "workQueue"]
+    },
+    {
+      "method": "interruptIdleWorkers(boolean)",
+      "scenario": "对比空闲 Worker 与持锁活跃 Worker 的中断结果",
+      "variables": ["onlyOne", "w", "t", "t.isInterrupted()"]
+    },
+    {
+      "method": "afterExecute(Runnable,Throwable)",
+      "scenario": "对比 execute 与 submit 任务失败时的 Throwable 参数",
+      "variables": ["r", "t", "r instanceof Future"]
+    },
+    {
+      "method": "tryTerminate()",
+      "scenario": "观察 ctl 从关闭状态收口到 TERMINATED",
+      "variables": ["c", "workerCountOf(c)", "workQueue", "termination"]
+    },
+    {
+      "method": "BlockingAfterOfferQueue.offer(Runnable)",
+      "document": "/jdk/concurrent/threadpoolexecutor/debug-lab#实验四offer-后-shutdown-的复查回滚",
+      "scenario": "在 Lab 中稳定暂停 offer 返回并插入 shutdown",
+      "variables": ["accepted", "offered", "continueOffer"],
+      "sourceClass": null
+    },
+    {
+      "method": "HookTrackingExecutor.afterExecute(Runnable,Throwable)",
+      "document": "/jdk/concurrent/threadpoolexecutor/debug-lab#实验七三个生命周期钩子与-submit-异常",
+      "scenario": "在 Lab 中解包 FutureTask 保存的业务异常",
+      "variables": ["runnable", "throwable", "futureFailure"],
+      "sourceClass": null
+    }
+  ]
+}

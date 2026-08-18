@@ -1,0 +1,100 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-jmm-volatile-final",
+  "title": "JMM、volatile、final 与 VarHandle 内存语义",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.concurrent.JmmVolatileDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/JmmVolatileDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.lang.Thread",
+    "sourcePath": "jdk/src/share/classes/java/lang/Thread.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.util.concurrent.atomic.AtomicInteger",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/atomic/AtomicInteger.java"
+    },
+    {
+      "className": "java.util.concurrent.FutureTask",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/FutureTask.java"
+    },
+    {
+      "className": "java.util.concurrent.CopyOnWriteArrayList",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/CopyOnWriteArrayList.java"
+    },
+    {
+      "className": "sun.misc.Unsafe",
+      "sourcePath": "jdk/src/share/classes/sun/misc/Unsafe.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "Thread.start()",
+      "document": "/jdk/concurrent/jmm/happens-before#start-与-join-是两条方向相反的边",
+      "purpose": "把调用 start 之前的动作发布给被启动线程中的全部动作"
+    },
+    {
+      "method": "Thread.join(long)",
+      "document": "/jdk/concurrent/jmm/happens-before#start-与-join-是两条方向相反的边",
+      "purpose": "在检测到目标线程终止后读取其终止前发布的普通结果"
+    },
+    {
+      "method": "AtomicInteger.compareAndSet(int,int)",
+      "document": "/jdk/concurrent/jmm/volatile-final#volatile-的精确能力",
+      "purpose": "对比 volatile 单次访问与 CAS 读改写的原子性边界",
+      "sourceClass": "java.util.concurrent.atomic.AtomicInteger"
+    },
+    {
+      "method": "FutureTask.set(V)",
+      "document": "/jdk/concurrent/jmm/volatile-final#volatile-引用发布的是之前的状态",
+      "purpose": "观察普通 outcome 如何先写入，再通过 volatile state 终态发布",
+      "sourceClass": "java.util.concurrent.FutureTask"
+    },
+    {
+      "method": "CopyOnWriteArrayList.setArray(Object[])",
+      "document": "/jdk/concurrent/jmm/volatile-final#volatile-引用发布的是之前的状态",
+      "purpose": "观察 volatile 数组引用如何发布整份构造完成的新快照",
+      "sourceClass": "java.util.concurrent.CopyOnWriteArrayList"
+    },
+    {
+      "method": "Unsafe.putOrderedObject(Object,long,Object)",
+      "document": "/jdk/concurrent/jmm/varhandle-version#jdk-8-为什么大量出现-unsafe",
+      "purpose": "定位 JDK 8 release 风格 ordered 写的内部 VM 边界",
+      "sourceClass": "sun.misc.Unsafe"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "JmmVolatileDebugLab.observeVolatilePublication()",
+      "scenario": "先写普通 payload，再写 volatile ready，读取方观察到 ready 后读取 payload",
+      "variables": ["state.payload", "state.ready", "observedPayload"]
+    },
+    {
+      "method": "JmmVolatileDebugLab.observeControlledLostUpdate()",
+      "scenario": "两个线程在写回前读取相同 volatile 旧值，稳定复现丢失更新",
+      "variables": ["counter.value", "snapshotsRead", "writeBack", "snapshot"]
+    },
+    {
+      "method": "JmmVolatileDebugLab.observeStartAndJoinBoundaries()",
+      "scenario": "在 start 前写配置，在线程内写结果，并在 join 返回后读取",
+      "variables": ["configuration", "result", "worker.getState()"]
+    },
+    {
+      "method": "JmmVolatileDebugLab.observeFinalSnapshot()",
+      "scenario": "构造不可变对象后通过 Thread.start 安全发布",
+      "variables": ["snapshot.name", "snapshot.value", "observed"]
+    },
+    {
+      "method": "JmmVolatileDebugLab.observeVarHandleAvailability()",
+      "scenario": "分别在 Java 8 与 Java 17 运行同一 Lab，观察 VarHandle API 可用性",
+      "variables": ["java.specification.version", "available"]
+    }
+  ]
+}

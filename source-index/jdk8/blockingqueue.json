@@ -1,0 +1,142 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-java-util-concurrent-blockingqueue",
+  "title": "OpenJDK 8 BlockingQueue、ArrayBlockingQueue、LinkedBlockingQueue 与 SynchronousQueue 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.concurrent.BlockingQueueDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/BlockingQueueDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.util.concurrent.BlockingQueue",
+    "sourcePath": "jdk/src/share/classes/java/util/concurrent/BlockingQueue.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.util.concurrent.ArrayBlockingQueue",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/ArrayBlockingQueue.java"
+    },
+    {
+      "className": "java.util.concurrent.LinkedBlockingQueue",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/LinkedBlockingQueue.java"
+    },
+    {
+      "className": "java.util.concurrent.SynchronousQueue",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/SynchronousQueue.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "BlockingQueue.put(E)",
+      "document": "/jdk/concurrent/blockingqueue/#四组方法如何选择",
+      "purpose": "队列已满时可中断地等待空间"
+    },
+    {
+      "method": "BlockingQueue.take()",
+      "document": "/jdk/concurrent/blockingqueue/#四组方法如何选择",
+      "purpose": "队列为空时可中断地等待元素"
+    },
+    {
+      "method": "ArrayBlockingQueue.put(E)",
+      "document": "/jdk/concurrent/blockingqueue/array-linked#arrayblockingqueue-put-的等待路径",
+      "purpose": "在单一主锁下检查满条件并进入 notFull 条件队列"
+    },
+    {
+      "method": "ArrayBlockingQueue.take()",
+      "document": "/jdk/concurrent/blockingqueue/array-linked#arrayblockingqueue-take-的释放路径",
+      "purpose": "在单一主锁下检查空条件并移除队首"
+    },
+    {
+      "method": "ArrayBlockingQueue.enqueue(E)",
+      "document": "/jdk/concurrent/blockingqueue/array-linked#arrayblockingqueue-put-的等待路径",
+      "purpose": "写入 putIndex、环形前进、增加 count 并通知 notEmpty"
+    },
+    {
+      "method": "ArrayBlockingQueue.dequeue()",
+      "document": "/jdk/concurrent/blockingqueue/array-linked#arrayblockingqueue-take-的释放路径",
+      "purpose": "清空 takeIndex、环形前进、减少 count 并通知 notFull"
+    },
+    {
+      "method": "LinkedBlockingQueue.put(E)",
+      "document": "/jdk/concurrent/blockingqueue/array-linked#linkedblockingqueue-put-与跨锁-signal",
+      "purpose": "使用 putLock 入队，并在 0 到 1 边界跨锁通知消费者"
+    },
+    {
+      "method": "LinkedBlockingQueue.take()",
+      "document": "/jdk/concurrent/blockingqueue/array-linked#linkedblockingqueue-put-与跨锁-signal",
+      "purpose": "使用 takeLock 出队，并在满到非满边界跨锁通知生产者"
+    },
+    {
+      "method": "LinkedBlockingQueue.signalNotEmpty()",
+      "document": "/jdk/concurrent/blockingqueue/array-linked#linkedblockingqueue-put-与跨锁-signal",
+      "purpose": "取得 takeLock 后通知等待非空条件的消费者"
+    },
+    {
+      "method": "LinkedBlockingQueue.signalNotFull()",
+      "document": "/jdk/concurrent/blockingqueue/array-linked#linkedblockingqueue-put-与跨锁-signal",
+      "purpose": "取得 putLock 后通知等待非满条件的生产者"
+    },
+    {
+      "method": "SynchronousQueue.Transferer.transfer(E,boolean,long)",
+      "document": "/jdk/concurrent/blockingqueue/synchronousqueue#所有操作汇入-transfer",
+      "purpose": "把 DATA 或 REQUEST 的立即、定时和无限等待统一为传输操作"
+    },
+    {
+      "method": "SynchronousQueue.TransferStack.transfer(E,boolean,long)",
+      "document": "/jdk/concurrent/blockingqueue/synchronousqueue#非公平-transferstack-的三种分支",
+      "purpose": "观察 LIFO 等待节点、FULFILLING 占位与协助匹配"
+    },
+    {
+      "method": "SynchronousQueue.TransferQueue.transfer(E,boolean,long)",
+      "document": "/jdk/concurrent/blockingqueue/synchronousqueue#公平-transferqueue-如何前进",
+      "purpose": "观察 FIFO 双队列入队、互补匹配和 head/tail 协助推进"
+    },
+    {
+      "method": "SynchronousQueue.TransferStack.clean(SNode)",
+      "document": "/jdk/concurrent/blockingqueue/synchronousqueue#超时、中断与取消竞态",
+      "purpose": "取消等待后解除栈节点链接并清除对象引用"
+    },
+    {
+      "method": "SynchronousQueue.TransferQueue.clean(QNode,QNode)",
+      "document": "/jdk/concurrent/blockingqueue/synchronousqueue#超时、中断与取消竞态",
+      "purpose": "清理公平队列的取消节点并处理暂时不能移除的尾节点"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "ArrayBlockingQueue.put(E)",
+      "scenario": "容量一队列已满时让生产者执行 put",
+      "variables": ["e", "count", "items.length", "putIndex", "lock"]
+    },
+    {
+      "method": "ArrayBlockingQueue.dequeue()",
+      "scenario": "消费者 take 后触发 notFull.signal",
+      "variables": ["takeIndex", "putIndex", "count", "notFull"]
+    },
+    {
+      "method": "LinkedBlockingQueue.put(E)",
+      "scenario": "空队列首次入队以及满队列生产者等待",
+      "variables": ["c", "count", "capacity", "putLock", "notFull"]
+    },
+    {
+      "method": "LinkedBlockingQueue.take()",
+      "scenario": "满队列移除一个元素并跨锁通知生产者",
+      "variables": ["x", "c", "count", "takeLock", "notEmpty"]
+    },
+    {
+      "method": "SynchronousQueue.TransferStack.transfer(E,boolean,long)",
+      "scenario": "非公平队列中让定时消费者与生产者直接交接",
+      "variables": ["e", "timed", "nanos", "mode", "h", "s", "s.match"]
+    },
+    {
+      "method": "SynchronousQueue.TransferQueue.transfer(E,boolean,long)",
+      "scenario": "公平队列中让定时消费者与生产者直接交接",
+      "variables": ["e", "timed", "nanos", "isData", "h", "t", "m", "m.item"]
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "baselines": [
+    {
+      "id": "openjdk-8u412",
+      "repository": "https://github.com/openjdk/jdk8u",
+      "sourceRef": "jdk8u412-b08",
+      "resolvedCommit": "43cb87550865a93c559c9e8eaa59fcb071301bd3"
+    },
+    {
+      "id": "openjdk-17-ga",
+      "repository": "https://github.com/openjdk/jdk",
+      "sourceRef": "jdk-17+35",
+      "resolvedCommit": "dfacda488bfbe2e11e8d607a6d08527710286982"
+    },
+    {
+      "id": "openjdk-21-ga",
+      "repository": "https://github.com/openjdk/jdk",
+      "sourceRef": "jdk-21+35",
+      "resolvedCommit": "890adb6410dab4606a4f26a942aed02fb2f55387"
+    },
+    {
+      "id": "spring-framework-5.3.39",
+      "repository": "https://github.com/spring-projects/spring-framework",
+      "sourceRef": "v5.3.39",
+      "resolvedCommit": "f1b128b88d734670b4e1842e9ecf41f5252c778d"
+    },
+    {
+      "id": "spring-boot-2.7.18",
+      "repository": "https://github.com/spring-projects/spring-boot",
+      "sourceRef": "v2.7.18",
+      "resolvedCommit": "0c8b382d42db22b92efcf47000d0ff9ef4971629"
+    }
+  ]
+}

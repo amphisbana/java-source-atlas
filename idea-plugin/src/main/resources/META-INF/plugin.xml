@@ -1,0 +1,44 @@
+<idea-plugin>
+    <id>io.github.java-source-atlas.idea</id>
+    <name>Java Source Atlas</name>
+    <vendor>Java Source Atlas</vendor>
+
+    <description><![CDATA[
+      Java Source Atlas connects JDK and Spring source guides directly to the IntelliJ IDEA editor.
+      Java Source Atlas 将 JDK 与 Spring 源码教程带到 IntelliJ IDEA 的阅读现场。
+      插件根据当前 Java 类和方法匹配教程、源码入口和推荐断点，并支持从工具窗口反向跳转源码。
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.java</depends>
+    <depends optional="true" config-file="jcef.xml">com.intellij.modules.jcef</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="io.github.javasourceatlas.idea.index.AtlasIndexService"/>
+        <applicationService serviceImplementation="io.github.javasourceatlas.idea.settings.AtlasSettingsState"/>
+        <applicationConfigurable
+                id="io.github.javasourceatlas.idea.settings"
+                displayName="Java Source Atlas"
+                instance="io.github.javasourceatlas.idea.settings.AtlasConfigurable"/>
+        <toolWindow
+                id="Source Atlas"
+                anchor="right"
+                icon="/icons/atlas.svg"
+                factoryClass="io.github.javasourceatlas.idea.ui.AtlasToolWindowFactory"/>
+        <codeInsight.lineMarkerProvider
+                language="JAVA"
+                implementationClass="io.github.javasourceatlas.idea.gutter.AtlasLineMarkerProvider"/>
+    </extensions>
+
+    <actions>
+        <action
+                id="JavaSourceAtlas.OpenDocumentation"
+                class="io.github.javasourceatlas.idea.action.AtlasOpenDocumentationAction"
+                text="在 Source Atlas 中查看解析"
+                description="打开当前 Java 类或方法对应的源码解析"
+                icon="/icons/atlas.svg">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>

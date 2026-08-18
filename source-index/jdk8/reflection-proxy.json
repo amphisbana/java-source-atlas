@@ -1,0 +1,171 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-reflection-dynamic-proxy",
+  "title": "OpenJDK 8 Reflection 与 JDK Dynamic Proxy 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.runtime.ReflectionProxyDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/runtime/ReflectionProxyDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.lang.reflect.Method",
+    "sourcePath": "jdk/src/share/classes/java/lang/reflect/Method.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.lang.Class",
+      "sourcePath": "jdk/src/share/classes/java/lang/Class.java"
+    },
+    {
+      "className": "java.lang.reflect.AccessibleObject",
+      "sourcePath": "jdk/src/share/classes/java/lang/reflect/AccessibleObject.java"
+    },
+    {
+      "className": "sun.reflect.ReflectionFactory",
+      "sourcePath": "jdk/src/share/classes/sun/reflect/ReflectionFactory.java"
+    },
+    {
+      "className": "sun.reflect.NativeMethodAccessorImpl",
+      "sourcePath": "jdk/src/share/classes/sun/reflect/NativeMethodAccessorImpl.java"
+    },
+    {
+      "className": "sun.reflect.MethodAccessorGenerator",
+      "sourcePath": "jdk/src/share/classes/sun/reflect/MethodAccessorGenerator.java"
+    },
+    {
+      "className": "java.lang.reflect.Proxy",
+      "sourcePath": "jdk/src/share/classes/java/lang/reflect/Proxy.java"
+    },
+    {
+      "className": "java.lang.reflect.WeakCache",
+      "sourcePath": "jdk/src/share/classes/java/lang/reflect/WeakCache.java"
+    },
+    {
+      "className": "java.lang.reflect.InvocationHandler",
+      "sourcePath": "jdk/src/share/classes/java/lang/reflect/InvocationHandler.java"
+    },
+    {
+      "className": "sun.misc.ProxyGenerator",
+      "sourcePath": "jdk/src/share/classes/sun/misc/ProxyGenerator.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "Class.getDeclaredMethod(String,Class<?>...)",
+      "document": "/jdk/runtime/reflection-proxy/reflection-invoke#getmethod-与-getdeclaredmethod-先解决查找范围",
+      "purpose": "从当前类直接声明的方法中按名称和精确参数类型取得 Method 副本"
+    },
+    {
+      "method": "Method.invoke(Object,Object...)",
+      "document": "/jdk/runtime/reflection-proxy/reflection-invoke#method-invoke-的准确主线",
+      "purpose": "执行访问检查，取得 MethodAccessor，并以统一 Object 外观调用目标"
+    },
+    {
+      "method": "Method.acquireMethodAccessor()",
+      "document": "/jdk/runtime/reflection-proxy/reflection-invoke#acquiremethodaccessor-如何在副本间共享",
+      "purpose": "复用 root accessor 或通过 ReflectionFactory 创建并传播执行器"
+    },
+    {
+      "method": "ReflectionFactory.newMethodAccessor(Method)",
+      "document": "/jdk/runtime/reflection-proxy/reflection-invoke#jdk-8-inflation-启动成本与稳定调用成本的折中",
+      "purpose": "按 inflation 配置选择初始 native/delegating 或直接生成 accessor"
+    },
+    {
+      "method": "NativeMethodAccessorImpl.invoke(Object,Object[])",
+      "document": "/jdk/runtime/reflection-proxy/reflection-invoke#jdk-8-inflation-启动成本与稳定调用成本的折中",
+      "purpose": "累计调用次数，超过默认阈值后生成 accessor 并切换 delegate"
+    },
+    {
+      "method": "Proxy.newProxyInstance(ClassLoader,Class<?>[],InvocationHandler)",
+      "document": "/jdk/runtime/reflection-proxy/dynamic-proxy#newproxyinstance-分成-class-阶段和实例阶段",
+      "purpose": "查找或生成代理 Class，并以指定 InvocationHandler 构造代理实例"
+    },
+    {
+      "method": "WeakCache.get(K,P)",
+      "document": "/jdk/runtime/reflection-proxy/dynamic-proxy#weakcache-的键为何包含接口顺序",
+      "purpose": "按 loader 与有序接口身份列表并发缓存代理 Class"
+    },
+    {
+      "method": "ProxyClassFactory.apply(ClassLoader,Class<?>[])",
+      "document": "/jdk/runtime/reflection-proxy/dynamic-proxy#proxyclassfactory-校验哪些约束",
+      "purpose": "校验接口身份、loader 可见性、重复项和 non-public 包约束"
+    },
+    {
+      "method": "ProxyGenerator.generateClassFile()",
+      "document": "/jdk/runtime/reflection-proxy/dynamic-proxy#proxygenerator-先收集方法再写-class-file",
+      "purpose": "合并 Object 与接口方法，生成构造器、Method 字段和分派字节码"
+    },
+    {
+      "method": "ProxyGenerator.ProxyMethod.generateMethod()",
+      "document": "/jdk/runtime/reflection-proxy/dynamic-proxy#生成类大致长什么样",
+      "purpose": "生成参数装箱、handler 调用、返回转换和异常包装代码"
+    },
+    {
+      "method": "InvocationHandler.invoke(Object,Method,Object[])",
+      "document": "/jdk/runtime/reflection-proxy/dynamic-proxy#handler-的三个入参分别代表什么",
+      "purpose": "接收代理实例、代表 Method 与装箱参数，执行应用定义的分派策略"
+    },
+    {
+      "method": "Proxy.isProxyClass(Class<?>)",
+      "document": "/jdk/runtime/reflection-proxy/access-version#动态代理从-classpath-到-module-aware",
+      "purpose": "可靠确认 Class 是否由 JDK Proxy 机制生成，而非只判断是否继承 Proxy"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "Class.privateGetDeclaredMethods(boolean)",
+      "scenario": "首次和再次查询 GreetingTarget 的声明方法，比较 ReflectionData 缓存路径",
+      "variables": ["publicOnly", "rd", "res", "rd.declaredPublicMethods", "rd.declaredMethods"]
+    },
+    {
+      "method": "Method.invoke(Object,Object[])",
+      "scenario": "调用 welcome(String,long)，观察访问检查和 Integer 到 long 的拆箱拓宽",
+      "variables": ["override", "clazz", "obj", "args", "methodAccessor"]
+    },
+    {
+      "method": "Method.acquireMethodAccessor()",
+      "scenario": "同一成员的 Method 副本首次调用和后续调用，观察 root accessor 共享",
+      "variables": ["root", "root.methodAccessor", "methodAccessor", "tmp"]
+    },
+    {
+      "method": "NativeMethodAccessorImpl.invoke(Object,Object[])",
+      "scenario": "JDK 8 对同一 Method 连续调用至少 17 次，观察默认 inflation 切换",
+      "variables": ["numInvocations", "ReflectionFactory.inflationThreshold()", "parent", "method"]
+    },
+    {
+      "method": "Proxy.newProxyInstance(ClassLoader,Class<?>[],InvocationHandler)",
+      "scenario": "使用同序和逆序接口列表创建三个实例，区分 Class 缓存与实例构造",
+      "variables": ["loader", "interfaces", "intfs", "h", "cl", "cons"]
+    },
+    {
+      "method": "WeakCache.get(Object,Object)",
+      "scenario": "第二次使用相同 loader 与接口顺序创建代理，确认缓存命中",
+      "variables": ["cacheKey", "subKey", "supplier", "valueMap"]
+    },
+    {
+      "method": "Proxy.ProxyClassFactory.apply(ClassLoader,Class<?>[])",
+      "scenario": "首次生成 GreetingService 代理，观察 loader 可见性与 proxyPkg 选择",
+      "variables": ["loader", "interfaces", "interfaceSet", "proxyPkg", "accessFlags", "proxyName"]
+    },
+    {
+      "method": "ProxyGenerator.addProxyMethod(Method,Class<?>)",
+      "scenario": "FirstView 与 SecondView 提供重复 identity 签名，观察最前接口决定代表 Method",
+      "variables": ["m", "fromClass", "sig", "sigmethods", "exceptionTypes"]
+    },
+    {
+      "method": "ProxyGenerator.ProxyMethod.generateMethod()",
+      "scenario": "生成带 String 和 long 参数的代理方法，观察装箱、返回强转与异常表",
+      "variables": ["parameterTypes", "returnType", "exceptionTypes", "catchList", "minfo"]
+    },
+    {
+      "method": "ReflectionProxyDebugLab.ForwardingInvocationHandler.invoke(Object,Method,Object[])",
+      "scenario": "分别调用接口方法、default 方法、toString、equals 和真实目标失败方法",
+      "variables": ["proxy", "method", "method.getDeclaringClass()", "args", "exception.getCause()"]
+    }
+  ]
+}

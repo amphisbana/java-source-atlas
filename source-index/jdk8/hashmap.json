@@ -1,0 +1,73 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-java-util-hashmap",
+  "title": "OpenJDK 8 HashMap 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.collection.HashMapDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/collection/HashMapDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.util.HashMap",
+    "sourcePath": "jdk/src/share/classes/java/util/HashMap.java"
+  },
+  "entryPoints": [
+    {
+      "method": "put(K,V)",
+      "document": "/jdk/collections/hashmap/put",
+      "purpose": "公开写入入口"
+    },
+    {
+      "method": "putVal(int,K,V,boolean,boolean)",
+      "document": "/jdk/collections/hashmap/put#putval-的五个阶段",
+      "purpose": "桶定位、覆盖、碰撞与新增主流程"
+    },
+    {
+      "method": "resize()",
+      "document": "/jdk/collections/hashmap/resize",
+      "purpose": "首次分配、容量扩张和节点迁移"
+    },
+    {
+      "method": "treeifyBin(Node[],int)",
+      "document": "/jdk/collections/hashmap/treeify#treeifybin-并不总是树化",
+      "purpose": "扩容优先判断与链表树化"
+    },
+    {
+      "method": "getNode(int,Object)",
+      "document": "/jdk/collections/hashmap/read-remove#get-与-getnode",
+      "purpose": "桶首、链表与树查询"
+    },
+    {
+      "method": "removeNode(int,Object,Object,boolean,boolean)",
+      "document": "/jdk/collections/hashmap/read-remove#remove-的四个关键参数",
+      "purpose": "按键或键值组合删除节点"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "hash(Object)",
+      "scenario": "观察哈希扰动与 null 键",
+      "variables": ["key", "h"]
+    },
+    {
+      "method": "putVal(int,K,V,boolean,boolean)",
+      "scenario": "观察空桶、覆盖、链表和树分支",
+      "variables": ["tab", "n", "i", "p", "e", "binCount", "size", "threshold"]
+    },
+    {
+      "method": "resize()",
+      "scenario": "观察首次分配与扩容拆链",
+      "variables": ["oldCap", "oldThr", "newCap", "newThr", "loHead", "hiHead"]
+    },
+    {
+      "method": "treeifyBin(Node[],int)",
+      "scenario": "观察扩容优先和树化条件",
+      "variables": ["tab", "n", "index", "hd", "tl"]
+    }
+  ]
+}

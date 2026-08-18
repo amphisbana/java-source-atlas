@@ -1,0 +1,68 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-java-util-arraylist",
+  "title": "OpenJDK 8 ArrayList 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.collection.ArrayListDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/collection/ArrayListDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.util.ArrayList",
+    "sourcePath": "jdk/src/share/classes/java/util/ArrayList.java"
+  },
+  "entryPoints": [
+    {
+      "method": "add(E)",
+      "document": "/jdk/collections/arraylist/#add-e-调用链",
+      "purpose": "尾部添加与容量检查入口"
+    },
+    {
+      "method": "ensureCapacityInternal(int)",
+      "document": "/jdk/collections/arraylist/#第一步-计算最小容量",
+      "purpose": "无参列表首次容量和最小容量计算"
+    },
+    {
+      "method": "grow(int)",
+      "document": "/jdk/collections/arraylist/mutation#grow-的-1-5-倍策略",
+      "purpose": "1.5 倍候选容量和数组复制"
+    },
+    {
+      "method": "remove(int)",
+      "document": "/jdk/collections/arraylist/mutation#删除为什么要清空尾部",
+      "purpose": "左移元素并释放尾部引用"
+    },
+    {
+      "method": "Itr.next()",
+      "document": "/jdk/collections/arraylist/iterator-version#fail-fast-如何发生",
+      "purpose": "游标推进与结构性修改检查"
+    },
+    {
+      "method": "subList(int,int)",
+      "document": "/jdk/collections/arraylist/mutation#sublist-是视图-不是副本",
+      "purpose": "创建共享父列表数据的范围视图"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "grow(int)",
+      "scenario": "观察首次分配与后续扩容",
+      "variables": ["minCapacity", "oldCapacity", "newCapacity", "elementData"]
+    },
+    {
+      "method": "add(int,E)",
+      "scenario": "观察中间插入的数组搬移",
+      "variables": ["index", "size", "elementData"]
+    },
+    {
+      "method": "Itr.checkForComodification()",
+      "scenario": "观察迭代器快速失败",
+      "variables": ["expectedModCount", "ArrayList.this.modCount"]
+    }
+  ]
+}

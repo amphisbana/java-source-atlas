@@ -1,0 +1,139 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "spring-framework-5-3-transaction",
+  "title": "Spring Framework 5.3 声明式事务源码解析",
+  "primaryVersion": "Spring Framework 5.3.39",
+  "sourceRef": "v5.3.39",
+  "lab": {
+    "module": "labs/spring-framework-lab",
+    "mainClass": "io.github.javasourceatlas.spring.transaction.SpringTransactionDebugLab",
+    "sourcePath": "labs/spring-framework-lab/src/main/java/io/github/javasourceatlas/spring/transaction/SpringTransactionDebugLab.java"
+  },
+  "compatibleVersions": [
+    "Spring Framework 5.3.x",
+    "Spring Framework 6.x（主干概念兼容，方法可见性和异常返回值规则需按小版本复核）"
+  ],
+  "source": {
+    "repository": "https://github.com/spring-projects/spring-framework",
+    "className": "org.springframework.transaction.interceptor.TransactionInterceptor",
+    "sourcePath": "spring-tx/src/main/java/org/springframework/transaction/interceptor/TransactionInterceptor.java"
+  },
+  "relatedSources": [
+    {
+      "className": "org.springframework.transaction.interceptor.TransactionAspectSupport",
+      "sourcePath": "spring-tx/src/main/java/org/springframework/transaction/interceptor/TransactionAspectSupport.java"
+    },
+    {
+      "className": "org.springframework.transaction.annotation.AnnotationTransactionAttributeSource",
+      "sourcePath": "spring-tx/src/main/java/org/springframework/transaction/annotation/AnnotationTransactionAttributeSource.java"
+    },
+    {
+      "className": "org.springframework.transaction.interceptor.AbstractFallbackTransactionAttributeSource",
+      "sourcePath": "spring-tx/src/main/java/org/springframework/transaction/interceptor/AbstractFallbackTransactionAttributeSource.java"
+    },
+    {
+      "className": "org.springframework.transaction.annotation.SpringTransactionAnnotationParser",
+      "sourcePath": "spring-tx/src/main/java/org/springframework/transaction/annotation/SpringTransactionAnnotationParser.java"
+    },
+    {
+      "className": "org.springframework.transaction.support.AbstractPlatformTransactionManager",
+      "sourcePath": "spring-tx/src/main/java/org/springframework/transaction/support/AbstractPlatformTransactionManager.java"
+    },
+    {
+      "className": "org.springframework.transaction.support.DefaultTransactionStatus",
+      "sourcePath": "spring-tx/src/main/java/org/springframework/transaction/support/DefaultTransactionStatus.java"
+    },
+    {
+      "className": "org.springframework.transaction.support.TransactionSynchronizationManager",
+      "sourcePath": "spring-tx/src/main/java/org/springframework/transaction/support/TransactionSynchronizationManager.java"
+    },
+    {
+      "className": "org.springframework.transaction.interceptor.RuleBasedTransactionAttribute",
+      "sourcePath": "spring-tx/src/main/java/org/springframework/transaction/interceptor/RuleBasedTransactionAttribute.java"
+    },
+    {
+      "className": "org.springframework.transaction.annotation.ProxyTransactionManagementConfiguration",
+      "sourcePath": "spring-tx/src/main/java/org/springframework/transaction/annotation/ProxyTransactionManagementConfiguration.java"
+    },
+    {
+      "className": "org.springframework.transaction.interceptor.BeanFactoryTransactionAttributeSourceAdvisor",
+      "sourcePath": "spring-tx/src/main/java/org/springframework/transaction/interceptor/BeanFactoryTransactionAttributeSourceAdvisor.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "TransactionInterceptor.invoke(MethodInvocation)",
+      "document": "/spring/transaction/transaction-interceptor",
+      "purpose": "把 Spring AOP 方法调用适配到统一事务模板"
+    },
+    {
+      "method": "TransactionAspectSupport.invokeWithinTransaction(Method,Class,InvocationCallback)",
+      "document": "/spring/transaction/transaction-interceptor",
+      "purpose": "解析属性、选择管理器、调用目标并在返回或异常后完成事务"
+    },
+    {
+      "method": "AbstractFallbackTransactionAttributeSource.getTransactionAttribute(Method,Class)",
+      "document": "/spring/transaction/transaction-interceptor",
+      "purpose": "从最具体方法或类解析并缓存 @Transactional 属性"
+    },
+    {
+      "method": "AbstractPlatformTransactionManager.getTransaction(TransactionDefinition)",
+      "document": "/spring/transaction/propagation-suspension",
+      "purpose": "根据现有资源与传播行为创建、参与、挂起或建立保存点"
+    },
+    {
+      "method": "AbstractPlatformTransactionManager.suspend(Object)",
+      "document": "/spring/transaction/propagation-suspension",
+      "purpose": "暂存同步状态和具体事务资源，为 REQUIRES_NEW 或 NOT_SUPPORTED 解绑外层"
+    },
+    {
+      "method": "AbstractPlatformTransactionManager.commit(TransactionStatus)",
+      "document": "/spring/transaction/commit-rollback",
+      "purpose": "检查 local/global rollback-only 后选择提交或改为回滚"
+    },
+    {
+      "method": "AbstractPlatformTransactionManager.processRollback(DefaultTransactionStatus,boolean)",
+      "document": "/spring/transaction/commit-rollback",
+      "purpose": "区分保存点、新事务和参与者，执行局部或整体回滚"
+    },
+    {
+      "method": "RuleBasedTransactionAttribute.rollbackOn(Throwable)",
+      "document": "/spring/transaction/commit-rollback",
+      "purpose": "按异常继承距离选择最具体的 rollback 或 no-rollback 规则"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "TransactionInterceptor.invoke(MethodInvocation)",
+      "scenario": "确认客户端调用真正进入事务代理，并取得实际 targetClass",
+      "variables": ["invocation.method", "invocation.this", "targetClass"]
+    },
+    {
+      "method": "TransactionAspectSupport.invokeWithinTransaction(...)",
+      "scenario": "观察事务属性、管理器、joinpoint 名称和 TransactionInfo 调用栈",
+      "variables": ["txAttr", "tm", "joinpointIdentification", "txInfo"]
+    },
+    {
+      "method": "AbstractPlatformTransactionManager.handleExistingTransaction(...)",
+      "scenario": "对比 REQUIRED 参与、REQUIRES_NEW 挂起与 NESTED 保存点分支",
+      "variables": ["definition.propagationBehavior", "transaction", "suspendedResources", "status"]
+    },
+    {
+      "method": "AbstractPlatformTransactionManager.commit(TransactionStatus)",
+      "scenario": "定位正常返回为何被 rollback-only 改写为回滚",
+      "variables": ["status.localRollbackOnly", "status.globalRollbackOnly", "status.newTransaction"]
+    },
+    {
+      "method": "AbstractPlatformTransactionManager.processRollback(...)",
+      "scenario": "区分保存点回滚、物理回滚和参与者标记共享事务",
+      "variables": ["status.hasSavepoint", "status.newTransaction", "unexpected", "globalRollbackOnParticipationFailure"]
+    },
+    {
+      "method": "RecordingTransactionManager.doSuspend(Object)",
+      "sourceClass": null,
+      "scenario": "在教学 Lab 中观察 tx-1 解绑、tx-2 运行和 tx-1 恢复的精确顺序",
+      "variables": ["transaction.resource", "boundResource", "TransactionEvents"]
+    }
+  ]
+}

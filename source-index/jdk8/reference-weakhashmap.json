@@ -1,0 +1,143 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-reference-weakhashmap",
+  "title": "OpenJDK 8 Reference 与 WeakHashMap 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.reference.ReferenceWeakHashMapDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/reference/ReferenceWeakHashMapDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.lang.ref.Reference",
+    "sourcePath": "jdk/src/share/classes/java/lang/ref/Reference.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.lang.ref.ReferenceQueue",
+      "sourcePath": "jdk/src/share/classes/java/lang/ref/ReferenceQueue.java"
+    },
+    {
+      "className": "java.lang.ref.SoftReference",
+      "sourcePath": "jdk/src/share/classes/java/lang/ref/SoftReference.java"
+    },
+    {
+      "className": "java.lang.ref.WeakReference",
+      "sourcePath": "jdk/src/share/classes/java/lang/ref/WeakReference.java"
+    },
+    {
+      "className": "java.lang.ref.PhantomReference",
+      "sourcePath": "jdk/src/share/classes/java/lang/ref/PhantomReference.java"
+    },
+    {
+      "className": "java.util.WeakHashMap",
+      "sourcePath": "jdk/src/share/classes/java/util/WeakHashMap.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "Reference.get()",
+      "document": "/jdk/runtime/reference-weakhashmap/reference-processing#四类引用的处理边界",
+      "purpose": "读取尚未被清除的 referent，并区分 PhantomReference 的恒 null 行为"
+    },
+    {
+      "method": "Reference.clear()",
+      "document": "/jdk/runtime/reference-weakhashmap/reference-processing#clear-与-enqueue-不能混为一个动作",
+      "purpose": "显式清 referent，但不触发自动入队"
+    },
+    {
+      "method": "Reference.enqueue()",
+      "document": "/jdk/runtime/reference-weakhashmap/reference-processing#clear-与-enqueue-不能混为一个动作",
+      "purpose": "先清除 referent，再把已注册 Reference 显式送入 ReferenceQueue"
+    },
+    {
+      "method": "Reference.tryHandlePending(boolean)",
+      "document": "/jdk/runtime/reference-weakhashmap/reference-processing#gc-与-reference-handler-怎样交接",
+      "purpose": "JDK 8 Reference Handler 从 pending 链取引用并入队或执行 Cleaner"
+    },
+    {
+      "method": "ReferenceQueue.poll/remove(long)",
+      "document": "/jdk/runtime/reference-weakhashmap/reference-processing#referencequeue-的三种消费方式",
+      "purpose": "立即或有界阻塞消费已经入队的 Reference 通知"
+    },
+    {
+      "method": "SoftReference.get()",
+      "document": "/jdk/runtime/reference-weakhashmap/reference-processing#softreference",
+      "purpose": "返回软 referent，并在 JDK 8 实现中刷新 timestamp"
+    },
+    {
+      "method": "PhantomReference.get()",
+      "document": "/jdk/runtime/reference-weakhashmap/reference-processing#phantomreference",
+      "purpose": "始终返回 null，禁止通过虚引用恢复 referent"
+    },
+    {
+      "method": "WeakHashMap.get(Object)",
+      "sourceClass": "java.util.WeakHashMap",
+      "document": "/jdk/runtime/reference-weakhashmap/weakhashmap#get-的完整路径",
+      "purpose": "在读取前清队列，再按活 key 的 hash 与 equals 查桶"
+    },
+    {
+      "method": "WeakHashMap.put(K,V)",
+      "sourceClass": "java.util.WeakHashMap",
+      "document": "/jdk/runtime/reference-weakhashmap/weakhashmap#put-为什么先清队列",
+      "purpose": "建立注册到 Map ReferenceQueue 的弱 key Entry"
+    },
+    {
+      "method": "WeakHashMap.expungeStaleEntries()",
+      "sourceClass": "java.util.WeakHashMap",
+      "document": "/jdk/runtime/reference-weakhashmap/weakhashmap#expungestaleentries-怎样安全摘链",
+      "purpose": "按 Entry 身份从桶链摘除已入队弱键并清空强 value"
+    },
+    {
+      "method": "WeakHashMap.transfer(Entry[],Entry[])",
+      "sourceClass": "java.util.WeakHashMap",
+      "document": "/jdk/runtime/reference-weakhashmap/weakhashmap#resize-为什么可能撤销扩容",
+      "purpose": "迁移活 Entry、丢弃已清 key，并支持基于新 size 撤销扩容"
+    },
+    {
+      "method": "WeakHashMap.HashIterator.hasNext()",
+      "sourceClass": "java.util.WeakHashMap",
+      "document": "/jdk/runtime/reference-weakhashmap/weakhashmap#迭代器怎样避免当前-key-中途消失",
+      "purpose": "用 nextKey/currentKey 临时强引用保持迭代步骤中的 key"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "Reference.clear()/enqueue()",
+      "scenario": "先 clear 再显式 enqueue，区分 referent 与队列状态",
+      "variables": ["referent", "queue", "next", "enqueue 返回值"]
+    },
+    {
+      "method": "Reference.tryHandlePending(boolean)",
+      "scenario": "JDK 8 GC 清弱 key 后观察 Reference Handler 入队",
+      "variables": ["pending", "r", "c", "r.discovered", "r.queue"]
+    },
+    {
+      "method": "ReferenceQueue.enqueue(Reference)",
+      "scenario": "WeakReference 或 WeakHashMap.Entry 进入注册队列",
+      "variables": ["r", "r.queue", "head", "queueLength"]
+    },
+    {
+      "method": "WeakHashMap.expungeStaleEntries()",
+      "sourceClass": "java.util.WeakHashMap",
+      "scenario": "map.size 触发已入队 Entry 的桶级摘链",
+      "variables": ["x", "e", "i", "prev", "p", "size"]
+    },
+    {
+      "method": "WeakHashMap.transfer(Entry[],Entry[])",
+      "sourceClass": "java.util.WeakHashMap",
+      "scenario": "resize 期间 key 被清除并导致 Entry 丢弃",
+      "variables": ["src", "dest", "e", "key", "size", "threshold"]
+    },
+    {
+      "method": "WeakHashMap.HashIterator.hasNext()",
+      "sourceClass": "java.util.WeakHashMap",
+      "scenario": "迭代弱键时观察 nextKey 对当前 key 的临时强保活",
+      "variables": ["nextEntry", "nextKey", "currentKey", "expectedModCount"]
+    }
+  ]
+}

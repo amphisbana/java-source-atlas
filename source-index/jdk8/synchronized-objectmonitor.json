@@ -1,0 +1,121 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-synchronized-objectmonitor",
+  "title": "synchronized、ObjectMonitor 与 wait-notify 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.concurrent.SynchronizedMonitorDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/SynchronizedMonitorDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.lang.Object",
+    "sourcePath": "jdk/src/share/classes/java/lang/Object.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.lang.Thread",
+      "sourcePath": "jdk/src/share/classes/java/lang/Thread.java"
+    },
+    {
+      "className": "hotspot.runtime.ObjectMonitor",
+      "sourcePath": "hotspot/src/share/vm/runtime/objectMonitor.cpp"
+    },
+    {
+      "className": "hotspot.runtime.ObjectMonitorLayout",
+      "sourcePath": "hotspot/src/share/vm/runtime/objectMonitor.hpp"
+    },
+    {
+      "className": "hotspot.runtime.ObjectSynchronizer",
+      "sourcePath": "hotspot/src/share/vm/runtime/synchronizer.cpp"
+    },
+    {
+      "className": "hotspot.oops.markOop",
+      "sourcePath": "hotspot/src/share/vm/oops/markOop.hpp"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "monitorenter / monitorexit",
+      "document": "/jdk/concurrent/synchronized-monitor/bytecode-reentrancy#同步代码块与同步方法不是同一种字节码形态",
+      "purpose": "区分同步块显式 monitor 字节码与同步方法 ACC_SYNCHRONIZED 标志"
+    },
+    {
+      "method": "Object.wait(long,int)",
+      "document": "/jdk/concurrent/synchronized-monitor/wait-notify#wait-完整释放-sleep-不释放",
+      "purpose": "在条件不成立时加入等待集、完整释放 monitor 并在返回前重新取得"
+    },
+    {
+      "method": "Object.notify()",
+      "document": "/jdk/concurrent/synchronized-monitor/wait-notify#notify-不会释放-monitor",
+      "purpose": "选择一个等待者进入重新竞争阶段，但不释放当前线程持有的 monitor"
+    },
+    {
+      "method": "Object.notifyAll()",
+      "document": "/jdk/concurrent/synchronized-monitor/wait-notify#notify-与-notifyall-的选择",
+      "purpose": "让当前等待集中的全部线程重新竞争并逐个检查业务条件"
+    },
+    {
+      "method": "ObjectMonitor::enter(Thread*)",
+      "document": "/jdk/concurrent/synchronized-monitor/objectmonitor-queues#enter-快速失败后怎样进入竞争",
+      "purpose": "观察 owner 为空、当前线程重入和其他线程竞争三条膨胀 monitor 路径",
+      "sourceClass": "hotspot.runtime.ObjectMonitor"
+    },
+    {
+      "method": "ObjectMonitor::exit(bool,Thread*)",
+      "document": "/jdk/concurrent/synchronized-monitor/objectmonitor-queues#exit-释放不是简单写-owner-null",
+      "purpose": "区分递减重入与最后一层释放，并观察入口竞争者唤醒",
+      "sourceClass": "hotspot.runtime.ObjectMonitor"
+    },
+    {
+      "method": "ObjectMonitor::wait(jlong,bool,Thread*)",
+      "document": "/jdk/concurrent/synchronized-monitor/objectmonitor-queues#wait-从-owner-变成-waitset-节点",
+      "purpose": "跟踪 WaitSet 入队、完整释放、park、重新进入和重入深度恢复",
+      "sourceClass": "hotspot.runtime.ObjectMonitor"
+    },
+    {
+      "method": "ObjectMonitor::notify(Thread*)",
+      "document": "/jdk/concurrent/synchronized-monitor/objectmonitor-queues#notify-只改变等待者的竞争资格",
+      "purpose": "观察 notifyee 离开 WaitSet 后转入入口竞争且 owner 保持不变",
+      "sourceClass": "hotspot.runtime.ObjectMonitor"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "SynchronizedMonitorDebugLab.observeBlockedAndWaiting()",
+      "scenario": "同时稳定构造一个 WaitSet 等待者和一个入口 monitor 竞争者",
+      "variables": ["waiter.getState()", "contender.getState()", "waitCondition.open", "releaseOwner"]
+    },
+    {
+      "method": "SynchronizedMonitorDebugLab.observeWaitReleaseAndReacquire()",
+      "scenario": "两层重入调用 wait，通知后退出内层但继续持有外层",
+      "variables": ["condition.open", "innerExited", "releaseOuter", "contender.getState()"]
+    },
+    {
+      "method": "SynchronizedMonitorDebugLab.observeNotifyDoesNotReleaseMonitor()",
+      "scenario": "notifier 调用 notify 后停在同步块内，观察 waiter 仍不能继续",
+      "variables": ["notifyCalled", "releaseNotifier", "waiterResumed", "waiter.getState()"]
+    },
+    {
+      "method": "SynchronizedMonitorDebugLab.observeWaitInterruption()",
+      "scenario": "中断 WAITING 线程并观察异常与 catch 中的中断标记",
+      "variables": ["exceptionCaught", "flagAfterCatch", "waiter.getState()"]
+    },
+    {
+      "method": "ObjectMonitor::enter(Thread*)",
+      "scenario": "在可调试 HotSpot 中比较首次获取、重入与竞争慢路径",
+      "variables": ["Self", "_owner", "_recursions", "_cxq", "_EntryList"],
+      "sourceClass": "hotspot.runtime.ObjectMonitor"
+    },
+    {
+      "method": "ObjectMonitor::wait(jlong,bool,Thread*)",
+      "scenario": "在可调试 HotSpot 中观察保存重入深度、WaitSet 和重新进入",
+      "variables": ["save", "_recursions", "_WaitSet", "_owner"],
+      "sourceClass": "hotspot.runtime.ObjectMonitor"
+    }
+  ]
+}

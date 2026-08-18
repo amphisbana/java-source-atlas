@@ -1,0 +1,141 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-java-lang-threadlocal",
+  "title": "OpenJDK 8 ThreadLocal 与 ThreadLocalMap 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLocalDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/ThreadLocalDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.lang.ThreadLocal",
+    "sourcePath": "jdk/src/share/classes/java/lang/ThreadLocal.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.lang.Thread",
+      "sourcePath": "jdk/src/share/classes/java/lang/Thread.java"
+    },
+    {
+      "className": "java.lang.InheritableThreadLocal",
+      "sourcePath": "jdk/src/share/classes/java/lang/InheritableThreadLocal.java"
+    },
+    {
+      "className": "java.lang.ref.WeakReference",
+      "sourcePath": "jdk/src/share/classes/java/lang/ref/WeakReference.java"
+    },
+    {
+      "className": "java.util.concurrent.ThreadPoolExecutor",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/ThreadPoolExecutor.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "ThreadLocal.get()",
+      "document": "/jdk/concurrent/threadlocal/#get-的当前线程查找链",
+      "purpose": "从当前 Thread 的 map 读取绑定，缺失时初始化"
+    },
+    {
+      "method": "ThreadLocal.setInitialValue()",
+      "document": "/jdk/concurrent/threadlocal/#initialvalue-何时会再次调用",
+      "purpose": "调用每线程初始化逻辑并创建或更新绑定"
+    },
+    {
+      "method": "ThreadLocal.set(T)",
+      "document": "/jdk/concurrent/threadlocal/threadlocalmap#set-如何线性探测",
+      "purpose": "在当前线程 map 中更新、插入或替换 stale Entry"
+    },
+    {
+      "method": "ThreadLocal.remove()",
+      "document": "/jdk/concurrent/threadlocal/stale-cleanup#remove-为什么是确定性清理",
+      "purpose": "删除当前线程绑定并重排连续探测区间"
+    },
+    {
+      "method": "ThreadLocalMap.getEntry(ThreadLocal)",
+      "document": "/jdk/concurrent/threadlocal/threadlocalmap#getentry-的直接命中快路径",
+      "purpose": "按 ThreadLocal hash 尝试 home slot 身份命中"
+    },
+    {
+      "method": "ThreadLocalMap.getEntryAfterMiss(ThreadLocal,int,Entry)",
+      "document": "/jdk/concurrent/threadlocal/threadlocalmap#getentryaftermiss-如何继续探测",
+      "purpose": "沿连续 run 查找目标并顺带清理 stale"
+    },
+    {
+      "method": "ThreadLocalMap.set(ThreadLocal,Object)",
+      "document": "/jdk/concurrent/threadlocal/threadlocalmap#set-如何线性探测",
+      "purpose": "处理已有 key、碰撞、空槽插入和 stale 替换"
+    },
+    {
+      "method": "ThreadLocalMap.replaceStaleEntry(ThreadLocal,Object,int)",
+      "document": "/jdk/concurrent/threadlocal/threadlocalmap#replacestaleentry-的完整决策",
+      "purpose": "复用 staleSlot，并清理同一探测 run 的其他失效项"
+    },
+    {
+      "method": "ThreadLocalMap.expungeStaleEntry(int)",
+      "document": "/jdk/concurrent/threadlocal/stale-cleanup#expungestaleentry-清理一个连续-run",
+      "purpose": "清 value、删除 stale 槽并重新安置后续活 Entry"
+    },
+    {
+      "method": "ThreadLocalMap.cleanSomeSlots(int,int)",
+      "document": "/jdk/concurrent/threadlocal/stale-cleanup#cleansomeslots-的启发式扫描",
+      "purpose": "在插入或清理后执行对数级启发式 stale 扫描"
+    },
+    {
+      "method": "ThreadLocalMap.rehash()",
+      "document": "/jdk/concurrent/threadlocal/threadlocalmap#rehash-和-resize-的先后顺序",
+      "purpose": "扩容前全表清 stale，并按清理后的 size 决策"
+    },
+    {
+      "method": "InheritableThreadLocal.getMap(Thread)",
+      "document": "/jdk/concurrent/threadlocal/threadpool-leak#inheritablethreadlocal-使用另一张-map",
+      "purpose": "让可继承绑定进入 Thread.inheritableThreadLocals"
+    },
+    {
+      "method": "ThreadLocal.createInheritedMap(ThreadLocalMap)",
+      "document": "/jdk/concurrent/threadlocal/threadpool-leak#继承发生在线程对象构造时",
+      "purpose": "在线程构造期间复制父线程可继承绑定并调用 childValue"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "ThreadLocal.get()",
+      "scenario": "比较同一 ThreadLocal 在两个线程中的独立值",
+      "variables": ["t", "map", "e", "result"]
+    },
+    {
+      "method": "ThreadLocalMap.set(ThreadLocal,Object)",
+      "scenario": "观察 home slot、线性探测、已有 key 和 stale 分支",
+      "variables": ["key.threadLocalHashCode", "i", "e", "k", "size", "threshold"]
+    },
+    {
+      "method": "ThreadLocalMap.replaceStaleEntry(ThreadLocal,Object,int)",
+      "scenario": "set 在碰撞 run 中先遇到 stale，随后找到已有 key",
+      "variables": ["staleSlot", "slotToExpunge", "i", "e", "k"]
+    },
+    {
+      "method": "ThreadLocalMap.expungeStaleEntry(int)",
+      "scenario": "get 或 remove 清 stale 后重新安置后续碰撞项",
+      "variables": ["staleSlot", "i", "e", "k", "h", "size"]
+    },
+    {
+      "method": "ThreadLocalMap.cleanSomeSlots(int,int)",
+      "scenario": "插入新 Entry 后观察 n 右移和发现 stale 后扩大扫描",
+      "variables": ["i", "n", "e", "removed", "len"]
+    },
+    {
+      "method": "ThreadLocalMap(ThreadLocalMap)",
+      "scenario": "构造子 Thread 时复制 inheritableThreadLocals",
+      "variables": ["parentTable", "key", "value", "h", "size"]
+    },
+    {
+      "method": "InheritableThreadLocal.childValue(T)",
+      "scenario": "父线程构造 child 时生成子线程初始值",
+      "variables": ["parentValue", "Thread.currentThread()"]
+    }
+  ]
+}

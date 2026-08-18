@@ -1,0 +1,88 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-java-util-concurrent-completablefuture",
+  "title": "OpenJDK 8 CompletableFuture 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.concurrent.CompletableFutureDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/CompletableFutureDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.util.concurrent.CompletableFuture",
+    "sourcePath": "jdk/src/share/classes/java/util/concurrent/CompletableFuture.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.util.concurrent.CompletionStage",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/CompletionStage.java"
+    },
+    {
+      "className": "java.util.concurrent.ForkJoinPool",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/ForkJoinPool.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "supplyAsync(Supplier)",
+      "document": "/jdk/concurrent/completablefuture/#supplyasync-不等于创建一个专属线程",
+      "purpose": "创建异步源阶段并提交 AsyncSupply"
+    },
+    {
+      "method": "thenApply(Function)",
+      "document": "/jdk/concurrent/completablefuture/completion-stack#uniapply-的触发条件",
+      "purpose": "注册一元转换节点并传播正常或异常结果"
+    },
+    {
+      "method": "postComplete()",
+      "document": "/jdk/concurrent/completablefuture/completion-stack#postcomplete-为什么不用递归到底",
+      "purpose": "迭代弹出依赖节点并限制深链递归"
+    },
+    {
+      "method": "thenCompose(Function)",
+      "document": "/jdk/concurrent/completablefuture/composition#thenapply-与-thencompose",
+      "purpose": "把函数返回的 CompletionStage 展平为单层结果"
+    },
+    {
+      "method": "allOf(CompletableFuture...)",
+      "document": "/jdk/concurrent/completablefuture/composition#allof-如何构建依赖树",
+      "purpose": "使用平衡的 And 依赖树等待全部输入完成"
+    },
+    {
+      "method": "join()",
+      "document": "/jdk/concurrent/completablefuture/exception-cancel#get-与-join-的异常外观",
+      "purpose": "等待并按非受检异常约定解码最终结果"
+    },
+    {
+      "method": "cancel(boolean)",
+      "document": "/jdk/concurrent/completablefuture/exception-cancel#cancel-不会中断正在执行的任务",
+      "purpose": "以 CancellationException 完成阶段并触发依赖"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "uniApplyStage(Executor,Function)",
+      "scenario": "观察未完成与已完成源阶段的依赖注册路径",
+      "variables": ["e", "d", "c", "result", "stack"]
+    },
+    {
+      "method": "UniApply.tryFire(int)",
+      "scenario": "比较同步、异步和嵌套传播模式",
+      "variables": ["mode", "src", "dep", "executor", "fn"]
+    },
+    {
+      "method": "postComplete()",
+      "scenario": "跟踪 Completion 出栈和下游继续传播",
+      "variables": ["f", "h", "t", "d"]
+    },
+    {
+      "method": "waitingGet(boolean)",
+      "scenario": "观察 join/get 如何注册等待线程 Signaller",
+      "variables": ["interruptible", "q", "queued", "result"]
+    }
+  ]
+}

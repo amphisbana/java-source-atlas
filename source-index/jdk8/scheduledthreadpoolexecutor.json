@@ -1,0 +1,132 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-java-util-concurrent-scheduledthreadpoolexecutor",
+  "title": "OpenJDK 8 ScheduledThreadPoolExecutor 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.concurrent.ScheduledThreadPoolExecutorDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/ScheduledThreadPoolExecutorDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.util.concurrent.ScheduledThreadPoolExecutor",
+    "sourcePath": "jdk/src/share/classes/java/util/concurrent/ScheduledThreadPoolExecutor.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.util.concurrent.FutureTask",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/FutureTask.java"
+    },
+    {
+      "className": "java.util.concurrent.ThreadPoolExecutor",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/ThreadPoolExecutor.java"
+    },
+    {
+      "className": "java.util.concurrent.RunnableScheduledFuture",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/RunnableScheduledFuture.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "schedule(Runnable,long,TimeUnit)",
+      "document": "/jdk/concurrent/scheduledthreadpoolexecutor/#schedule-的完整调用链",
+      "purpose": "把单次命令包装为带绝对 nanoTime 触发时间的定时 Future"
+    },
+    {
+      "method": "scheduleAtFixedRate(Runnable,long,long,TimeUnit)",
+      "document": "/jdk/concurrent/scheduledthreadpoolexecutor/#周期任务为什么要保存-outertask",
+      "purpose": "创建 period 为正数的固定频率任务并保存装饰后的重入队对象"
+    },
+    {
+      "method": "scheduleWithFixedDelay(Runnable,long,long,TimeUnit)",
+      "document": "/jdk/concurrent/scheduledthreadpoolexecutor/periodic-cancel#period-正负如何选择下一时刻",
+      "purpose": "创建 period 为负数的固定延迟任务并从完成时刻计算下一轮"
+    },
+    {
+      "method": "decorateTask(Runnable,RunnableScheduledFuture)",
+      "document": "/jdk/concurrent/scheduledthreadpoolexecutor/#decoratetask-才是正确扩展点",
+      "purpose": "在不覆盖提交路径的前提下装饰内部定时任务"
+    },
+    {
+      "method": "delayedExecute(RunnableScheduledFuture)",
+      "document": "/jdk/concurrent/scheduledthreadpoolexecutor/#delayedexecute-为什么先入队再启动线程",
+      "purpose": "首次入队、并发关闭复查和预启动 worker"
+    },
+    {
+      "method": "ScheduledFutureTask.setNextRunTime()",
+      "document": "/jdk/concurrent/scheduledthreadpoolexecutor/periodic-cancel#period-正负如何选择下一时刻",
+      "purpose": "区分按计划时刻累加的固定频率和按完成时刻计算的固定延迟"
+    },
+    {
+      "method": "ScheduledFutureTask.run()",
+      "document": "/jdk/concurrent/scheduledthreadpoolexecutor/periodic-cancel#run-的三条分支",
+      "purpose": "检查关闭策略，执行单次任务或在 runAndReset 成功后重新调度"
+    },
+    {
+      "method": "reExecutePeriodic(RunnableScheduledFuture)",
+      "document": "/jdk/concurrent/scheduledthreadpoolexecutor/periodic-cancel#reexecuteperiodic-与首次提交的差异",
+      "purpose": "周期任务正常完成后的重新入队和关闭竞态复查"
+    },
+    {
+      "method": "DelayedWorkQueue.offer(Runnable)",
+      "document": "/jdk/concurrent/scheduledthreadpoolexecutor/delayed-work-queue#offer-如何维护最小堆",
+      "purpose": "上浮新任务、维护 heapIndex 并在新堆首出现时唤醒等待线程"
+    },
+    {
+      "method": "DelayedWorkQueue.take()",
+      "document": "/jdk/concurrent/scheduledthreadpoolexecutor/delayed-work-queue#take-的-leader-follower-等待",
+      "purpose": "只让一个 leader 定时等待堆首，其余 worker 作为 follower 等待信号"
+    },
+    {
+      "method": "ScheduledFutureTask.cancel(boolean)",
+      "document": "/jdk/concurrent/scheduledthreadpoolexecutor/periodic-cancel#cancel-的两个层次",
+      "purpose": "改变 Future 状态并按 removeOnCancel 策略尝试立即移出堆"
+    },
+    {
+      "method": "onShutdown()",
+      "document": "/jdk/concurrent/scheduledthreadpoolexecutor/periodic-cancel#onshutdown-如何筛选队列",
+      "purpose": "按延迟与周期关闭策略筛选、取消队列任务并尝试终止"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "schedule(Runnable,long,TimeUnit)",
+      "scenario": "观察单次和 execute 零延迟任务的包装过程",
+      "variables": ["command", "delay", "unit", "t"]
+    },
+    {
+      "method": "ScheduledFutureTask.run()",
+      "scenario": "分别触发单次、周期正常、周期异常和关闭取消分支",
+      "variables": ["periodic", "period", "time", "outerTask", "FutureTask.state"]
+    },
+    {
+      "method": "ScheduledFutureTask.setNextRunTime()",
+      "scenario": "比较固定频率和固定延迟的下一触发时刻",
+      "variables": ["time", "period", "now()"]
+    },
+    {
+      "method": "DelayedWorkQueue.offer(Runnable)",
+      "scenario": "插入比当前堆首更早的任务并使旧 leader 失效",
+      "variables": ["i", "queue[0]", "leader", "e.heapIndex"]
+    },
+    {
+      "method": "DelayedWorkQueue.take()",
+      "scenario": "两个空闲 worker 分别进入 leader 定时等待和 follower 无限等待",
+      "variables": ["first", "delay", "leader", "thisThread"]
+    },
+    {
+      "method": "ScheduledFutureTask.cancel(boolean)",
+      "scenario": "对比 removeOnCancel 开关前后的远期任务清理",
+      "variables": ["cancelled", "removeOnCancel", "heapIndex"]
+    },
+    {
+      "method": "onShutdown()",
+      "scenario": "在队列同时包含单次和周期任务时执行 shutdown",
+      "variables": ["keepDelayed", "keepPeriodic", "q", "t.isPeriodic()"]
+    }
+  ]
+}

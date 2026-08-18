@@ -1,0 +1,117 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-java-util-concurrent-atomic-striped64",
+  "title": "OpenJDK 8 AtomicInteger、LongAdder 与 Striped64 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.concurrent.AtomicDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/AtomicDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.util.concurrent.atomic.AtomicInteger",
+    "sourcePath": "jdk/src/share/classes/java/util/concurrent/atomic/AtomicInteger.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.util.concurrent.atomic.LongAdder",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/atomic/LongAdder.java"
+    },
+    {
+      "className": "java.util.concurrent.atomic.Striped64",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/atomic/Striped64.java"
+    },
+    {
+      "className": "java.util.concurrent.atomic.LongAccumulator",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/atomic/LongAccumulator.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "AtomicInteger.compareAndSet(int,int)",
+      "document": "/jdk/concurrent/atomic/atomic-integer#compareandset-的判定边界",
+      "purpose": "观察期望值匹配时提交、失配时保持当前值的条件更新"
+    },
+    {
+      "method": "AtomicInteger.getAndAdd(int)",
+      "document": "/jdk/concurrent/atomic/atomic-integer#getandadd-为什么能避免丢失更新",
+      "purpose": "理解返回旧值的一次原子读改写"
+    },
+    {
+      "method": "AtomicInteger.updateAndGet(IntUnaryOperator)",
+      "document": "/jdk/concurrent/atomic/atomic-integer#函数更新为什么要求无副作用",
+      "purpose": "跟踪 CAS 失败后用户函数可能重新计算的循环"
+    },
+    {
+      "method": "LongAdder.add(long)",
+      "document": "/jdk/concurrent/atomic/striped64#longadder-add-的三级路径",
+      "purpose": "区分 base 快路径、Cell 快路径和 longAccumulate 慢路径"
+    },
+    {
+      "method": "LongAdder.sum()",
+      "document": "/jdk/concurrent/atomic/sum-version#sum-如何读取逻辑总量",
+      "purpose": "汇总 base 与 Cell 并确认并发读取不是原子快照"
+    },
+    {
+      "method": "LongAdder.sumThenReset()",
+      "document": "/jdk/concurrent/atomic/sum-version#sumthenreset-为什么需要静默期",
+      "purpose": "理解逐条带读取归零与并发写入的边界"
+    },
+    {
+      "method": "Striped64.casBase(long,long)",
+      "document": "/jdk/concurrent/atomic/striped64#add-为什么先写-base",
+      "purpose": "观察无竞争更新和 cells 初始化竞争期间的基础值回退"
+    },
+    {
+      "method": "Striped64.longAccumulate(long,LongBinaryOperator,boolean)",
+      "document": "/jdk/concurrent/atomic/striped64#longaccumulate-的完整决策",
+      "purpose": "跟踪初始化、空槽安装、碰撞换槽、扩容和 base 回退"
+    },
+    {
+      "method": "Striped64.casCellsBusy()",
+      "document": "/jdk/concurrent/atomic/striped64#cellsbusy-不是什么",
+      "purpose": "确认结构修改权不保护普通 Cell 累加和汇总"
+    },
+    {
+      "method": "Striped64.advanceProbe(int)",
+      "document": "/jdk/concurrent/atomic/striped64#线程如何选择槽位",
+      "purpose": "观察碰撞线程如何改变 probe 并选择新槽位"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "AtomicInteger.compareAndSet(int,int)",
+      "scenario": "分别触发期望值匹配和失配",
+      "variables": ["expect", "update", "value", "return value"]
+    },
+    {
+      "method": "AtomicInteger.updateAndGet(IntUnaryOperator)",
+      "scenario": "受控竞争使第一次 CAS 失败并重新计算",
+      "variables": ["prev", "next", "value", "updateFunction"]
+    },
+    {
+      "method": "LongAdder.add(long)",
+      "scenario": "比较 base CAS、Cell CAS 和进入慢路径",
+      "variables": ["x", "as", "b", "a", "uncontended"]
+    },
+    {
+      "method": "Striped64.longAccumulate(long,LongBinaryOperator,boolean)",
+      "scenario": "观察 cells 初始化、空槽安装、连续碰撞和扩容",
+      "variables": ["x", "h", "as", "n", "a", "wasUncontended", "collide", "cellsBusy"]
+    },
+    {
+      "method": "Striped64.advanceProbe(int)",
+      "scenario": "目标 Cell CAS 失败后更换槽位",
+      "variables": ["probe", "cells.length", "probe & (cells.length - 1)"]
+    },
+    {
+      "method": "LongAdder.sumThenReset()",
+      "scenario": "在静默期逐项汇总并清零 base 和 Cell",
+      "variables": ["sum", "base", "as", "a.value"]
+    }
+  ]
+}

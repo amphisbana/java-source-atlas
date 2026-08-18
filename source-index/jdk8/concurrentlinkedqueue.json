@@ -1,0 +1,113 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-java-util-concurrent-concurrentlinkedqueue",
+  "title": "OpenJDK 8 ConcurrentLinkedQueue 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentLinkedQueueDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/ConcurrentLinkedQueueDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.util.concurrent.ConcurrentLinkedQueue",
+    "sourcePath": "jdk/src/share/classes/java/util/concurrent/ConcurrentLinkedQueue.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.util.Queue",
+      "sourcePath": "jdk/src/share/classes/java/util/Queue.java"
+    },
+    {
+      "className": "java.util.Spliterator",
+      "sourcePath": "jdk/src/share/classes/java/util/Spliterator.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "ConcurrentLinkedQueue.offer(E)",
+      "document": "/jdk/concurrent/concurrentlinkedqueue/offer-tail#offer-的完整循环",
+      "purpose": "从 tail 附近寻找末节点并用 next CAS 发布新节点"
+    },
+    {
+      "method": "Node.casNext(Node,Node)",
+      "document": "/jdk/concurrent/concurrentlinkedqueue/offer-tail#casnext-是入队线性化点",
+      "purpose": "确认从 null 后继到新节点的成功 CAS 是入队线性化点"
+    },
+    {
+      "method": "ConcurrentLinkedQueue.casTail(Node,Node)",
+      "document": "/jdk/concurrent/concurrentlinkedqueue/offer-tail#tail-为什么故意允许滞后",
+      "purpose": "观察两跳推进、允许失败和提示指针的性能职责"
+    },
+    {
+      "method": "ConcurrentLinkedQueue.poll()",
+      "document": "/jdk/concurrent/concurrentlinkedqueue/poll-iteration#poll-的完整扫描",
+      "purpose": "跳过死亡节点并竞争第一个非 null item"
+    },
+    {
+      "method": "Node.casItem(E,E)",
+      "document": "/jdk/concurrent/concurrentlinkedqueue/poll-iteration#casitem-是移除线性化点",
+      "purpose": "确认 item CAS 为 null 使一个元素只被成功取走一次"
+    },
+    {
+      "method": "ConcurrentLinkedQueue.updateHead(Node,Node)",
+      "document": "/jdk/concurrent/concurrentlinkedqueue/poll-iteration#updatehead-为什么让旧-head-指向自己",
+      "purpose": "推进 head 并把旧节点改成自链接恢复标记"
+    },
+    {
+      "method": "ConcurrentLinkedQueue.succ(Node)",
+      "document": "/jdk/concurrent/concurrentlinkedqueue/poll-iteration#updatehead-为什么让旧-head-指向自己",
+      "purpose": "识别自链接旧节点并回到当前 head"
+    },
+    {
+      "method": "ConcurrentLinkedQueue.Itr.advance()",
+      "document": "/jdk/concurrent/concurrentlinkedqueue/poll-iteration#迭代器为什么需要-nextitem",
+      "purpose": "缓存已承诺元素、跳过 null item 并协助解链"
+    },
+    {
+      "method": "ConcurrentLinkedQueue.size()",
+      "document": "/jdk/concurrent/concurrentlinkedqueue/poll-iteration#size-为什么不是并发计数器",
+      "purpose": "遍历统计非 null item 并理解并发结果不精确"
+    },
+    {
+      "method": "ConcurrentLinkedQueue.CLQSpliterator.trySplit()",
+      "document": "/jdk/concurrent/concurrentlinkedqueue/poll-iteration#spliterator-与-stream-边界",
+      "purpose": "观察弱一致来源如何按批次复制元素进行拆分"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "ConcurrentLinkedQueue.offer(E)",
+      "scenario": "连续插入 A、B，观察 tail 先滞后一跳再两跳推进",
+      "variables": ["t", "p", "q", "newNode", "tail"]
+    },
+    {
+      "method": "Node.casNext(Node,Node)",
+      "scenario": "两个生产者竞争同一个 null 后继",
+      "variables": ["cmp", "val", "next", "CAS result"]
+    },
+    {
+      "method": "ConcurrentLinkedQueue.poll()",
+      "scenario": "多个消费者竞争同一个非 null item",
+      "variables": ["h", "p", "q", "item", "head"]
+    },
+    {
+      "method": "ConcurrentLinkedQueue.updateHead(Node,Node)",
+      "scenario": "poll 跨过至少一个节点后推进 head",
+      "variables": ["h", "p", "h.next", "head"]
+    },
+    {
+      "method": "ConcurrentLinkedQueue.succ(Node)",
+      "scenario": "暂停线程恢复后读取已自链接的旧 head",
+      "variables": ["p", "next", "head"]
+    },
+    {
+      "method": "ConcurrentLinkedQueue.Itr.advance()",
+      "scenario": "创建迭代器后继续增删并遍历",
+      "variables": ["nextNode", "nextItem", "lastRet", "pred", "p", "item"]
+    }
+  ]
+}

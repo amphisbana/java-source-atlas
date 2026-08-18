@@ -1,0 +1,109 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-java-util-linkedhashmap",
+  "title": "OpenJDK 8 LinkedHashMap 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.collection.LinkedHashMapDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/collection/LinkedHashMapDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.util.LinkedHashMap",
+    "sourcePath": "jdk/src/share/classes/java/util/LinkedHashMap.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.util.HashMap",
+      "sourcePath": "jdk/src/share/classes/java/util/HashMap.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "LinkedHashMap(int,float,boolean)",
+      "document": "/jdk/collections/linkedhashmap/access-order",
+      "purpose": "选择插入顺序或访问顺序"
+    },
+    {
+      "method": "newNode(int,K,V,Node)",
+      "document": "/jdk/collections/linkedhashmap/",
+      "purpose": "创建普通 Entry 并连接到顺序链尾部"
+    },
+    {
+      "method": "replacementNode(Node,Node)",
+      "document": "/jdk/collections/linkedhashmap/",
+      "purpose": "节点表示替换时转移 before 和 after 链接"
+    },
+    {
+      "method": "newTreeNode(int,K,V,Node) / replacementTreeNode(Node,Node)",
+      "document": "/jdk/collections/linkedhashmap/",
+      "purpose": "树桶节点创建与替换时保持全局顺序"
+    },
+    {
+      "method": "get(Object)",
+      "document": "/jdk/collections/linkedhashmap/access-order",
+      "purpose": "查询节点并在访问顺序模式下触发移动"
+    },
+    {
+      "method": "afterNodeAccess(Node)",
+      "document": "/jdk/collections/linkedhashmap/access-order",
+      "purpose": "把命中的非尾节点移动到 tail"
+    },
+    {
+      "method": "afterNodeInsertion(boolean)",
+      "document": "/jdk/collections/linkedhashmap/lru",
+      "purpose": "普通插入完成后询问最老节点淘汰策略"
+    },
+    {
+      "method": "removeEldestEntry(Map.Entry)",
+      "document": "/jdk/collections/linkedhashmap/lru",
+      "purpose": "为有界映射提供可覆盖的淘汰决策 Hook"
+    },
+    {
+      "method": "afterNodeRemoval(Node)",
+      "document": "/jdk/collections/linkedhashmap/lru",
+      "purpose": "节点从哈希表删除后同步修复顺序链"
+    },
+    {
+      "method": "LinkedHashIterator.nextNode()",
+      "document": "/jdk/collections/linkedhashmap/access-order",
+      "purpose": "沿 after 遍历并执行快速失败检查"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "linkNodeLast(Entry)",
+      "scenario": "观察首个节点和后续节点如何成为 tail",
+      "variables": ["p", "last", "head", "tail"]
+    },
+    {
+      "method": "afterNodeAccess(Node)",
+      "scenario": "观察 get 命中非尾节点后的摘除与尾插",
+      "variables": ["e", "p", "b", "a", "last", "head", "tail", "modCount"]
+    },
+    {
+      "method": "afterNodeInsertion(boolean)",
+      "scenario": "观察新增映射后的 LRU 策略判断",
+      "variables": ["evict", "first", "head", "tail", "size"]
+    },
+    {
+      "method": "afterNodeRemoval(Node)",
+      "scenario": "观察主动删除或 LRU 淘汰后的双链修复",
+      "variables": ["e", "p", "b", "a", "head", "tail", "size", "modCount"]
+    },
+    {
+      "method": "transferLinks(Entry,Entry)",
+      "scenario": "观察树化或退化时替代节点继承原顺序位置",
+      "variables": ["src", "dst", "b", "a", "head", "tail"]
+    },
+    {
+      "method": "LinkedHashIterator.nextNode()",
+      "scenario": "观察访问顺序变化导致旧迭代器快速失败",
+      "variables": ["next", "current", "expectedModCount", "modCount"]
+    }
+  ]
+}

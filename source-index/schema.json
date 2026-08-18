@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://java-source-atlas.dev/schema/source-topic.json",
+  "title": "Java Source Atlas Topic Index",
+  "type": "object",
+  "required": ["schemaVersion", "topicId", "title", "primaryVersion", "sourceRef", "lab", "source", "entryPoints"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "topicId": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "primaryVersion": { "type": "string", "minLength": 1 },
+    "sourceRef": { "type": "string", "minLength": 1 },
+    "compatibleVersions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "lab": {
+      "type": "object",
+      "required": ["module", "mainClass", "sourcePath"],
+      "properties": {
+        "module": { "type": "string", "minLength": 1 },
+        "mainClass": { "type": "string", "minLength": 1 },
+        "sourcePath": { "type": "string", "minLength": 1 }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": ["repository", "className", "sourcePath"],
+      "properties": {
+        "repository": { "type": "string", "format": "uri" },
+        "className": { "type": "string", "minLength": 1 },
+        "sourcePath": { "type": "string", "minLength": 1 }
+      }
+    },
+    "relatedSources": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["className", "sourcePath"],
+        "properties": {
+          "className": { "type": "string", "minLength": 1 },
+          "sourcePath": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "entryPoints": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["method", "document", "purpose"],
+        "properties": {
+          "method": { "type": "string", "minLength": 1 },
+          "document": { "type": "string", "minLength": 1 },
+          "purpose": { "type": "string", "minLength": 1 },
+          "sourceClass": { "type": ["string", "null"], "minLength": 1 }
+        }
+      }
+    },
+    "breakpoints": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["method", "scenario", "variables"],
+        "properties": {
+          "method": { "type": "string", "minLength": 1 },
+          "scenario": { "type": "string", "minLength": 1 },
+          "sourceClass": { "type": ["string", "null"], "minLength": 1 },
+          "variables": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

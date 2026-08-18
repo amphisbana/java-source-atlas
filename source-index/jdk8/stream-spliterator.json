@@ -1,0 +1,260 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-java-util-stream-spliterator",
+  "title": "OpenJDK 8 Stream 与 Spliterator 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.stream.StreamSpliteratorDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/stream/StreamSpliteratorDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.util.stream.AbstractPipeline",
+    "sourcePath": "jdk/src/share/classes/java/util/stream/AbstractPipeline.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.util.stream.ReferencePipeline",
+      "sourcePath": "jdk/src/share/classes/java/util/stream/ReferencePipeline.java"
+    },
+    {
+      "className": "java.util.stream.Sink",
+      "sourcePath": "jdk/src/share/classes/java/util/stream/Sink.java"
+    },
+    {
+      "className": "java.util.function.Consumer",
+      "sourcePath": "jdk/src/share/classes/java/util/function/Consumer.java"
+    },
+    {
+      "className": "java.util.stream.StreamOpFlag",
+      "sourcePath": "jdk/src/share/classes/java/util/stream/StreamOpFlag.java"
+    },
+    {
+      "className": "java.util.Spliterator",
+      "sourcePath": "jdk/src/share/classes/java/util/Spliterator.java"
+    },
+    {
+      "className": "java.util.ArrayList",
+      "sourcePath": "jdk/src/share/classes/java/util/ArrayList.java"
+    },
+    {
+      "className": "java.util.stream.AbstractTask",
+      "sourcePath": "jdk/src/share/classes/java/util/stream/AbstractTask.java"
+    },
+    {
+      "className": "java.util.stream.AbstractShortCircuitTask",
+      "sourcePath": "jdk/src/share/classes/java/util/stream/AbstractShortCircuitTask.java"
+    },
+    {
+      "className": "java.util.stream.ReduceOps",
+      "sourcePath": "jdk/src/share/classes/java/util/stream/ReduceOps.java"
+    },
+    {
+      "className": "java.util.stream.ForEachOps",
+      "sourcePath": "jdk/src/share/classes/java/util/stream/ForEachOps.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "AbstractPipeline(AbstractPipeline,int)",
+      "document": "/jdk/functional/stream/pipeline-sink#一个-stage-保存什么",
+      "purpose": "连接前后 stage，组合 flags，并阻止同一上游 stage 再次链接"
+    },
+    {
+      "method": "AbstractPipeline.evaluate(TerminalOp)",
+      "document": "/jdk/functional/stream/pipeline-sink#evaluate-如何启动终止操作",
+      "purpose": "标记流水线已消费，取得 source Spliterator，并选择顺序或并行求值"
+    },
+    {
+      "method": "AbstractPipeline.sourceSpliterator(int)",
+      "document": "/jdk/functional/stream/pipeline-sink#evaluate-如何启动终止操作",
+      "purpose": "兑现并清空 source，并在并行 stateful stage 边界调整 Spliterator 与 flags"
+    },
+    {
+      "method": "AbstractPipeline.wrapSink(Sink)",
+      "document": "/jdk/functional/stream/pipeline-sink#wrapsink-为什么从终止端反向走",
+      "purpose": "从末 stage 沿 previousStage 反向包装终止 Sink"
+    },
+    {
+      "method": "AbstractPipeline.copyInto(Sink,Spliterator)",
+      "document": "/jdk/functional/stream/short-circuit#copyinto-的两条遍历路径",
+      "purpose": "根据 SHORT_CIRCUIT flag 选择批量遍历或可取消遍历"
+    },
+    {
+      "method": "AbstractPipeline.copyIntoWithCancel(Sink,Spliterator)",
+      "document": "/jdk/functional/stream/short-circuit#copyinto-的两条遍历路径",
+      "purpose": "驱动 Sink 生命周期并委托 source pipeline 执行取消感知遍历"
+    },
+    {
+      "method": "ReferencePipeline.filter(Predicate)",
+      "document": "/jdk/functional/stream/pipeline-sink#一次融合遍历的变量轨迹",
+      "purpose": "创建清除 SIZED 的无状态 stage，并只向下游传递谓词通过的元素"
+    },
+    {
+      "method": "ReferencePipeline.map(Function)",
+      "document": "/jdk/functional/stream/pipeline-sink#一次融合遍历的变量轨迹",
+      "purpose": "创建清除 SORTED 和 DISTINCT 的无状态映射 stage"
+    },
+    {
+      "method": "ReferencePipeline.forEachWithCancel(Spliterator,Sink)",
+      "document": "/jdk/functional/stream/short-circuit#copyinto-的两条遍历路径",
+      "purpose": "在每次推进前查询 cancellationRequested，并在请求取消后停止"
+    },
+    {
+      "method": "Sink.begin(long)",
+      "document": "/jdk/functional/stream/pipeline-sink#sink-的四段生命周期",
+      "purpose": "在遍历前把已知规模或未知规模标记通知给当前 Sink"
+    },
+    {
+      "method": "Consumer.accept(T)",
+      "document": "/jdk/functional/stream/pipeline-sink#sink-的四段生命周期",
+      "purpose": "接收一个元素；Stream 包装 Sink 通过该入口把元素推向下游"
+    },
+    {
+      "method": "Sink.cancellationRequested()",
+      "document": "/jdk/functional/stream/pipeline-sink#sink-的四段生命周期",
+      "purpose": "让短路 Sink 在下一次源推进前请求协作停止"
+    },
+    {
+      "method": "Sink.end()",
+      "document": "/jdk/functional/stream/pipeline-sink#sink-的四段生命周期",
+      "purpose": "通知当前 Sink 本轮输入已经结束并完成必要收尾"
+    },
+    {
+      "method": "StreamOpFlag.combineOpFlags(int,int)",
+      "document": "/jdk/functional/stream/pipeline-sink#flags-不是一组简单-boolean",
+      "purpose": "组合 source、intermediate 和 terminal 对流特征的设置与清除信息"
+    },
+    {
+      "method": "Spliterator.tryAdvance(Consumer)",
+      "document": "/jdk/functional/stream/parallel-spliterator#四个核心入口各自回答什么",
+      "purpose": "把下一个剩余元素交给 action，并报告推进是否成功"
+    },
+    {
+      "method": "Spliterator.trySplit()",
+      "document": "/jdk/functional/stream/parallel-spliterator#四个核心入口各自回答什么",
+      "purpose": "从尚未遍历的范围拆出不重叠分区，供并行任务移交"
+    },
+    {
+      "method": "Spliterator.estimateSize()",
+      "document": "/jdk/functional/stream/parallel-spliterator#characteristics-不是性能装饰",
+      "purpose": "向上层提供当前剩余元素数量的估计"
+    },
+    {
+      "method": "Spliterator.characteristics()",
+      "document": "/jdk/functional/stream/parallel-spliterator#characteristics-不是性能装饰",
+      "purpose": "声明 ORDERED、SIZED、SUBSIZED 等可依赖的数据源特征"
+    },
+    {
+      "method": "ArrayList.ArrayListSpliterator.getFence()",
+      "document": "/jdk/functional/stream/parallel-spliterator#arraylistspliterator-如何延迟绑定",
+      "purpose": "首次需要范围时绑定当前 size、fence 和 expectedModCount"
+    },
+    {
+      "method": "ArrayList.ArrayListSpliterator.trySplit()",
+      "document": "/jdk/functional/stream/parallel-spliterator#arraylist-trysplit-返回前缀",
+      "purpose": "按索引中点返回左侧前缀，并让原 Spliterator 保留右侧后缀"
+    },
+    {
+      "method": "ArrayList.ArrayListSpliterator.forEachRemaining(Consumer)",
+      "document": "/jdk/functional/stream/parallel-spliterator#fail-fast-是尽力检测-不是事务回滚",
+      "purpose": "批量推进绑定范围，并在末端检查结构版本是否改变"
+    },
+    {
+      "method": "AbstractTask.suggestTargetSize(long)",
+      "document": "/jdk/functional/stream/parallel-spliterator#目标叶大小只是启发式",
+      "purpose": "根据初始规模和当前实现的 leaf target 计算建议叶阈值"
+    },
+    {
+      "method": "AbstractTask.compute()",
+      "document": "/jdk/functional/stream/parallel-spliterator#abstracttask-怎样长出任务树",
+      "purpose": "循环拆分 source 分区，交替 fork 子节点并在叶节点执行 doLeaf"
+    },
+    {
+      "method": "ReduceOps.ReduceTask.onCompletion(CountedCompleter)",
+      "document": "/jdk/functional/stream/parallel-spliterator#完成顺序与结果顺序是两件事",
+      "purpose": "把左子任务局部结果与右子任务局部结果按树结构归并"
+    },
+    {
+      "method": "ForEachOps.ForEachOrderedTask.compute()",
+      "document": "/jdk/functional/stream/parallel-spliterator#foreach-与-foreachordered-的边界",
+      "purpose": "建立左侧前驱完成依赖，并为不能立即输出的分区准备 Node 缓冲"
+    },
+    {
+      "method": "ForEachOps.ForEachOrderedTask.onCompletion(CountedCompleter)",
+      "document": "/jdk/functional/stream/parallel-spliterator#foreach-与-foreachordered-的边界",
+      "purpose": "前驱满足后按遇见顺序执行缓冲节点，并释放后继任务"
+    },
+    {
+      "method": "AbstractShortCircuitTask.compute()",
+      "document": "/jdk/functional/stream/short-circuit#并行短路的共享结果",
+      "purpose": "拆分并计算短路任务，同时轮询共享结果与祖先取消标记"
+    },
+    {
+      "method": "AbstractShortCircuitTask.shortCircuit(R)",
+      "document": "/jdk/functional/stream/short-circuit#并行短路的共享结果",
+      "purpose": "以 CAS 发布第一个全局有效结果，让其他任务协作停止"
+    },
+    {
+      "method": "AbstractShortCircuitTask.cancelLaterNodes()",
+      "document": "/jdk/functional/stream/parallel-spliterator#并行短路为何仍可能多做工作",
+      "purpose": "沿父任务链标记遇见顺序上更晚的右侧兄弟分区取消"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "AbstractPipeline(AbstractPipeline,int)",
+      "scenario": "组装 filter、map 和 limit，确认构建阶段尚未推进 source",
+      "variables": ["previousStage", "nextStage", "depth", "sourceOrOpFlags", "combinedFlags", "linkedOrConsumed"]
+    },
+    {
+      "method": "AbstractPipeline.wrapSink(Sink)",
+      "scenario": "collect 启动后观察 terminal Sink 被 limit、map、filter 反向包装",
+      "variables": ["sink", "p", "p.depth", "p.previousStage", "p.previousStage.combinedFlags"]
+    },
+    {
+      "method": "ReferencePipeline.forEachWithCancel(Spliterator,Sink)",
+      "scenario": "filter、map、limit(1) 在接收第二个源元素后停止推进",
+      "variables": ["spliterator", "sink", "sink.cancellationRequested()"]
+    },
+    {
+      "method": "ArrayList.ArrayListSpliterator.getFence()",
+      "scenario": "创建 Spliterator 后先追加元素，再以 estimateSize 触发延迟绑定",
+      "variables": ["fence", "index", "expectedModCount", "list.size", "list.modCount"]
+    },
+    {
+      "method": "ArrayList.ArrayListSpliterator.trySplit()",
+      "scenario": "把八元素 ArrayList 的索引范围拆为前缀与剩余后缀",
+      "variables": ["lo", "hi", "mid", "index", "fence", "expectedModCount"]
+    },
+    {
+      "method": "ArrayList.ArrayListSpliterator.forEachRemaining(Consumer)",
+      "scenario": "fence 绑定后结构性修改，观察 action 与末尾 modCount 检查",
+      "variables": ["i", "hi", "mc", "expectedModCount", "list.modCount", "elementData"]
+    },
+    {
+      "method": "AbstractTask.compute()",
+      "scenario": "并行归约从根 Spliterator 构建二叉任务树并形成叶节点",
+      "variables": ["rs", "ls", "sizeEstimate", "sizeThreshold", "forkRight", "task", "taskToFork", "task.getPendingCount()"]
+    },
+    {
+      "method": "ReduceOps.ReduceTask.onCompletion(CountedCompleter)",
+      "scenario": "多个叶结果完成后观察左结果与右结果的有序 combine",
+      "variables": ["leftChild", "rightChild", "leftChild.getLocalResult()", "rightChild.getLocalResult()", "caller"]
+    },
+    {
+      "method": "AbstractShortCircuitTask.shortCircuit(R)",
+      "scenario": "并行 match 或 find 叶任务发现有效结果并尝试发布",
+      "variables": ["result", "sharedResult", "sharedResult.get()"]
+    },
+    {
+      "method": "AbstractShortCircuitTask.cancelLaterNodes()",
+      "scenario": "有序 findFirst 找到候选后取消遇见顺序更晚的分区",
+      "variables": ["node", "parent", "parent.leftChild", "rightSibling", "rightSibling.canceled"]
+    }
+  ]
+}

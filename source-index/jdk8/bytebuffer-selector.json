@@ -1,0 +1,237 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "openjdk8-bytebuffer-selector",
+  "title": "OpenJDK 8 ByteBuffer 与 Selector 源码解析",
+  "primaryVersion": "OpenJDK 8u",
+  "sourceRef": "jdk8u412-b08",
+  "lab": {
+    "module": "labs/jdk-labs",
+    "mainClass": "io.github.javasourceatlas.jdk.nio.NioBufferSelectorDebugLab",
+    "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/nio/NioBufferSelectorDebugLab.java"
+  },
+  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "source": {
+    "repository": "https://github.com/openjdk/jdk8u",
+    "className": "java.nio.ByteBuffer",
+    "sourcePath": "jdk/src/share/classes/java/nio/ByteBuffer.java"
+  },
+  "relatedSources": [
+    {
+      "className": "java.nio.Buffer",
+      "sourcePath": "jdk/src/share/classes/java/nio/Buffer.java"
+    },
+    {
+      "className": "java.nio.HeapByteBuffer",
+      "sourcePath": "jdk/src/share/classes/java/nio/HeapByteBuffer.java"
+    },
+    {
+      "className": "java.nio.DirectByteBuffer",
+      "sourcePath": "jdk/src/share/classes/java/nio/DirectByteBuffer.java"
+    },
+    {
+      "className": "java.nio.Bits",
+      "sourcePath": "jdk/src/share/classes/java/nio/Bits.java"
+    },
+    {
+      "className": "java.nio.channels.Selector",
+      "sourcePath": "jdk/src/share/classes/java/nio/channels/Selector.java"
+    },
+    {
+      "className": "java.nio.channels.SelectionKey",
+      "sourcePath": "jdk/src/share/classes/java/nio/channels/SelectionKey.java"
+    },
+    {
+      "className": "java.nio.channels.spi.SelectorProvider",
+      "sourcePath": "jdk/src/share/classes/java/nio/channels/spi/SelectorProvider.java"
+    },
+    {
+      "className": "java.nio.channels.spi.AbstractSelector",
+      "sourcePath": "jdk/src/share/classes/java/nio/channels/spi/AbstractSelector.java"
+    },
+    {
+      "className": "java.nio.channels.spi.AbstractSelectableChannel",
+      "sourcePath": "jdk/src/share/classes/java/nio/channels/spi/AbstractSelectableChannel.java"
+    },
+    {
+      "className": "sun.nio.ch.SelectorImpl",
+      "sourcePath": "jdk/src/share/classes/sun/nio/ch/SelectorImpl.java"
+    },
+    {
+      "className": "sun.nio.ch.EPollSelectorImpl",
+      "sourcePath": "jdk/src/solaris/classes/sun/nio/ch/EPollSelectorImpl.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "Buffer.position(int)",
+      "document": "/jdk/io/nio/buffer-state#四个指标的准确含义",
+      "purpose": "校验新 position，并在位置退到 mark 左侧时丢弃 mark",
+      "sourceClass": "java.nio.Buffer"
+    },
+    {
+      "method": "Buffer.limit(int)",
+      "document": "/jdk/io/nio/buffer-state#四个指标的准确含义",
+      "purpose": "校验新 limit，并同步收缩越界的 position 与 mark",
+      "sourceClass": "java.nio.Buffer"
+    },
+    {
+      "method": "Buffer.flip()",
+      "document": "/jdk/io/nio/buffer-state#flip-把刚写入的前缀交给读取方",
+      "purpose": "把旧 position 设置为新 limit，再把 position 归零并丢弃 mark",
+      "sourceClass": "java.nio.Buffer"
+    },
+    {
+      "method": "Buffer.clear()",
+      "document": "/jdk/io/nio/buffer-state#clear-放弃所有未读数据-整段重新可写",
+      "purpose": "把 position 归零并把 limit 恢复为 capacity，但不擦除底层内容",
+      "sourceClass": "java.nio.Buffer"
+    },
+    {
+      "method": "Buffer.rewind()",
+      "document": "/jdk/io/nio/buffer-state#rewind-在既有限制内重新读取",
+      "purpose": "保持 limit 不变，把 position 归零以重新消费同一范围",
+      "sourceClass": "java.nio.Buffer"
+    },
+    {
+      "method": "HeapByteBuffer.compact()",
+      "document": "/jdk/io/nio/buffer-state#compact-保留未处理尾部-再继续接收",
+      "purpose": "把剩余字节搬到逻辑起点，并将 position 设置为保留字节数",
+      "sourceClass": "java.nio.HeapByteBuffer"
+    },
+    {
+      "method": "ByteBuffer.allocateDirect(int)",
+      "document": "/jdk/io/nio/buffer-state#直接缓冲区",
+      "purpose": "创建直接字节缓冲区并进入平台直接内存分配路径",
+      "sourceClass": "java.nio.ByteBuffer"
+    },
+    {
+      "method": "ByteBuffer.order(ByteOrder)",
+      "document": "/jdk/io/nio/buffer-state#字节序决定多字节值如何拼装",
+      "purpose": "设置多字节基本类型读写采用的大端或小端顺序",
+      "sourceClass": "java.nio.ByteBuffer"
+    },
+    {
+      "method": "ByteBuffer.asIntBuffer()",
+      "document": "/jdk/io/nio/buffer-state#类型视图-共享内容-独立游标",
+      "purpose": "从当前剩余字节创建共享内容但边界独立的 int 视图",
+      "sourceClass": "java.nio.ByteBuffer"
+    },
+    {
+      "method": "Selector.open()",
+      "document": "/jdk/io/nio/selector-loop#selector-open-如何落到平台实现",
+      "purpose": "委托系统默认 SelectorProvider 创建平台 Selector",
+      "sourceClass": "java.nio.channels.Selector"
+    },
+    {
+      "method": "SelectorProvider.provider()",
+      "document": "/jdk/io/nio/selector-loop#selector-open-如何落到平台实现",
+      "purpose": "按属性、服务配置和平台默认实现定位并缓存 provider",
+      "sourceClass": "java.nio.channels.spi.SelectorProvider"
+    },
+    {
+      "method": "AbstractSelectableChannel.register(Selector,int,Object)",
+      "document": "/jdk/io/nio/selector-loop#注册调用链",
+      "purpose": "检查 Channel 状态、合法兴趣位和非阻塞模式，再复用或创建 SelectionKey",
+      "sourceClass": "java.nio.channels.spi.AbstractSelectableChannel"
+    },
+    {
+      "method": "AbstractSelectableChannel.configureBlocking(boolean)",
+      "document": "/jdk/io/nio/selector-loop#注册调用链",
+      "purpose": "在注册锁内切换阻塞模式，并拒绝把仍有有效 key 的 Channel 改回阻塞",
+      "sourceClass": "java.nio.channels.spi.AbstractSelectableChannel"
+    },
+    {
+      "method": "Selector.select(long)",
+      "document": "/jdk/io/nio/selector-loop#select、超时与空返回",
+      "purpose": "在限定时间内执行选择，并返回本轮 ready set 被更新的 key 数",
+      "sourceClass": "java.nio.channels.Selector"
+    },
+    {
+      "method": "Selector.wakeup()",
+      "document": "/jdk/io/nio/selector-loop#wakeup-是一次许可-不是事件队列",
+      "purpose": "让当前或下一次阻塞选择立即返回，以便 Selector 线程处理控制命令",
+      "sourceClass": "java.nio.channels.Selector"
+    },
+    {
+      "method": "SelectionKey.interestOps(int)",
+      "document": "/jdk/io/nio/selector-loop#interestops-与-readyops-的时间边界",
+      "purpose": "声明后续选择需要观察的合法操作位集合",
+      "sourceClass": "java.nio.channels.SelectionKey"
+    },
+    {
+      "method": "SelectionKey.readyOps()",
+      "document": "/jdk/io/nio/selector-loop#interestops-与-readyops-的时间边界",
+      "purpose": "读取最近选择操作为当前有效 key 报告的就绪位",
+      "sourceClass": "java.nio.channels.SelectionKey"
+    },
+    {
+      "method": "SelectionKey.cancel()",
+      "document": "/jdk/io/nio/selector-loop#取消集合-cancelledkeys",
+      "purpose": "使 key 失效并加入 Selector 的延迟注销集合",
+      "sourceClass": "java.nio.channels.SelectionKey"
+    },
+    {
+      "method": "SelectorImpl.processDeregisterQueue()",
+      "document": "/jdk/io/nio/selector-loop#取消集合-cancelledkeys",
+      "purpose": "处理取消集合并从 Selector、Channel 与底层轮询器注销 key",
+      "sourceClass": "sun.nio.ch.SelectorImpl"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "Buffer.nextGetIndex()",
+      "scenario": "相对 get 消费动画中的 A、B、C、D",
+      "sourceClass": "java.nio.Buffer",
+      "variables": ["position", "limit", "p"]
+    },
+    {
+      "method": "Buffer.flip()",
+      "scenario": "写入 A 到 D 后把写入边界切换为读取边界",
+      "sourceClass": "java.nio.Buffer",
+      "variables": ["mark", "position", "limit", "capacity"]
+    },
+    {
+      "method": "HeapByteBuffer.compact()",
+      "scenario": "消费 A、B 后保留 C、D，并继续追加 E",
+      "sourceClass": "java.nio.HeapByteBuffer",
+      "variables": ["pos", "lim", "rem", "hb", "offset"]
+    },
+    {
+      "method": "DirectByteBuffer(int)",
+      "scenario": "运行 heap/direct 对比时创建八字节直接缓冲区",
+      "sourceClass": "java.nio.DirectByteBuffer",
+      "variables": ["cap", "size", "base", "address", "cleaner"]
+    },
+    {
+      "method": "SelectorProvider.provider()",
+      "scenario": "回环实验首次调用 Selector.open",
+      "sourceClass": "java.nio.channels.spi.SelectorProvider",
+      "variables": ["provider", "lock", "系统属性", "服务配置", "默认 provider"]
+    },
+    {
+      "method": "AbstractSelectableChannel.register(Selector,int,Object)",
+      "scenario": "Server 注册 ACCEPT，Client 注册 CONNECT，Peer 注册 READ",
+      "sourceClass": "java.nio.channels.spi.AbstractSelectableChannel",
+      "variables": ["sel", "ops", "att", "regLock", "keyLock", "k", "validOps()", "isBlocking()"]
+    },
+    {
+      "method": "SelectorImpl.lockAndDoSelect(long)",
+      "scenario": "事件循环以 250ms 切片等待本机回环事件",
+      "sourceClass": "sun.nio.ch.SelectorImpl",
+      "variables": ["timeout", "publicKeys", "publicSelectedKeys", "isOpen()"]
+    },
+    {
+      "method": "EPollSelectorImpl.doSelect(long)",
+      "scenario": "在 Linux OpenJDK 8u 观察注销、epoll 等待、就绪更新和 wakeup 排空",
+      "sourceClass": "sun.nio.ch.EPollSelectorImpl",
+      "variables": ["timeout", "pollWrapper", "fdToKey", "interruptTriggered", "numKeysUpdated"]
+    },
+    {
+      "method": "SelectorImpl.processDeregisterQueue()",
+      "scenario": "取消回环 key 后执行下一次选择完成延迟注销",
+      "sourceClass": "sun.nio.ch.SelectorImpl",
+      "variables": ["cancelledKeys", "ski", "keys", "selectedKeys"]
+    }
+  ]
+}

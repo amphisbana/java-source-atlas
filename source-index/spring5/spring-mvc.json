@@ -1,0 +1,212 @@
+{
+  "$schema": "../schema.json",
+  "schemaVersion": 1,
+  "topicId": "spring-framework-5-3-mvc",
+  "title": "Spring Framework 5.3 MVC 源码解析",
+  "primaryVersion": "Spring Framework 5.3.39",
+  "sourceRef": "v5.3.39",
+  "lab": {
+    "module": "labs/spring-framework-lab",
+    "mainClass": "io.github.javasourceatlas.spring.mvc.SpringMvcDebugLab",
+    "sourcePath": "labs/spring-framework-lab/src/main/java/io/github/javasourceatlas/spring/mvc/SpringMvcDebugLab.java"
+  },
+  "compatibleVersions": [
+    "Spring Framework 5.3.x / javax.servlet",
+    "Spring Framework 6.x / jakarta.servlet（概念兼容，API 与实现需复核）"
+  ],
+  "source": {
+    "repository": "https://github.com/spring-projects/spring-framework",
+    "className": "org.springframework.web.servlet.DispatcherServlet",
+    "sourcePath": "spring-webmvc/src/main/java/org/springframework/web/servlet/DispatcherServlet.java"
+  },
+  "relatedSources": [
+    {
+      "className": "org.springframework.web.servlet.FrameworkServlet",
+      "sourcePath": "spring-webmvc/src/main/java/org/springframework/web/servlet/FrameworkServlet.java"
+    },
+    {
+      "className": "org.springframework.web.servlet.handler.AbstractHandlerMapping",
+      "sourcePath": "spring-webmvc/src/main/java/org/springframework/web/servlet/handler/AbstractHandlerMapping.java"
+    },
+    {
+      "className": "org.springframework.web.servlet.handler.AbstractHandlerMethodMapping",
+      "sourcePath": "spring-webmvc/src/main/java/org/springframework/web/servlet/handler/AbstractHandlerMethodMapping.java"
+    },
+    {
+      "className": "org.springframework.web.servlet.mvc.method.RequestMappingInfoHandlerMapping",
+      "sourcePath": "spring-webmvc/src/main/java/org/springframework/web/servlet/mvc/method/RequestMappingInfoHandlerMapping.java"
+    },
+    {
+      "className": "org.springframework.web.servlet.HandlerExecutionChain",
+      "sourcePath": "spring-webmvc/src/main/java/org/springframework/web/servlet/HandlerExecutionChain.java"
+    },
+    {
+      "className": "org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter",
+      "sourcePath": "spring-webmvc/src/main/java/org/springframework/web/servlet/mvc/method/annotation/RequestMappingHandlerAdapter.java"
+    },
+    {
+      "className": "org.springframework.web.method.support.InvocableHandlerMethod",
+      "sourcePath": "spring-web/src/main/java/org/springframework/web/method/support/InvocableHandlerMethod.java"
+    },
+    {
+      "className": "org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod",
+      "sourcePath": "spring-webmvc/src/main/java/org/springframework/web/servlet/mvc/method/annotation/ServletInvocableHandlerMethod.java"
+    },
+    {
+      "className": "org.springframework.web.method.support.HandlerMethodArgumentResolverComposite",
+      "sourcePath": "spring-web/src/main/java/org/springframework/web/method/support/HandlerMethodArgumentResolverComposite.java"
+    },
+    {
+      "className": "org.springframework.web.method.support.HandlerMethodReturnValueHandlerComposite",
+      "sourcePath": "spring-web/src/main/java/org/springframework/web/method/support/HandlerMethodReturnValueHandlerComposite.java"
+    },
+    {
+      "className": "org.springframework.web.servlet.mvc.method.annotation.AbstractMessageConverterMethodArgumentResolver",
+      "sourcePath": "spring-webmvc/src/main/java/org/springframework/web/servlet/mvc/method/annotation/AbstractMessageConverterMethodArgumentResolver.java"
+    },
+    {
+      "className": "org.springframework.web.servlet.mvc.method.annotation.AbstractMessageConverterMethodProcessor",
+      "sourcePath": "spring-webmvc/src/main/java/org/springframework/web/servlet/mvc/method/annotation/AbstractMessageConverterMethodProcessor.java"
+    },
+    {
+      "className": "org.springframework.web.servlet.mvc.method.annotation.RequestResponseBodyMethodProcessor",
+      "sourcePath": "spring-webmvc/src/main/java/org/springframework/web/servlet/mvc/method/annotation/RequestResponseBodyMethodProcessor.java"
+    },
+    {
+      "className": "org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver",
+      "sourcePath": "spring-webmvc/src/main/java/org/springframework/web/servlet/mvc/method/annotation/ExceptionHandlerExceptionResolver.java"
+    },
+    {
+      "className": "org.springframework.web.servlet.handler.HandlerExceptionResolverComposite",
+      "sourcePath": "spring-webmvc/src/main/java/org/springframework/web/servlet/handler/HandlerExceptionResolverComposite.java"
+    },
+    {
+      "className": "org.springframework.web.servlet.mvc.support.DefaultHandlerExceptionResolver",
+      "sourcePath": "spring-webmvc/src/main/java/org/springframework/web/servlet/mvc/support/DefaultHandlerExceptionResolver.java"
+    }
+  ],
+  "entryPoints": [
+    {
+      "method": "FrameworkServlet.processRequest(HttpServletRequest,HttpServletResponse)",
+      "document": "/spring/mvc/dispatch-chain",
+      "purpose": "建立并恢复请求线程上下文，再委托 DispatcherServlet.doService"
+    },
+    {
+      "method": "DispatcherServlet.doDispatch(HttpServletRequest,HttpServletResponse)",
+      "document": "/spring/mvc/dispatch-chain",
+      "purpose": "编排 multipart、handler、adapter、拦截器、结果处理与清理"
+    },
+    {
+      "method": "AbstractHandlerMethodMapping.lookupHandlerMethod(String,HttpServletRequest)",
+      "document": "/spring/mvc/dispatch-chain",
+      "purpose": "从启动期映射注册表过滤候选并选择最具体 HandlerMethod"
+    },
+    {
+      "method": "RequestMappingInfoHandlerMapping.handleNoMatch(Set<RequestMappingInfo>,String,HttpServletRequest)",
+      "document": "/spring/mvc/dispatch-chain",
+      "purpose": "根据部分匹配结果区分 405、415、406 与请求参数条件失败"
+    },
+    {
+      "method": "HandlerExecutionChain.applyPreHandle(HttpServletRequest,HttpServletResponse)",
+      "document": "/spring/mvc/dispatch-chain",
+      "purpose": "按注册顺序执行前置拦截器并维护已成功执行的索引"
+    },
+    {
+      "method": "RequestMappingHandlerAdapter.invokeHandlerMethod(HttpServletRequest,HttpServletResponse,HandlerMethod)",
+      "document": "/spring/mvc/handler-adapter",
+      "purpose": "组装数据绑定、模型、异步、参数和返回值处理环境"
+    },
+    {
+      "method": "InvocableHandlerMethod.getMethodArgumentValues(NativeWebRequest,ModelAndViewContainer,Object...)",
+      "document": "/spring/mvc/handler-adapter",
+      "purpose": "为每个 MethodParameter 选择 resolver 并生成目标参数数组"
+    },
+    {
+      "method": "HandlerMethodArgumentResolverComposite.resolveArgument(MethodParameter,ModelAndViewContainer,NativeWebRequest,WebDataBinderFactory)",
+      "document": "/spring/mvc/argument-return-exception",
+      "purpose": "缓存并委托首个支持当前方法参数的解析器"
+    },
+    {
+      "method": "RequestResponseBodyMethodProcessor.resolveArgument(MethodParameter,ModelAndViewContainer,NativeWebRequest,WebDataBinderFactory)",
+      "document": "/spring/mvc/argument-return-exception",
+      "purpose": "读取请求体、调用消息转换器并执行数据绑定与可选校验"
+    },
+    {
+      "method": "InvocableHandlerMethod.doInvoke(Object...)",
+      "document": "/spring/mvc/handler-adapter",
+      "purpose": "反射调用目标 Bean 的桥接方法并保持目标异常语义"
+    },
+    {
+      "method": "HandlerMethodReturnValueHandlerComposite.handleReturnValue(Object,MethodParameter,ModelAndViewContainer,NativeWebRequest)",
+      "document": "/spring/mvc/argument-return-exception",
+      "purpose": "选择首个支持返回类型的处理器并写响应或更新视图模型"
+    },
+    {
+      "method": "AbstractMessageConverterMethodProcessor.writeWithMessageConverters(Object,MethodParameter,NativeWebRequest)",
+      "document": "/spring/mvc/argument-return-exception",
+      "purpose": "完成内容协商并选择可写当前返回类型和媒体类型的转换器"
+    },
+    {
+      "method": "DispatcherServlet.processHandlerException(HttpServletRequest,HttpServletResponse,Object,Exception)",
+      "document": "/spring/mvc/argument-return-exception",
+      "purpose": "顺序调用异常解析器，把异常转换为已处理响应或 ModelAndView"
+    },
+    {
+      "method": "ExceptionHandlerExceptionResolver.doResolveHandlerMethodException(HttpServletRequest,HttpServletResponse,HandlerMethod,Exception)",
+      "document": "/spring/mvc/argument-return-exception",
+      "purpose": "查找并调用局部或全局 @ExceptionHandler 方法"
+    }
+  ],
+  "breakpoints": [
+    {
+      "method": "DispatcherServlet.doDispatch(HttpServletRequest,HttpServletResponse)",
+      "scenario": "分别执行正常、业务异常和 HTTP 方法不匹配请求",
+      "variables": ["processedRequest", "mappedHandler", "mv", "dispatchException"]
+    },
+    {
+      "method": "AbstractHandlerMethodMapping.lookupHandlerMethod(String,HttpServletRequest)",
+      "scenario": "匹配 GET /orders/42 并观察最佳 RequestMappingInfo",
+      "variables": ["lookupPath", "directPathMatches", "matchingMappings", "bestMatch"]
+    },
+    {
+      "method": "RequestMappingInfoHandlerMapping.handleNoMatch(Set<RequestMappingInfo>,String,HttpServletRequest)",
+      "scenario": "POST /orders/42 路径命中但 HTTP method 条件失败",
+      "variables": ["infos", "partialMatches", "methods"]
+    },
+    {
+      "method": "AbstractHandlerMapping.getHandlerExecutionChain(Object,HttpServletRequest)",
+      "scenario": "观察 OrderController 与 TraceHandlerInterceptor 的组合",
+      "variables": ["handler", "chain", "adaptedInterceptors"]
+    },
+    {
+      "method": "RequestMappingHandlerAdapter.invokeHandlerMethod(HttpServletRequest,HttpServletResponse,HandlerMethod)",
+      "scenario": "进入注解方法适配器并创建 ServletInvocableHandlerMethod",
+      "variables": ["handlerMethod", "invocableMethod", "mavContainer", "asyncManager"]
+    },
+    {
+      "method": "InvocableHandlerMethod.getMethodArgumentValues(NativeWebRequest,ModelAndViewContainer,Object...)",
+      "scenario": "解析 orderId 路径变量与 detail 查询参数",
+      "variables": ["parameters", "providedArgs", "args", "parameter"]
+    },
+    {
+      "method": "RequestResponseBodyMethodProcessor.resolveArgument(MethodParameter,ModelAndViewContainer,NativeWebRequest,WebDataBinderFactory)",
+      "scenario": "POST /orders/echo 通过 StringHttpMessageConverter 读取 text/plain 请求体",
+      "variables": ["parameter", "arg", "binder", "bindingResult"]
+    },
+    {
+      "method": "HandlerMethodReturnValueHandlerComposite.handleReturnValue(Object,MethodParameter,ModelAndViewContainer,NativeWebRequest)",
+      "scenario": "正常请求返回 ResponseEntity<String>",
+      "variables": ["returnValue", "returnType", "mavContainer", "handler"]
+    },
+    {
+      "method": "AbstractMessageConverterMethodProcessor.writeWithMessageConverters(Object,MethodParameter,NativeWebRequest)",
+      "scenario": "观察 ResponseEntity 或 @ResponseBody 的媒体类型与 converter 选择",
+      "variables": ["value", "targetType", "acceptableTypes", "producibleTypes", "selectedMediaType"]
+    },
+    {
+      "method": "DispatcherServlet.processHandlerException(HttpServletRequest,HttpServletResponse,Object,Exception)",
+      "scenario": "订单 0 抛异常后命中全局 @ExceptionHandler",
+      "variables": ["handler", "ex", "handlerExceptionResolvers", "exMv"]
+    }
+  ]
+}

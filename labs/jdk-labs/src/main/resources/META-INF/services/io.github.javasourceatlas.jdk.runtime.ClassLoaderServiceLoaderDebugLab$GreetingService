@@ -1,0 +1,4 @@
+# ServiceLoader 按资源中的声明顺序发现 provider；空行和井号后的内容会被忽略。
+io.github.javasourceatlas.jdk.runtime.ClassLoaderServiceLoaderDebugLab$AlphaGreetingService
+io.github.javasourceatlas.jdk.runtime.ClassLoaderServiceLoaderDebugLab$AlphaGreetingService # 重复名称应去重
+io.github.javasourceatlas.jdk.runtime.ClassLoaderServiceLoaderDebugLab$BetaGreetingService
