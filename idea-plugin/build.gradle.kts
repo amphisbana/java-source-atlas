@@ -9,7 +9,7 @@ val localIdeaPath = providers.gradleProperty("atlas.localIdeaPath")
     .orElse("/Applications/IntelliJ IDEA.app")
 
 group = "io.github.java-source-atlas"
-version = "0.2.2"
+version = "0.2.3"
 
 repositories {
     mavenCentral()
@@ -101,6 +101,7 @@ intellijPlatform {
               <li>在 IDEA 工具窗口内嵌阅读专题教程。</li>
               <li>支持推荐断点一键添加，以及配套 Lab 的打开和 Debug。</li>
               <li>增强重载方法签名与 JDK、Spring Framework、Spring Boot 版本匹配。</li>
+              <li>按专题、源码入口和推荐断点分组展示操作按钮，优化窄工具窗口布局。</li>
             </ul>
         """.trimIndent()
     }

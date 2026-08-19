@@ -4,7 +4,7 @@
 
 插件面向 IntelliJ IDEA 2024.2 至 2026.2，编译目标为 Java 21。Gradle Toolchain 会在本机没有 JDK 21 时自动获取所需运行时。
 
-## 0.2.2 当前能力
+## 0.2.3 当前能力
 
 - 右侧 `Source Atlas` 工具窗口；
 - 按当前 Java 类和方法自动匹配专题；
@@ -16,6 +16,7 @@
 - 在已收录的方法旁显示 gutter 图标；
 - 区分 JDK、Spring Framework 与 Spring Boot 的 exact、patch、minor、major 差异和兼容范围；
 - 在 IDEA 设置中修改教程站点地址。
+- 按专题、源码入口和推荐断点分组展示对应操作，避免无关按钮占用工具窗口空间。
 
 插件默认使用 `https://amphisbana.github.io/java-source-atlas`，安装后无需运行本地文档服务。
 开发仓库内容时，可在 IDEA 设置中临时改为 `http://127.0.0.1:4180`。

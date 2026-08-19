@@ -9,7 +9,6 @@ import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.ui.ColoredListCellRenderer;
 import com.intellij.ui.DocumentAdapter;
-import com.intellij.ui.JBSplitter;
 import com.intellij.ui.SearchTextField;
 import com.intellij.ui.SimpleTextAttributes;
 import com.intellij.ui.components.JBLabel;
@@ -17,6 +16,7 @@ import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.util.ui.JBUI;
+import com.intellij.util.ui.UIUtil;
 import io.github.javasourceatlas.idea.browser.AtlasEmbeddedBrowser;
 import io.github.javasourceatlas.idea.browser.AtlasEmbeddedBrowserFactory;
 import io.github.javasourceatlas.idea.context.AtlasContextResolver;
@@ -46,7 +46,6 @@ import javax.swing.Timer;
 import javax.swing.event.DocumentEvent;
 import java.awt.BorderLayout;
 import java.awt.Component;
-import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.event.MouseAdapter;
@@ -71,15 +70,18 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     private final JBLabel topicTitleLabel = new JBLabel("选择一个源码专题");
     private final JBLabel versionLabel = new JBLabel();
     private final JBLabel compatibilityLabel = new JBLabel();
+    private final JBLabel actionHintLabel = new JBLabel("选择专题后，从源码入口开始阅读");
     private final JBLabel tutorialLocationLabel = new JBLabel("选择源码入口后在 IDEA 内阅读教程");
     private final JBTabbedPane tabs = new JBTabbedPane();
+    private final JBTabbedPane navigationTabs = new JBTabbedPane();
     private final JButton openDocumentationButton = new JButton("IDE 内阅读", AtlasIcons.DOCUMENTATION);
     private final JButton openExternalDocumentationButton = new JButton("浏览器打开");
     private final JButton navigateSourceButton = new JButton("定位源码", AtlasIcons.SOURCE);
-    private final JButton addBreakpointButton = new JButton("添加当前断点");
     private final JButton addAllBreakpointsButton = new JButton("添加全部断点");
     private final JButton openLabButton = new JButton("打开 Lab");
     private final JButton debugLabButton = new JButton("Debug Lab");
+    private final JButton backToNavigationButton = new JButton("返回专题导航");
+    private final JButton tutorialExternalDocumentationButton = new JButton("浏览器打开");
     private final Timer contextTimer;
 
     private AtlasEmbeddedBrowser tutorialBrowser;
@@ -148,10 +150,23 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                 }
             }
         });
+        breakpointList.addMouseListener(new MouseAdapter() {
+            /**
+             * 双击推荐断点时添加当前断点，保留单断点操作但不占用页签顶部空间。
+             *
+             * @param event 鼠标事件
+             */
+            @Override
+            public void mouseClicked(MouseEvent event) {
+                if (event.getClickCount() == 2 && event.getButton() == MouseEvent.BUTTON1) {
+                    addSelectedBreakpoint();
+                }
+            }
+        });
     }
 
     /**
-     * 连接搜索框和底部命令按钮。
+     * 连接搜索框和各页签中的操作按钮。
      */
     private void configureActions() {
         searchField.getTextEditor().getDocument().addDocumentListener(new DocumentAdapter() {
@@ -168,10 +183,20 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         openDocumentationButton.addActionListener(ignored -> openDocumentationInIde());
         openExternalDocumentationButton.addActionListener(ignored -> openDocumentationExternally());
         navigateSourceButton.addActionListener(ignored -> navigateToSource());
-        addBreakpointButton.addActionListener(ignored -> addSelectedBreakpoint());
         addAllBreakpointsButton.addActionListener(ignored -> addAllBreakpoints());
         openLabButton.addActionListener(ignored -> openLab());
         debugLabButton.addActionListener(ignored -> debugLab());
+        backToNavigationButton.addActionListener(ignored -> tabs.setSelectedIndex(0));
+        tutorialExternalDocumentationButton.addActionListener(ignored -> openDocumentationExternally());
+
+        // 2026-08-19：把“IDE 内阅读”设为当前专题的主操作，降低首次使用时的选择成本。
+        openDocumentationButton.putClientProperty("JButton.buttonType", "default");
+        openDocumentationButton.setToolTipText("在 IDEA 内打开当前源码入口对应的教程");
+        openExternalDocumentationButton.setToolTipText("在系统浏览器中打开当前教程");
+        navigateSourceButton.setToolTipText("跳转到项目或依赖中的源码类和方法");
+        addAllBreakpointsButton.setToolTipText("添加当前专题的全部推荐断点");
+        openLabButton.setToolTipText("打开当前专题的 Lab 主类");
+        debugLabButton.setToolTipText("创建临时配置并 Debug 当前专题 Lab");
     }
 
     /**
@@ -192,18 +217,31 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
      */
     private JComponent createNavigationContent() {
         JPanel root = new JPanel(new BorderLayout(0, JBUI.scale(8)));
-        root.setBorder(JBUI.Borders.empty(8));
+        root.setBorder(JBUI.Borders.empty(10));
         root.add(createHeader(), BorderLayout.NORTH);
 
-        JBSplitter outerSplitter = new JBSplitter(true, 0.34f);
-        outerSplitter.setFirstComponent(createSection("全部专题", new JBScrollPane(topicList)));
-
-        JBSplitter detailSplitter = new JBSplitter(true, 0.58f);
-        detailSplitter.setFirstComponent(createSection("关键源码入口", new JBScrollPane(entryPointList)));
-        detailSplitter.setSecondComponent(createSection("推荐断点", new JBScrollPane(breakpointList)));
-        outerSplitter.setSecondComponent(detailSplitter);
-        root.add(outerSplitter, BorderLayout.CENTER);
-        root.add(createCommandBar(), BorderLayout.SOUTH);
+        // 2026-08-19：窄工具窗口不再并排展示三组列表，改为单列分段页签，避免说明文字被挤压。
+        navigationTabs.addTab("专题", createListSection(
+                "全部专题",
+                topicList,
+                openDocumentationButton,
+                openExternalDocumentationButton
+        ));
+        navigationTabs.addTab("源码入口", createListSection(
+                "关键源码入口",
+                entryPointList,
+                navigateSourceButton,
+                addAllBreakpointsButton,
+                openLabButton
+        ));
+        navigationTabs.addTab("推荐断点", createListSection(
+                "推荐断点",
+                breakpointList,
+                debugLabButton
+        ));
+        navigationTabs.setBorder(JBUI.Borders.emptyTop(2));
+        navigationTabs.addChangeListener(ignored -> updateActionState());
+        root.add(navigationTabs, BorderLayout.CENTER);
         return root;
     }
 
@@ -214,9 +252,16 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
      */
     private JComponent createTutorialContent() {
         JPanel root = new JPanel(new BorderLayout(0, JBUI.scale(6)));
-        root.setBorder(JBUI.Borders.empty(8));
-        tutorialLocationLabel.setBorder(JBUI.Borders.emptyBottom(4));
-        root.add(tutorialLocationLabel, BorderLayout.NORTH);
+        root.setBorder(JBUI.Borders.empty(10));
+        JPanel tutorialHeader = new JPanel(new BorderLayout(JBUI.scale(8), 0));
+        tutorialHeader.setBorder(JBUI.Borders.emptyBottom(4));
+        tutorialLocationLabel.setToolTipText("当前教程地址会跟随所选源码入口变化");
+        tutorialHeader.add(tutorialLocationLabel, BorderLayout.CENTER);
+        JPanel tutorialActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, JBUI.scale(6), 0));
+        tutorialActions.add(backToNavigationButton);
+        tutorialActions.add(tutorialExternalDocumentationButton);
+        tutorialHeader.add(tutorialActions, BorderLayout.EAST);
+        root.add(tutorialHeader, BorderLayout.NORTH);
         tutorialBrowser = AtlasEmbeddedBrowserFactory.create();
         if (tutorialBrowser != null) {
             root.add(tutorialBrowser.component(), BorderLayout.CENTER);
@@ -236,22 +281,35 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
      * @return 头部组件
      */
     private JComponent createHeader() {
-        JPanel header = new JPanel();
-        header.setLayout(new javax.swing.BoxLayout(header, javax.swing.BoxLayout.Y_AXIS));
+        JPanel header = new JPanel(new BorderLayout(JBUI.scale(10), JBUI.scale(8)));
 
-        topicTitleLabel.setFont(topicTitleLabel.getFont().deriveFont(Font.BOLD));
-        header.add(topicTitleLabel);
-        header.add(javax.swing.Box.createVerticalStrut(JBUI.scale(4)));
-        header.add(contextLabel);
-        header.add(javax.swing.Box.createVerticalStrut(JBUI.scale(2)));
-        header.add(versionLabel);
-        header.add(javax.swing.Box.createVerticalStrut(JBUI.scale(2)));
-        header.add(compatibilityLabel);
-        header.add(javax.swing.Box.createVerticalStrut(JBUI.scale(8)));
+        // 2026-08-19：搜索框独立置顶，使信息层级与源码浏览流程保持一致。
+        searchField.getTextEditor().getEmptyText().setText("搜索类名、方法或专题");
+        searchField.setToolTipText("支持专题标题、源码类名、方法名和版本搜索");
+        header.add(searchField, BorderLayout.NORTH);
 
-        searchField.getTextEditor().getEmptyText().setText("搜索类、方法或专题");
-        searchField.setMaximumSize(new Dimension(Integer.MAX_VALUE, searchField.getPreferredSize().height));
-        header.add(searchField);
+        JPanel summary = new JPanel();
+        summary.setLayout(new javax.swing.BoxLayout(summary, javax.swing.BoxLayout.Y_AXIS));
+        summary.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(UIUtil.getBoundsColor()),
+                JBUI.Borders.empty(10)
+        ));
+        topicTitleLabel.setFont(topicTitleLabel.getFont().deriveFont(Font.BOLD, 14f));
+        topicTitleLabel.setToolTipText("当前选中的源码专题");
+        contextLabel.setForeground(UIUtil.getLabelInfoForeground());
+        versionLabel.setForeground(UIUtil.getLabelInfoForeground());
+        compatibilityLabel.setForeground(UIUtil.getLabelInfoForeground());
+        actionHintLabel.setForeground(UIUtil.getLabelInfoForeground());
+        summary.add(topicTitleLabel);
+        summary.add(javax.swing.Box.createVerticalStrut(JBUI.scale(5)));
+        summary.add(contextLabel);
+        summary.add(javax.swing.Box.createVerticalStrut(JBUI.scale(2)));
+        summary.add(versionLabel);
+        summary.add(javax.swing.Box.createVerticalStrut(JBUI.scale(2)));
+        summary.add(compatibilityLabel);
+        summary.add(javax.swing.Box.createVerticalStrut(JBUI.scale(5)));
+        summary.add(actionHintLabel);
+        header.add(summary, BorderLayout.CENTER);
         return header;
     }
 
@@ -272,26 +330,64 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     }
 
     /**
-     * 创建教程、源码、断点与 Lab 命令区。
+     * 创建带页签数量和空状态说明的单列列表区域。
      *
-     * @return 命令区组件
+     * @param title   区域标题
+     * @param list    列表组件
+     * @param actions 当前页签显示的操作按钮
+     * @return 列表区域
      */
-    private JComponent createCommandBar() {
-        JPanel commandBar = new JPanel();
-        commandBar.setLayout(new javax.swing.BoxLayout(commandBar, javax.swing.BoxLayout.Y_AXIS));
-        commandBar.setBorder(BorderFactory.createEmptyBorder(JBUI.scale(4), 0, 0, 0));
-        JPanel navigationRow = new JPanel(new FlowLayout(FlowLayout.LEFT, JBUI.scale(6), 0));
-        navigationRow.add(openDocumentationButton);
-        navigationRow.add(openExternalDocumentationButton);
-        navigationRow.add(navigateSourceButton);
-        JPanel experimentRow = new JPanel(new FlowLayout(FlowLayout.LEFT, JBUI.scale(6), JBUI.scale(4)));
-        experimentRow.add(addBreakpointButton);
-        experimentRow.add(addAllBreakpointsButton);
-        experimentRow.add(openLabButton);
-        experimentRow.add(debugLabButton);
-        commandBar.add(navigationRow);
-        commandBar.add(experimentRow);
-        return commandBar;
+    private JComponent createListSection(String title, JBList<?> list, JButton... actions) {
+        JPanel section = new JPanel(new BorderLayout(0, JBUI.scale(5)));
+        JPanel sectionHeader = new JPanel();
+        sectionHeader.setLayout(new javax.swing.BoxLayout(sectionHeader, javax.swing.BoxLayout.Y_AXIS));
+
+        // 2026-08-19：操作跟随所属页签展示，减少跨场景按钮造成的认知负担。
+        if (actions.length > 0) {
+            JComponent actionBar = createTabActionBar(actions);
+            actionBar.setAlignmentX(Component.LEFT_ALIGNMENT);
+            sectionHeader.add(actionBar);
+            sectionHeader.add(javax.swing.Box.createVerticalStrut(JBUI.scale(5)));
+        }
+        JLabel label = new JBLabel(title);
+        label.setFont(label.getFont().deriveFont(Font.BOLD));
+        label.setForeground(UIUtil.getLabelInfoForeground());
+        label.setAlignmentX(Component.LEFT_ALIGNMENT);
+        sectionHeader.add(label);
+        section.add(sectionHeader, BorderLayout.NORTH);
+        list.getEmptyText().setText(emptyTextFor(title));
+        section.add(new JBScrollPane(list), BorderLayout.CENTER);
+        return section;
+    }
+
+    /**
+     * 创建页签顶部的紧凑操作栏。
+     *
+     * @param actions 当前页签可执行的操作
+     * @return 顶部操作栏
+     */
+    private JComponent createTabActionBar(JButton... actions) {
+        JPanel actionBar = new JPanel(new FlowLayout(FlowLayout.LEFT, JBUI.scale(6), 0));
+        for (JButton action : actions) {
+            actionBar.add(action);
+        }
+        return actionBar;
+    }
+
+    /**
+     * 根据列表用途提供明确的空状态文案，避免用户把空白误认为页面未加载。
+     *
+     * @param title 列表标题
+     * @return 空状态文案
+     */
+    private String emptyTextFor(String title) {
+        if ("全部专题".equals(title)) {
+            return "暂无匹配专题，请调整搜索条件";
+        }
+        if ("关键源码入口".equals(title)) {
+            return "当前专题暂无源码入口";
+        }
+        return "当前专题暂无推荐断点";
     }
 
     /**
@@ -328,16 +424,24 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         breakpointModel.clear();
         if (topic == null) {
             topicTitleLabel.setText("没有匹配的源码专题");
+            topicTitleLabel.setToolTipText("调整搜索条件后重新选择专题");
+            contextLabel.setText("当前光标：未找到匹配专题");
+            versionLabel.setText("");
             compatibilityLabel.setText("调整搜索条件后重试");
+            actionHintLabel.setText("输入类名、方法名或专题名称开始搜索");
+            updateNavigationTabTitles();
             updateActionState();
             return;
         }
 
-        topicTitleLabel.setText(topic.title());
+        topicTitleLabel.setText(StringUtil.shortenTextWithEllipsis(topic.title(), 58, 0));
+        topicTitleLabel.setToolTipText(topic.title());
         topic.entryPoints().forEach(entryPointModel::addElement);
         topic.breakpoints().forEach(breakpointModel::addElement);
         versionLabel.setText("项目版本：检测中…");
         compatibilityLabel.setText("教程基线：" + topic.primaryVersion());
+        actionHintLabel.setText("先选源码入口，再阅读调用链或定位实现");
+        updateNavigationTabTitles();
         AtlasVersionDetector.detectAsync(project, this, versionInfo -> applyVersionInfo(topic, versionInfo));
 
         if (preferredEntry != null && topic.entryPoints().contains(preferredEntry)) {
@@ -417,11 +521,23 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         AtlasBreakpoint breakpoint = breakpointList.getSelectedValue();
         openDocumentationButton.setEnabled(topic != null && entryPoint != null);
         openExternalDocumentationButton.setEnabled(topic != null && entryPoint != null);
-        addBreakpointButton.setEnabled(topic != null && breakpoint != null);
         addAllBreakpointsButton.setEnabled(topic != null && !topic.breakpoints().isEmpty());
         navigateSourceButton.setEnabled(false);
         openLabButton.setEnabled(false);
         debugLabButton.setEnabled(false);
+        if (topic != null && navigationTabs.getSelectedIndex() == 2) {
+            actionHintLabel.setText(breakpoint == null
+                    ? "查看推荐断点，并使用 Debug Lab 复现调试现场"
+                    : "当前断点已选中，可启动 Debug Lab 观察变量变化");
+        } else if (topic != null && navigationTabs.getSelectedIndex() == 1) {
+            actionHintLabel.setText(entryPoint == null
+                    ? "选择一个源码入口开始阅读"
+                    : "可定位源码、添加全部断点或打开配套 Lab");
+        } else if (topic != null) {
+            actionHintLabel.setText(entryPoint == null
+                    ? "当前专题暂无可阅读的源码入口"
+                    : "可在 IDEA 内阅读默认入口，也可使用浏览器打开");
+        }
         navigateSourceButton.setToolTipText(topic == null || entryPoint == null
                 ? "选择源码入口后可定位"
                 : "正在检查项目类路径…");
@@ -455,6 +571,15 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                         : "当前项目类路径中未找到该源码类");
             });
         }
+    }
+
+    /**
+     * 根据当前专题刷新三个工作页签的数量，帮助用户判断每个页签是否有内容。
+     */
+    private void updateNavigationTabTitles() {
+        navigationTabs.setTitleAt(0, "专题 " + topicModel.size());
+        navigationTabs.setTitleAt(1, "源码入口 " + entryPointModel.size());
+        navigationTabs.setTitleAt(2, "推荐断点 " + breakpointModel.size());
     }
 
     /**
@@ -520,7 +645,6 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         if (topic == null || breakpoints.isEmpty()) {
             return;
         }
-        addBreakpointButton.setEnabled(false);
         addAllBreakpointsButton.setEnabled(false);
         AtlasBreakpointManager.addBreakpointsAsync(project, this, topic, breakpoints, result -> {
             updateActionState();
@@ -654,9 +778,10 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                 boolean selected,
                 boolean hasFocus
         ) {
-            append(value.title());
+            append(StringUtil.shortenTextWithEllipsis(value.title(), 52, 0));
             append("  " + value.primaryVersion(), SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES);
             setBorder(JBUI.Borders.empty(3, 2));
+            setToolTipText(value.title() + " · " + value.primaryVersion());
         }
     }
 
@@ -683,8 +808,11 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                 boolean hasFocus
         ) {
             append(value.method(), SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES);
-            append("  " + StringUtil.notNullize(value.purpose()), SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES);
+            append("  " + StringUtil.shortenTextWithEllipsis(
+                    StringUtil.notNullize(value.purpose()), 68, 0
+            ), SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES);
             setBorder(JBUI.Borders.empty(3, 2));
+            setToolTipText(value.method() + " · " + StringUtil.notNullize(value.purpose()));
         }
     }
 
@@ -711,11 +839,19 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                 boolean hasFocus
         ) {
             append(value.method(), SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES);
-            append("  " + StringUtil.notNullize(value.scenario()), SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES);
+            append("  " + StringUtil.shortenTextWithEllipsis(
+                    StringUtil.notNullize(value.scenario()), 56, 0
+            ), SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES);
             if (!value.variables().isEmpty()) {
-                append("  [" + String.join(", ", value.variables()) + "]", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES);
+                String variables = StringUtil.shortenTextWithEllipsis(
+                        String.join(", ", value.variables()), 54, 0
+                );
+                append("  [" + variables + "]", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES);
             }
             setBorder(JBUI.Borders.empty(3, 2));
+            setToolTipText(value.method() + " · " + StringUtil.notNullize(value.scenario())
+                    + (value.variables().isEmpty() ? "" : " · 观察变量：" + String.join(", ", value.variables()))
+                    + " · 双击添加当前断点");
         }
     }
 }

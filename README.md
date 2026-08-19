@@ -14,7 +14,7 @@ JDK 版本对比工作台使用 `jdk8u412-b08`、`jdk-17+35`、`jdk-21+35` 三�
 
 Spring 深挖把 Boot、IOC、AOP、MVC 与 Transaction 放回同一条启动和请求调用栈，补充早期代理一致性、线程事务资源、异常回滚与 HTTP 异常解析的跨模块边界。
 
-IDEA 插件 0.2.2 提供 `Source Atlas` 工具窗口、参数级方法匹配、IDE 内嵌教程、源码反向跳转、gutter 图标、推荐断点一键添加、Lab 打开与 Debug，以及 JDK/Spring/Boot 结构化版本提示。插件默认连接公开教程站点，并在构建时直接复用 `source-index`，29 个专题的教程、源码、断点和 Lab 坐标只维护一份。
+IDEA 插件 0.2.3 提供 `Source Atlas` 工具窗口、参数级方法匹配、IDE 内嵌教程、源码反向跳转、gutter 图标、推荐断点一键添加、Lab 打开与 Debug，以及 JDK/Spring/Boot 结构化版本提示。插件默认连接公开教程站点，并在构建时直接复用 `source-index`，29 个专题的教程、源码、断点和 Lab 坐标只维护一份。
 
 ## 已完成内容
 
