@@ -4,7 +4,7 @@ export default defineConfig({
   lang: 'zh-CN',
   title: 'Java Source Atlas',
   description: '用调用链、断点和可运行案例学习 Java 源码',
-  base: process.env.DOCS_BASE || '/',
+  base: process.env.DOCS_BASE || '/atlas/',
   cleanUrls: true,
   lastUpdated: true,
   head: [
