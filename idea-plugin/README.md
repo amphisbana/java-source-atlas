@@ -18,7 +18,7 @@
 - 在 IDEA 设置中修改教程站点地址。
 - 按专题、源码入口和推荐断点分组展示对应操作，避免无关按钮占用工具窗口空间。
 
-插件默认使用 `https://amphisbana.github.io/java-source-atlas`，安装后无需运行本地文档服务。
+插件默认使用 `http://source.shaojie.wang/atlas`，安装后无需运行本地文档服务。
 开发仓库内容时，可在 IDEA 设置中临时改为 `http://127.0.0.1:4180`。
 
 内嵌教程依赖 IDEA 的 JCEF 运行环境；IDEA 2026.2 中插件会连接拆分后的可选 JCEF 模块，

@@ -38,7 +38,7 @@ public final class AtlasConfigurable implements Configurable {
         docsBaseUrlField = new JBTextField();
         JPanel panel = FormBuilder.createFormBuilder()
                 .addLabeledComponent(new JBLabel("教程站点地址："), docsBaseUrlField, 1, false)
-                .addComponent(new JBLabel("默认使用线上站点；本地开发可改为 http://127.0.0.1:4180"), 1)
+                .addComponent(new JBLabel("默认使用 http://source.shaojie.wang/atlas；本地开发可改为 http://127.0.0.1:4180"), 1)
                 .addComponentFillVertically(new JPanel(), 0)
                 .getPanel();
         reset();

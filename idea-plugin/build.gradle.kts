@@ -95,7 +95,7 @@ intellijPlatform {
         changeNotes = """
             <ul>
               <li>默认连接公开教程站点，安装后无需启动本地 VitePress 服务。</li>
-              <li>自动迁移 0.2.1 保存的本地默认教程地址，并保留自定义地址能力。</li>
+              <li>默认教程地址切换到自定义域名，并自动迁移旧版本地或 GitHub Pages 默认地址。</li>
               <li>修复 IDEA 2026.2 拆分 JCEF 模块后工具窗口无法显示内容的问题。</li>
               <li>JCEF 不可用时保留完整专题导航，并降级为系统浏览器阅读教程。</li>
               <li>在 IDEA 工具窗口内嵌阅读专题教程。</li>

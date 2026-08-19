@@ -15,8 +15,9 @@ import org.jetbrains.annotations.NotNull;
 @State(name = "JavaSourceAtlasSettings", storages = @Storage("java-source-atlas.xml"))
 public final class AtlasSettingsState implements PersistentStateComponent<AtlasSettingsState> {
 
-    public static final String DEFAULT_DOCS_BASE_URL = "https://amphisbana.github.io/java-source-atlas";
+    public static final String DEFAULT_DOCS_BASE_URL = "http://source.shaojie.wang/atlas";
     private static final String LEGACY_LOCAL_DOCS_BASE_URL = "http://127.0.0.1:4180";
+    private static final String LEGACY_PUBLIC_DOCS_BASE_URL = "https://amphisbana.github.io/java-source-atlas";
 
     public String docsBaseUrl = DEFAULT_DOCS_BASE_URL;
 
@@ -47,10 +48,11 @@ public final class AtlasSettingsState implements PersistentStateComponent<AtlasS
     @Override
     public void loadState(@NotNull AtlasSettingsState state) {
         XmlSerializerUtil.copyBean(state, this);
-        // 2026-08-18：0.2.1 把本地开发地址作为默认值，升级后迁移到可直接访问的线上站点。
+        // 2026-08-19：线上文档站切换到自定义域名，旧版默认地址升级后迁移到新站点；用户自定义地址不覆盖。
         if (docsBaseUrl == null
                 || docsBaseUrl.isBlank()
-                || LEGACY_LOCAL_DOCS_BASE_URL.equals(docsBaseUrl.trim())) {
+                || LEGACY_LOCAL_DOCS_BASE_URL.equals(docsBaseUrl.trim())
+                || LEGACY_PUBLIC_DOCS_BASE_URL.equals(docsBaseUrl.trim())) {
             docsBaseUrl = DEFAULT_DOCS_BASE_URL;
         }
     }

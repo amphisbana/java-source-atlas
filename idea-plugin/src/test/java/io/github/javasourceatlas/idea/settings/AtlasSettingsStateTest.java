@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class AtlasSettingsStateTest {
 
     /**
-     * 验证 0.2.1 保存的本地默认地址在升级后迁移到公开站点。
+     * 验证旧版本保存的本地默认地址在升级后迁移到新的线上站点。
      */
     @Test
     void shouldMigrateLegacyLocalDefaultUrl() {
@@ -21,6 +21,20 @@ class AtlasSettingsStateTest {
         currentState.loadState(savedState);
 
         assertEquals(AtlasSettingsState.DEFAULT_DOCS_BASE_URL, currentState.docsBaseUrl);
+    }
+
+    /**
+     * 验证旧版 GitHub Pages 默认地址在自定义域名启用后自动迁移。
+     */
+    @Test
+    void shouldMigrateLegacyPublicDefaultUrl() {
+        AtlasSettingsState savedState = new AtlasSettingsState();
+        savedState.docsBaseUrl = "https://amphisbana.github.io/java-source-atlas";
+        AtlasSettingsState currentState = new AtlasSettingsState();
+
+        currentState.loadState(savedState);
+
+        assertEquals("http://source.shaojie.wang/atlas", currentState.docsBaseUrl);
     }
 
     /**
