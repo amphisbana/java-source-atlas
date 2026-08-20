@@ -83,6 +83,14 @@
       "purpose": "观察弱一致来源如何按批次复制元素进行拆分"
     }
   ],
+  "evidence": [{
+    "claim": "ConcurrentLinkedQueue 用 CAS 发布节点并保持 FIFO，同时以禁止 null 区分空队列。",
+    "entryPoint": "ConcurrentLinkedQueue.offer(E)",
+    "document": "/jdk/concurrent/concurrentlinkedqueue/offer-tail#offer-的完整循环",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentLinkedQueueBehaviorTest",
+    "testMethod": "shouldKeepFifoAndRejectNull"
+  }],
   "breakpoints": [
     {
       "method": "ConcurrentLinkedQueue.offer(E)",

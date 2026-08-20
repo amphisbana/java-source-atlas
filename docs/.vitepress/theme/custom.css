@@ -101,6 +101,7 @@ body {
 .topic-study-panel__header,
 .topic-study-panel__insight,
 .topic-study-panel__grid,
+.topic-study-panel__evidence,
 .topic-study-panel__footer {
   padding: 20px 22px;
 }
@@ -243,6 +244,50 @@ body {
   line-height: 1.55;
 }
 
+.topic-study-panel__evidence {
+  display: grid;
+  gap: 10px;
+  border-bottom: 1px solid var(--atlas-line);
+  background: var(--vp-c-bg);
+}
+
+.topic-study-panel__evidence-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.15fr) minmax(280px, 1fr);
+  gap: 18px;
+  align-items: start;
+  padding: 12px 14px;
+  border-left: 3px solid var(--atlas-coral);
+  background: var(--atlas-surface);
+}
+
+.topic-study-panel__evidence-row strong {
+  color: var(--atlas-ink);
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+.topic-study-panel__evidence-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: baseline;
+  min-width: 0;
+  font-size: 0.78rem;
+}
+
+.topic-study-panel__evidence-links a {
+  color: var(--vp-c-brand-1);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.topic-study-panel__evidence-links code {
+  overflow-wrap: anywhere;
+  color: var(--vp-c-text-2);
+  font-size: 0.72rem;
+}
+
 .topic-study-panel__footer {
   display: flex;
   align-items: flex-end;
@@ -304,13 +349,13 @@ body {
   color: var(--vp-c-brand-1);
 }
 
-.topic-study-panel__button--primary {
+.topic-study-panel__actions .topic-study-panel__button--primary {
   border-color: var(--vp-c-brand-1);
   background: var(--vp-c-brand-1);
   color: #fff;
 }
 
-.topic-study-panel__button--primary:hover {
+.topic-study-panel__actions .topic-study-panel__button--primary:hover {
   background: var(--vp-c-brand-2);
   color: #fff;
 }
@@ -566,6 +611,7 @@ body {
   .topic-study-panel__header,
   .topic-study-panel__insight,
   .topic-study-panel__grid,
+  .topic-study-panel__evidence,
   .topic-study-panel__footer {
     padding: 16px;
   }
@@ -573,6 +619,11 @@ body {
   .topic-study-panel__grid {
     grid-template-columns: 1fr;
     gap: 18px;
+  }
+
+  .topic-study-panel__evidence-row {
+    grid-template-columns: 1fr;
+    gap: 7px;
   }
 
   .topic-study-panel__actions {

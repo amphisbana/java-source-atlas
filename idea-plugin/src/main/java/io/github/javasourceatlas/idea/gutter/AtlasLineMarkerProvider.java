@@ -12,6 +12,7 @@ import com.intellij.psi.PsiIdentifier;
 import com.intellij.psi.PsiMethod;
 import io.github.javasourceatlas.idea.icons.AtlasIcons;
 import io.github.javasourceatlas.idea.index.AtlasIndexService;
+import io.github.javasourceatlas.idea.learning.AtlasLearningProgressState;
 import io.github.javasourceatlas.idea.match.AtlasMethodMatcher;
 import io.github.javasourceatlas.idea.model.AtlasEntryPoint;
 import io.github.javasourceatlas.idea.model.AtlasTopic;
@@ -57,9 +58,13 @@ public final class AtlasLineMarkerProvider implements LineMarkerProvider {
         }
 
         GutterIconNavigationHandler<PsiElement> handler =
-                (MouseEvent event, PsiElement ignored) -> BrowserUtil.browse(
-                        AtlasSettingsState.getInstance().documentationUrl(entryPoint.document())
-                );
+                (MouseEvent event, PsiElement ignored) -> {
+                    // 2026-08-20：gutter 主动阅读入口纳入最近阅读历史，便于在学习路径中恢复上下文。
+                    AtlasLearningProgressState.getInstance().recordRecent(topic.topicId());
+                    BrowserUtil.browse(
+                            AtlasSettingsState.getInstance().documentationUrl(entryPoint.document())
+                    );
+                };
         return new LineMarkerInfo<>(
                 element,
                 element.getTextRange(),

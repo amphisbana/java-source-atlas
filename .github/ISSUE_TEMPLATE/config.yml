@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 在线文档与学习路线
+    url: https://source.shaojie.wang/atlas/
+    about: 先从源码索引、学习路线和现有专题中确认是否已有答案。
+  - name: 反馈入口
+    url: https://source.shaojie.wang/atlas/guide/feedback
+    about: 了解如何提交可复现的问题、专题建议和文档修正。

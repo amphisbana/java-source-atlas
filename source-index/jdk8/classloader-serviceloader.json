@@ -141,6 +141,14 @@
       "purpose": "为父层框架显式提供当前调用环境的类与资源可见范围"
     }
   ],
+  "evidence": [{
+    "claim": "ClassLoader.loadClass 会先检查已加载类并优先委派父加载器，再尝试自身查找。",
+    "entryPoint": "ClassLoader.loadClass(String,boolean)",
+    "document": "/jdk/runtime/classloader/loading-delegation#loadclass-的四段决策",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.runtime.ClassLoaderServiceLoaderBehaviorTest",
+    "testMethod": "shouldDelegateToParentBeforeCallingFindClass"
+  }],
   "breakpoints": [
     {
       "method": "ClassLoader.loadClass(String,boolean)",

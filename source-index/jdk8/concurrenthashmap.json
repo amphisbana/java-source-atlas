@@ -95,6 +95,14 @@
       "sourceClass": "java.util.concurrent.ConcurrentHashMap"
     }
   ],
+  "evidence": [{
+    "claim": "ConcurrentHashMap 禁止 null 键和值，使无锁读取可以用 null 明确表示未命中。",
+    "entryPoint": "ConcurrentHashMap.get(Object)",
+    "document": "/jdk/concurrent/concurrenthashmap/#get-为什么不锁桶",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentHashMapBehaviorTest",
+    "testMethod": "shouldRejectNullKeyAndValue"
+  }],
   "breakpoints": [
     {
       "method": "ConcurrentHashMap.putVal(K,V,boolean)",

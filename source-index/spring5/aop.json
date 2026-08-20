@@ -102,6 +102,14 @@
       "purpose": "取得当前线程调用栈中显式暴露的代理，演示自调用补救及其边界"
     }
   ],
+  "evidence": [{
+    "claim": "目标实现接口且未强制类代理时，Spring AOP 可以为 Bean 创建 JDK 动态代理。",
+    "entryPoint": "AbstractAutoProxyCreator.postProcessAfterInitialization(Object,String)",
+    "document": "/spring/aop/proxy-creation",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.spring.aop.SpringAopBehaviorTest",
+    "testMethod": "shouldCreateJdkProxyForInterfaceBasedTarget"
+  }],
   "breakpoints": [
     {
       "method": "AbstractAutoProxyCreator.wrapIfNecessary(...)",

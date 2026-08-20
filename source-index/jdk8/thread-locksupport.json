@@ -123,6 +123,14 @@
       "sourceClass": "java.util.concurrent.FutureTask"
     }
   ],
+  "evidence": [{
+    "claim": "直接调用 run 仍在当前线程执行，只有 start 才创建并调度新线程。",
+    "entryPoint": "start()",
+    "document": "/jdk/concurrent/thread-locksupport/#start-与-run-不是同一种调用",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLockSupportBehaviorTest",
+    "testMethod": "shouldSeparateDirectRunFromStart"
+  }],
   "breakpoints": [
     {
       "method": "start()",

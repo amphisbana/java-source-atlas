@@ -1,0 +1,25 @@
+title: "Lab 分享："
+labels:
+  - lab
+body:
+  - type: input
+    id: lab
+    attributes:
+      label: Lab 或实验名称
+      placeholder: ThreadPoolExecutor 拒绝策略实验
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 运行步骤
+      description: 提供 JDK、Maven/Gradle 命令和关键断点。
+    validations:
+      required: true
+  - type: textarea
+    id: observation
+    attributes:
+      label: 观察结论
+      description: 说明实验验证了哪个源码分支，欢迎附截图或日志。
+    validations:
+      required: true

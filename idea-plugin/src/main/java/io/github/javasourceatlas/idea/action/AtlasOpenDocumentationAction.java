@@ -10,6 +10,7 @@ import com.intellij.openapi.ui.Messages;
 import io.github.javasourceatlas.idea.context.AtlasContextResolver;
 import io.github.javasourceatlas.idea.icons.AtlasIcons;
 import io.github.javasourceatlas.idea.index.AtlasIndexService;
+import io.github.javasourceatlas.idea.learning.AtlasLearningProgressState;
 import io.github.javasourceatlas.idea.model.AtlasEditorContext;
 import io.github.javasourceatlas.idea.model.AtlasEntryPoint;
 import io.github.javasourceatlas.idea.settings.AtlasSettingsState;
@@ -69,6 +70,8 @@ public final class AtlasOpenDocumentationAction extends DumbAwareAction {
         AtlasEntryPoint entryPoint = context.entryPoint() == null
                 ? context.topic().entryPoints().get(0)
                 : context.entryPoint();
+        // 2026-08-20：编辑器右键主动打开教程也计入最近阅读，和工具窗口入口保持一致。
+        AtlasLearningProgressState.getInstance().recordRecent(context.topic().topicId());
         BrowserUtil.browse(AtlasSettingsState.getInstance().documentationUrl(entryPoint.document()));
     }
 

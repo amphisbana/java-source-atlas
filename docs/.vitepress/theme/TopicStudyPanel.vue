@@ -70,6 +70,19 @@ const featuredEntries = computed(() => topic.value?.entryPoints.slice(0, 2) ?? [
 const featuredBreakpoints = computed(() => topic.value?.breakpoints.slice(0, 2) ?? [])
 
 /**
+ * 读取当前专题经过仓库校验的行为证据，保持结论、入口、Lab 与测试方法同屏可追溯。
+ */
+const evidenceItems = computed(() => topic.value?.evidence ?? [])
+
+/**
+ * 将测试完整类名缩短为类名，完整定位仍由 title 提供。
+ */
+function testLabel(testClass: string, testMethod: string): string {
+  const simpleClass = testClass.split('.').pop() ?? testClass
+  return `${simpleClass}#${testMethod}`
+}
+
+/**
  * 判断当前专题是否已经完成“主线阅读 + Lab 实验”两个动作。
  */
 const isComplete = computed(() => progress.value.readMain && progress.value.ranLab)
@@ -181,6 +194,24 @@ function formatUpdatedAt(value: string): string {
           <small>{{ breakpoint.scenario }}</small>
           <span class="topic-study-panel__variables">观察：{{ breakpoint.variables.join('、') }}</span>
         </div>
+      </div>
+    </div>
+
+    <div class="topic-study-panel__evidence">
+      <div class="topic-study-panel__section-title">可执行证据链</div>
+      <div
+        v-for="evidence in evidenceItems"
+        :key="`${evidence.testClass}-${evidence.testMethod}`"
+        class="topic-study-panel__evidence-row"
+      >
+        <strong>{{ evidence.claim }}</strong>
+        <span class="topic-study-panel__evidence-links">
+          <a :href="documentUrl(evidence.document)">{{ evidence.entryPoint }} 讲解</a>
+          <a :href="withBase(topicLabUrl(topic))">Lab#{{ evidence.labMethod }}</a>
+          <code :title="`${evidence.testClass}#${evidence.testMethod}`">
+            {{ testLabel(evidence.testClass, evidence.testMethod) }}
+          </code>
+        </span>
       </div>
     </div>
 

@@ -102,6 +102,14 @@
       "purpose": "运行 Callable 但不发布正常结果，为周期任务保留 NEW 状态"
     }
   ],
+  "evidence": [{
+    "claim": "FutureTask.run 通过 runner CAS 保证同一个任务的 Callable 最多被执行一次。",
+    "entryPoint": "run()",
+    "document": "/jdk/concurrent/futuretask/state-machine#run-如何只让一个线程执行-callable",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.concurrent.FutureTaskBehaviorTest",
+    "testMethod": "shouldRunCallableOnlyOnce"
+  }],
   "breakpoints": [
     {
       "method": "run()",

@@ -1,0 +1,29 @@
+title: "专题讨论："
+labels:
+  - topic
+body:
+  - type: markdown
+    attributes:
+      value: |
+        这里适合讨论源码阅读方向、版本差异和专题设计，不是提交可复现 Bug 的地方。
+  - type: input
+    id: subject
+    attributes:
+      label: 讨论主题
+      placeholder: JDK 21 中某个并发机制的实现变化
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: 背景与问题
+      description: 附上专题链接、源码入口或你已经观察到的现象。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 希望得到的帮助
+      description: 说明你希望一起确认的调用链、断点或版本边界。
+    validations:
+      required: true

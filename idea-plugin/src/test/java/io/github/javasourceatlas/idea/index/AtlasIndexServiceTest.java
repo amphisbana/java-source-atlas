@@ -1,7 +1,9 @@
 package io.github.javasourceatlas.idea.index;
 
 import io.github.javasourceatlas.idea.model.AtlasTopic;
+import io.github.javasourceatlas.idea.model.AtlasTopicRelation;
 import io.github.javasourceatlas.idea.model.AtlasVersionComparison;
+import io.github.javasourceatlas.idea.model.AtlasBreakpoint;
 import org.junit.jupiter.api.Test;
 
 import java.io.InputStream;
@@ -29,6 +31,7 @@ class AtlasIndexServiceTest {
 
             assertEquals(29, topics.size());
             assertTrue(topics.stream().allMatch(topic -> topic.lab() != null));
+            assertTrue(topics.stream().allMatch(topic -> !topic.evidence().isEmpty()));
 
             // 2026-08-20：版本对比数据由 source-index 生成，必须确认插件资源没有丢失或错配。
             Set<String> comparisonIds = topics.stream()
@@ -61,6 +64,8 @@ class AtlasIndexServiceTest {
                     "io.github.javasourceatlas.jdk.collection.HashMapDebugLab",
                     hashMap.lab().mainClass()
             );
+            assertEquals("shouldReplaceValueWithoutIncreasingSize", hashMap.evidence().getFirst().testMethod());
+            assertEquals("openjdk8-java-util-linkedhashmap", hashMap.recommendedNextTopicId());
 
             AtlasTopic springIoc = findTopic(topics, "spring-framework-5-3-ioc");
             assertTrue(springIoc.containsSourceClass(
@@ -68,6 +73,65 @@ class AtlasIndexServiceTest {
             ));
             assertFalse(springIoc.breakpoints().isEmpty());
         }
+    }
+
+    /**
+     * 验证下一站与反向前置关系都能从同一份推荐关系图推导，无需维护第二套关联数据。
+     */
+    @Test
+    void shouldDeriveRecommendedAndRelatedTopics() {
+        AtlasIndexService index = new AtlasIndexService();
+        AtlasTopic hashMap = index.findById("openjdk8-java-util-hashmap").orElseThrow();
+
+        assertEquals(
+                "openjdk8-java-util-linkedhashmap",
+                index.recommendedNext(hashMap).orElseThrow().topicId()
+        );
+        List<AtlasTopicRelation> relations = index.relatedTopics(hashMap);
+        assertTrue(relations.stream().anyMatch(relation ->
+                "推荐下一步".equals(relation.label())
+                        && "openjdk8-java-util-linkedhashmap".equals(relation.topic().topicId())));
+        assertTrue(relations.stream().anyMatch(relation ->
+                "前置专题".equals(relation.label())
+                        && "openjdk8-java-util-arraylist".equals(relation.topic().topicId())));
+    }
+
+    /**
+     * 验证最近阅读编号会按输入顺序解析，并忽略已经从索引删除的历史编号。
+     */
+    @Test
+    void shouldResolveTopicsByIdsInInputOrder() {
+        AtlasIndexService index = new AtlasIndexService();
+
+        List<AtlasTopic> topics = index.topicsByIds(List.of(
+                "openjdk8-java-util-treemap",
+                "missing-topic",
+                "openjdk8-java-util-hashmap"
+        ));
+
+        assertEquals(List.of(
+                "openjdk8-java-util-treemap",
+                "openjdk8-java-util-hashmap"
+        ), topics.stream().map(AtlasTopic::topicId).toList());
+    }
+
+    /**
+     * 验证推荐断点能匹配精确入口，并为所属类相同的简单方法名提供讲解回退。
+     */
+    @Test
+    void shouldFindBreakpointExplanation() {
+        AtlasIndexService index = new AtlasIndexService();
+        AtlasTopic topic = index.findById("openjdk8-java-util-hashmap").orElseThrow();
+        AtlasBreakpoint breakpoint = topic.breakpoints().stream()
+                .filter(item -> item.method().startsWith("putVal"))
+                .findFirst()
+                .orElseThrow();
+
+        assertTrue(index.explanationForBreakpoint(topic, breakpoint).isPresent());
+        assertFalse(index.explanationForBreakpoint(
+                topic,
+                new AtlasBreakpoint("missingMethod()", "无对应讲解", List.of(), null)
+        ).isPresent());
     }
 
     /**

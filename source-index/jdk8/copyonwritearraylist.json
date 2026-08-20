@@ -59,6 +59,14 @@
       "purpose": "创建使用 expectedArray 校验父列表版本的视图"
     }
   ],
+  "evidence": [{
+    "claim": "CopyOnWriteArrayList 迭代器持有创建时的数组快照，后续写入不会改变这次遍历。",
+    "entryPoint": "get(int)",
+    "document": "/jdk/concurrent/copyonwritearraylist/#get-的最短调用链",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.concurrent.CopyOnWriteArrayListBehaviorTest",
+    "testMethod": "shouldKeepIteratorSnapshotAfterWrite"
+  }],
   "breakpoints": [
     {
       "method": "add(E)",

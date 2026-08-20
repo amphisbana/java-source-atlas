@@ -247,6 +247,14 @@
       "purpose": "沿父任务链标记遇见顺序上更晚的右侧兄弟分区取消"
     }
   ],
+  "evidence": [{
+    "claim": "Stream 中间操作只组装流水线，终止操作到来前不会遍历数据，并且流只能消费一次。",
+    "entryPoint": "AbstractPipeline(AbstractPipeline,int)",
+    "document": "/jdk/functional/stream/pipeline-sink#一个-stage-保存什么",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.stream.StreamSpliteratorBehaviorTest",
+    "testMethod": "shouldEvaluateLazilyAndRejectSecondConsumption"
+  }],
   "breakpoints": [
     {
       "method": "ReferencePipeline.count()",

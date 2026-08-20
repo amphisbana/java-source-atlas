@@ -116,6 +116,14 @@
       "purpose": "用 nextKey/currentKey 临时强引用保持迭代步骤中的 key"
     }
   ],
+  "evidence": [{
+    "claim": "Reference.clear 只清除 referent，入队是独立状态变化，二者不能混为一次操作。",
+    "entryPoint": "Reference.get()",
+    "document": "/jdk/runtime/reference-weakhashmap/reference-processing#四类引用的处理边界",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.reference.ReferenceWeakHashMapBehaviorTest",
+    "testMethod": "shouldSeparateClearFromEnqueue"
+  }],
   "breakpoints": [
     {
       "method": "Reference.clear()/enqueue()",

@@ -128,6 +128,14 @@
       "purpose": "把条件节点转入同步队列"
     }
   ],
+  "evidence": [{
+    "claim": "ReentrantLock 由持有线程重复获取时累加持有次数，逐次 unlock 才能完全释放。",
+    "entryPoint": "ReentrantLock.lock()",
+    "document": "/jdk/concurrent/locks/#非公平锁路径",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.lock.ReentrantLockBehaviorTest",
+    "testMethod": "shouldTrackReentrantHoldCount"
+  }],
   "breakpoints": [
     {
       "method": "NonfairSync.lock()",

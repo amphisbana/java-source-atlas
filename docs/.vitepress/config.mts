@@ -107,7 +107,9 @@ export default defineConfig({
           { text: 'Spring MVC 实验', link: '/spring/mvc/debug-lab' }
         ]
       },
-      { text: '贡献指南', link: '/guide/contributing' }
+      { text: '路线图', link: '/roadmap/' },
+      { text: '贡献指南', link: '/guide/contributing' },
+      { text: '反馈', link: '/guide/feedback' }
     ],
     sidebar: {
       '/learning-path/': [
@@ -490,6 +492,19 @@ export default defineConfig({
           text: '项目指南',
           items: [
             { text: '如何阅读一个主题', link: '/guide/reading' },
+            { text: '贡献源码解析', link: '/guide/contributing' },
+            { text: '新专题模板', link: '/guide/topic-template' },
+            { text: 'Lab 编写规范', link: '/guide/lab-authoring' },
+            { text: '反馈与问题定位', link: '/guide/feedback' }
+          ]
+        }
+      ],
+      '/roadmap/': [
+        {
+          text: '项目路线图',
+          items: [
+            { text: '路线图总览', link: '/roadmap/' },
+            { text: '反馈与问题定位', link: '/guide/feedback' },
             { text: '贡献源码解析', link: '/guide/contributing' }
           ]
         }

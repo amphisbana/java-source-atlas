@@ -4,6 +4,10 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.intellij.openapi.components.Service;
 import io.github.javasourceatlas.idea.model.AtlasTopic;
+import io.github.javasourceatlas.idea.model.AtlasTopicRelation;
+import io.github.javasourceatlas.idea.model.AtlasBreakpoint;
+import io.github.javasourceatlas.idea.model.AtlasEntryPoint;
+import io.github.javasourceatlas.idea.match.AtlasMethodMatcher;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,6 +16,8 @@ import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -70,6 +76,89 @@ public final class AtlasIndexService {
      */
     public List<AtlasTopic> search(String query) {
         return topics.stream().filter(topic -> topic.matchesQuery(query)).toList();
+    }
+
+    /**
+     * 查找当前专题索引中声明的下一站。
+     *
+     * @param topic 当前专题
+     * @return 推荐的下一专题
+     */
+    public Optional<AtlasTopic> recommendedNext(AtlasTopic topic) {
+        if (topic == null || topic.recommendedNextTopicId() == null
+                || topic.recommendedNextTopicId().isBlank()) {
+            return Optional.empty();
+        }
+        return findById(topic.recommendedNextTopicId());
+    }
+
+    /**
+     * 从单向推荐关系双向推导关联专题，先展示下一站，再展示以当前专题为下一站的前置专题。
+     *
+     * @param topic 当前专题
+     * @return 去重且保持学习方向的关联专题
+     */
+    public List<AtlasTopicRelation> relatedTopics(AtlasTopic topic) {
+        if (topic == null) {
+            return Collections.emptyList();
+        }
+
+        Map<String, AtlasTopicRelation> relations = new LinkedHashMap<>();
+        recommendedNext(topic).ifPresent(next -> relations.put(
+                next.topicId(),
+                new AtlasTopicRelation(next, "推荐下一步", topic.recommendedNextReason())
+        ));
+        for (AtlasTopic candidate : topics) {
+            if (topic.topicId().equals(candidate.recommendedNextTopicId())) {
+                relations.putIfAbsent(
+                        candidate.topicId(),
+                        new AtlasTopicRelation(candidate, "前置专题", candidate.recommendedNextReason())
+                );
+            }
+        }
+        return List.copyOf(relations.values());
+    }
+
+    /**
+     * 按编号顺序解析专题集合，自动忽略已经从索引删除的历史编号。
+     *
+     * @param topicIds 专题编号序列
+     * @return 保持输入顺序的现有专题
+     */
+    public List<AtlasTopic> topicsByIds(List<String> topicIds) {
+        if (topicIds == null || topicIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return topicIds.stream()
+                .map(this::findById)
+                .flatMap(Optional::stream)
+                .toList();
+    }
+
+    /**
+     * 为推荐断点查找最贴近的方法讲解，优先完整签名，再匹配所属类和简单方法名。
+     *
+     * @param topic      当前专题
+     * @param breakpoint 当前推荐断点
+     * @return 可解释该断点的源码入口
+     */
+    public Optional<AtlasEntryPoint> explanationForBreakpoint(AtlasTopic topic, AtlasBreakpoint breakpoint) {
+        if (topic == null || breakpoint == null) {
+            return Optional.empty();
+        }
+        Optional<AtlasEntryPoint> exact = topic.entryPoints().stream()
+                .filter(entryPoint -> entryPoint.method().equals(breakpoint.method()))
+                .findFirst();
+        if (exact.isPresent()) {
+            return exact;
+        }
+
+        String methodName = AtlasMethodMatcher.extractSimpleMethodName(breakpoint.method());
+        String sourceClass = topic.resolveSourceClass(breakpoint.method(), breakpoint.sourceClass());
+        return topic.entryPoints().stream()
+                .filter(entryPoint -> methodName.equals(entryPoint.simpleMethodName()))
+                .filter(entryPoint -> sourceClass.equals(entryPoint.effectiveSourceClass(topic)))
+                .findFirst();
     }
 
     /**

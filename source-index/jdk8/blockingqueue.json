@@ -112,6 +112,14 @@
       "purpose": "清理公平队列的取消节点并处理暂时不能移除的尾节点"
     }
   ],
+  "evidence": [{
+    "claim": "有界阻塞队列已满时 put 会等待，take 释放容量后生产者才能继续。",
+    "entryPoint": "BlockingQueue.put(E)",
+    "document": "/jdk/concurrent/blockingqueue/#四组方法如何选择",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.concurrent.BlockingQueueBehaviorTest",
+    "testMethod": "shouldResumeArrayQueuePutAfterTakeCreatesCapacity"
+  }],
   "breakpoints": [
     {
       "method": "ArrayBlockingQueue.put(E)",

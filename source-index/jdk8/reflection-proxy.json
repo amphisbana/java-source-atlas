@@ -121,6 +121,14 @@
       "purpose": "可靠确认 Class 是否由 JDK Proxy 机制生成，而非只判断是否继承 Proxy"
     }
   ],
+  "evidence": [{
+    "claim": "getDeclaredMethod 只查声明类，而公开成员查找会沿继承关系扩大范围。",
+    "entryPoint": "Class.getDeclaredMethod(String,Class<?>...)",
+    "document": "/jdk/runtime/reflection-proxy/reflection-invoke#getmethod-与-getdeclaredmethod-先解决查找范围",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.runtime.ReflectionProxyBehaviorTest",
+    "testMethod": "shouldSeparatePublicMemberSearchFromDeclaredMemberSearch"
+  }],
   "breakpoints": [
     {
       "method": "Class.privateGetDeclaredMethods(boolean)",

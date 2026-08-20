@@ -95,6 +95,14 @@
       "sourceClass": "hotspot.runtime.ObjectMonitor"
     }
   ],
+  "evidence": [{
+    "claim": "同一线程可以重复进入同一个 monitor，退出次数与进入深度匹配后锁才真正释放。",
+    "entryPoint": "monitorenter / monitorexit",
+    "document": "/jdk/concurrent/synchronized-monitor/bytecode-reentrancy#同步代码块与同步方法不是同一种字节码形态",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.concurrent.SynchronizedMonitorBehaviorTest",
+    "testMethod": "shouldReenterSameMonitor"
+  }],
   "breakpoints": [
     {
       "method": "SynchronizedMonitorDebugLab.observeBlockedAndWaiting()",

@@ -106,6 +106,14 @@
       "purpose": "查询 worker 是否使用本地 FIFO 调度模式"
     }
   ],
+  "evidence": [{
+    "claim": "ForkJoinPool 能把递归任务拆分到工作队列并通过窃取和 join 合并结果。",
+    "entryPoint": "ForkJoinPool.externalPush(ForkJoinTask)",
+    "document": "/jdk/concurrent/forkjoinpool/#外部提交与任务内部-fork-不是同一路径",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.concurrent.ForkJoinPoolBehaviorTest",
+    "testMethod": "shouldComputeRecursiveRangeSum"
+  }],
   "breakpoints": [
     {
       "method": "ForkJoinPool.externalPush(ForkJoinTask)",

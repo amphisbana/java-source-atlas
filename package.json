@@ -9,7 +9,8 @@
     "docs:preview": "vitepress preview docs",
     "check:source-index": "node scripts/validate-source-index.mjs",
     "check:links": "node scripts/check-doc-links.mjs",
-    "verify:docs": "npm run check:source-index && npm run docs:build && npm run check:links"
+    "verify:community": "node scripts/check-community-files.mjs",
+    "verify:docs": "npm run check:source-index && npm run verify:community && npm run docs:build && npm run check:links"
   },
   "devDependencies": {
     "vitepress": "^1.6.4",

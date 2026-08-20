@@ -10,6 +10,7 @@ const sourceIndexRoot = resolve(projectRoot, 'source-index')
 const docsRoot = resolve(projectRoot, 'docs')
 const schemaPath = resolve(sourceIndexRoot, 'schema.json')
 const baselinesPath = resolve(sourceIndexRoot, 'baselines.json')
+const learningPathPath = resolve(docsRoot, 'learning-path/index.md')
 
 const annotationKeywords = new Set([
   '$schema',
@@ -474,6 +475,133 @@ async function validateLabMetadata(document, indexFile, failures) {
 }
 
 /**
+ * 转义正则表达式中的方法名，避免 `$` 等合法 Java 标识符改变匹配语义。
+ *
+ * @param {string} value 原始方法名
+ * @returns {string} 可安全拼入正则表达式的文本
+ */
+function escapeRegularExpression(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * 判断 Java 源码中是否存在指定方法声明；这里只识别声明行，不把普通调用当作证据。
+ *
+ * @param {string} source Java 源码
+ * @param {string} methodName 方法名
+ * @returns {boolean} 是否找到声明
+ */
+function containsJavaMethod(source, methodName) {
+  const methodPattern = escapeRegularExpression(methodName)
+  const declarationPattern = new RegExp(
+    `(?:^|\\n)\\s*(?:(?:public|protected|private|static|final|synchronized|native|abstract|default)\\s+)*`
+      + `(?:[\\w$<>?.,\\[\\]]+\\s+)+${methodPattern}\\s*\\(`,
+    'm'
+  )
+  return declarationPattern.test(source)
+}
+
+/**
+ * 判断测试方法声明之前是否存在 JUnit @Test 注解，防止普通辅助方法被误当成行为证据。
+ *
+ * @param {string} source 测试源码
+ * @param {string} methodName 测试方法名
+ * @returns {boolean} 是否为真实测试方法
+ */
+function containsJunitTestMethod(source, methodName) {
+  const methodPattern = escapeRegularExpression(methodName)
+  const testPattern = new RegExp(
+    `@Test(?:\\s*\\([^)]*\\))?(?:\\s*@[\\w$.]+(?:\\([^)]*\\))?)*\\s*`
+      + `(?:(?:public|protected|private|static|final|synchronized)\\s+)*`
+      + `(?:[\\w$<>?.,\\[\\]]+\\s+)+${methodPattern}\\s*\\(`,
+    'm'
+  )
+  return testPattern.test(source)
+}
+
+/**
+ * 校验专题证据可以沿“结论 -> 入口/文档 -> Lab -> JUnit”完整落到仓库真实内容。
+ *
+ * @param {unknown} document 当前专题索引
+ * @param {string} indexFile 当前索引文件
+ * @param {string[]} failures 错误收集器
+ * @returns {Promise<number>} 当前专题通过结构读取的证据条数
+ */
+async function validateEvidence(document, indexFile, failures) {
+  if (document === null || typeof document !== 'object' || Array.isArray(document)) {
+    return 0
+  }
+
+  const evidenceItems = Array.isArray(document.evidence) ? document.evidence : []
+  const entryPoints = Array.isArray(document.entryPoints) ? document.entryPoints : []
+  const displayPath = relative(projectRoot, indexFile)
+  let labSource
+
+  if (typeof document.lab?.sourcePath === 'string') {
+    try {
+      labSource = await readFile(resolve(projectRoot, document.lab.sourcePath), 'utf8')
+    } catch {
+      // Lab 路径缺失由 validateLabMetadata 统一报告，这里只跳过方法级联校验。
+    }
+  }
+
+  for (const [index, evidence] of evidenceItems.entries()) {
+    if (evidence === null || typeof evidence !== 'object' || Array.isArray(evidence)) {
+      continue
+    }
+    const pointer = `${displayPath} #/evidence/${index}`
+    const entryExists = entryPoints.some((entryPoint) => (
+      entryPoint?.method === evidence.entryPoint && entryPoint?.document === evidence.document
+    ))
+    if (!entryExists) {
+      failures.push(`${pointer}: entryPoint 与 document 必须精确对应当前专题的同一源码入口`)
+    }
+
+    if (labSource !== undefined
+      && typeof evidence.labMethod === 'string'
+      && !containsJavaMethod(labSource, evidence.labMethod)) {
+      failures.push(`${pointer}/labMethod: ${evidence.labMethod} 不存在于 ${document.lab.sourcePath}`)
+    }
+
+    if (typeof evidence.testClass !== 'string' || typeof document.lab?.module !== 'string') {
+      continue
+    }
+    const testPath = `${document.lab.module}/src/test/java/${evidence.testClass.replaceAll('.', '/')}.java`
+    let testSource
+    try {
+      testSource = await readFile(resolve(projectRoot, testPath), 'utf8')
+    } catch {
+      failures.push(`${pointer}/testClass: 测试源码不存在 ${testPath}`)
+      continue
+    }
+    if (typeof evidence.testMethod === 'string'
+      && !containsJunitTestMethod(testSource, evidence.testMethod)) {
+      failures.push(`${pointer}/testMethod: ${evidence.testMethod} 不是 ${testPath} 中带 @Test 的方法`)
+    }
+  }
+
+  return evidenceItems.length
+}
+
+/**
+ * 校验学习路线首页展示的专题总数与索引一致，避免内容扩展后文案长期漂移。
+ *
+ * @param {number} topicCount 当前专题总数
+ * @param {string[]} failures 错误收集器
+ */
+async function validateLearningPathTopicCount(topicCount, failures) {
+  const source = await readFile(learningPathPath, 'utf8')
+  const match = source.match(/^description:\s*.*?全部\s*(\d+)\s*个源码专题/m)
+  if (match === null) {
+    failures.push('docs/learning-path/index.md: description 必须声明全部源码专题数量')
+    return
+  }
+  if (Number(match[1]) !== topicCount) {
+    failures.push(`docs/learning-path/index.md: 声明 ${match[1]} 个专题，实际索引为 ${topicCount} 个`)
+  }
+}
+
+/**
  * 校验集中版本基线并建立“仓库 -> 允许 ref”查询表。
  * resolvedCommit 固定到 tag 解引用后的提交，便于后续同步本地源码时复核。
  *
@@ -607,6 +735,7 @@ const indexFiles = (await collectJsonFiles(sourceIndexRoot))
 const topicOwners = new Map()
 const comparisonOwners = new Map()
 const recommendedReferences = []
+let evidenceCount = 0
 
 if (indexFiles.length === 0) {
   failures.push('source-index: 至少需要一个专题索引')
@@ -621,6 +750,7 @@ for (const indexFile of indexFiles) {
   collectRecommendedNextReference(document, indexFile, recommendedReferences, failures)
   validateSourceClassReferences(document, indexFile, failures)
   await validateLabMetadata(document, indexFile, failures)
+  evidenceCount += await validateEvidence(document, indexFile, failures)
   validateTopicBaseline(document, indexFile, repositoryRefs, failures)
 
   if (errors.length > 0) {
@@ -630,6 +760,7 @@ for (const indexFile of indexFiles) {
 }
 
 validateRecommendedNextTargets(recommendedReferences, topicOwners, failures)
+await validateLearningPathTopicCount(indexFiles.length, failures)
 
 const markdownFileCount = await validateMarkdownSourceLinks(repositoryRefs, failures)
 
@@ -639,6 +770,6 @@ if (failures.length > 0) {
   process.exitCode = 1
 } else {
   console.log(
-    `source-index 校验通过：${indexFiles.length} 个专题索引、${baselines.baselines.length} 个固定版本、${markdownFileCount} 篇 Markdown`
+    `source-index 校验通过：${indexFiles.length} 个专题索引、${evidenceCount} 条可执行证据、${baselines.baselines.length} 个固定版本、${markdownFileCount} 篇 Markdown`
   )
 }

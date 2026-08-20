@@ -1,0 +1,43 @@
+name: Bug 报告
+description: 报告文档站、源码索引、Lab 或 IDEA 插件中的可复现问题。
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请尽量提供最小复现步骤和版本信息，避免只描述“打不开”或“结果不对”。
+  - type: input
+    id: area
+    attributes:
+      label: 受影响区域
+      description: 例如 IDEA 插件、HashMap 专题、Spring IOC Lab、文档链接。
+      placeholder: IDEA 插件 / JDK ThreadLocal
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 请按实际操作顺序描述，并附上最小代码或专题链接。
+      placeholder: |
+        1. 打开……
+        2. 点击……
+        3. 看到……，预期应该……
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境信息
+      description: 填写操作系统、JDK、IDEA、插件版本或 Node/Maven 版本。
+      placeholder: macOS 15 / JDK 21 / IDEA 2024.2.5 / Plugin 0.2.4
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志或截图
+      description: 请删除密码、Token、公司代码等敏感信息后粘贴。
+      render: text

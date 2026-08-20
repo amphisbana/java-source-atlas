@@ -15,6 +15,7 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <applicationService serviceImplementation="io.github.javasourceatlas.idea.index.AtlasIndexService"/>
+        <applicationService serviceImplementation="io.github.javasourceatlas.idea.learning.AtlasLearningProgressState"/>
         <applicationService serviceImplementation="io.github.javasourceatlas.idea.settings.AtlasSettingsState"/>
         <applicationConfigurable
                 id="io.github.javasourceatlas.idea.settings"

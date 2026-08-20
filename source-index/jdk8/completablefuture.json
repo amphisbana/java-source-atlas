@@ -74,6 +74,14 @@
       "purpose": "以 CancellationException 完成阶段并触发依赖"
     }
   ],
+  "evidence": [{
+    "claim": "CompletableFuture 的结果转换与异步阶段依赖已有完成状态和执行器，而不是为每一步固定创建线程。",
+    "entryPoint": "supplyAsync(Supplier)",
+    "document": "/jdk/concurrent/completablefuture/#supplyasync-不等于创建一个专属线程",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.concurrent.CompletableFutureBehaviorTest",
+    "testMethod": "shouldTransformAndComposeResult"
+  }],
   "breakpoints": [
     {
       "method": "uniApplyStage(Executor,Function)",

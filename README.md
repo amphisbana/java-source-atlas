@@ -112,6 +112,8 @@ flowchart LR
 | [JDK 8 / 17 / 21 版本对比](docs/jdk/version-comparison/index.md) | 正在升级 JDK，想确认同一机制在不同版本中的实现变化。 |
 | [JDK 专题首页](docs/index.md) | 按分类浏览全部 JDK 与 Spring 专题。 |
 | [如何阅读一个专题](docs/guide/reading.md) | 不确定应该先看文档、源码、动画还是 Lab。 |
+| [项目路线图](docs/roadmap/index.md) | 了解当前能力、下一阶段重点和不在近期范围内的内容。 |
+| [反馈与问题定位](docs/guide/feedback.md) | 提交可复现 Bug、专题建议或文档修正。 |
 
 ## 技术栈
 
@@ -223,6 +225,8 @@ java-source-atlas/
 8. 第三方源码地址与许可证说明。
 
 详细规范见 [贡献指南](CONTRIBUTING.md)。
+
+新增 Lab 请同时阅读 [Lab 编写规范](docs/guide/lab-authoring.md)；提交前可使用仓库中的 Issue、Discussion 和 Pull Request 模板，让源码入口、断点、测试与版本边界保持完整。
 
 ## 版本基线与许可证
 

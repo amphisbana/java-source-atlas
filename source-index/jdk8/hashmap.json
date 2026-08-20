@@ -59,6 +59,14 @@
       "purpose": "按键或键值组合删除节点"
     }
   ],
+  "evidence": [{
+    "claim": "HashMap 为已有 key 写入新值时只替换 value，不增加映射数量。",
+    "entryPoint": "put(K,V)",
+    "document": "/jdk/collections/hashmap/put",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.collection.HashMapBehaviorTest",
+    "testMethod": "shouldReplaceValueWithoutIncreasingSize"
+  }],
   "breakpoints": [
     {
       "method": "hash(Object)",

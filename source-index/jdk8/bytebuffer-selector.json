@@ -189,6 +189,14 @@
       "sourceClass": "sun.nio.ch.SelectorImpl"
     }
   ],
+  "evidence": [{
+    "claim": "Buffer 的 position、limit 与 capacity 共同定义读写窗口，切换模式不需要复制数据。",
+    "entryPoint": "Buffer.position(int)",
+    "document": "/jdk/io/nio/buffer-state#四个指标的准确含义",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.nio.NioBufferSelectorBehaviorTest",
+    "testMethod": "shouldMoveBufferBoundariesWithoutErasingContent"
+  }],
   "breakpoints": [
     {
       "method": "Buffer.nextGetIndex()",

@@ -108,6 +108,14 @@
       "purpose": "按异常继承距离选择最具体的 rollback 或 no-rollback 规则"
     }
   ],
+  "evidence": [{
+    "claim": "事务拦截器会从最具体的实现方法解析传播行为与回滚规则，再决定事务边界。",
+    "entryPoint": "TransactionInterceptor.invoke(MethodInvocation)",
+    "document": "/spring/transaction/transaction-interceptor",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.spring.transaction.TransactionMetadataTest",
+    "testMethod": "shouldResolvePropagationFromImplementationMethod"
+  }],
   "breakpoints": [
     {
       "method": "TransactionInterceptor.invoke(MethodInvocation)",

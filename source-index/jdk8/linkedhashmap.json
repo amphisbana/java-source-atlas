@@ -79,6 +79,14 @@
       "purpose": "沿 after 遍历并执行快速失败检查"
     }
   ],
+  "evidence": [{
+    "claim": "插入顺序模式下替换已有键的值不会把节点移动到双向链表末尾。",
+    "entryPoint": "LinkedHashMap(int,float,boolean)",
+    "document": "/jdk/collections/linkedhashmap/access-order",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.collection.LinkedHashMapBehaviorTest",
+    "testMethod": "shouldKeepInsertionOrderWhenReplacingValue"
+  }],
   "breakpoints": [
     {
       "method": "linkNodeLast(Entry)",

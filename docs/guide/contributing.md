@@ -19,3 +19,11 @@
 - 是否区分实现细节和公开 API 契约。
 - 是否说明版本范围，而不是把某个版本写成永恒结论。
 
+## 开始实现
+
+1. 先用[新专题模板](/guide/topic-template)组织问题、入口、调用链、断点和版本边界。
+2. 按 [Lab 编写规范](/guide/lab-authoring)增加可运行案例和自动化断言。
+3. 同步维护 `source-index`、导航和学习路线，避免网站与 IDEA 插件的数据漂移。
+4. 运行 `mvn --batch-mode test` 和 `npm run verify:docs`。
+
+遇到不确定的版本差异或专题边界，可以先通过[反馈入口](/guide/feedback)进入 Issue 或 Discussion。

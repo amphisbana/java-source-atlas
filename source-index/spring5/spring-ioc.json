@@ -184,6 +184,14 @@
       "sourceClass": "org.springframework.beans.factory.annotation.QualifierAnnotationAutowireCandidateResolver"
     }
   ],
+  "evidence": [{
+    "claim": "IOC 容器会先处理 BeanDefinition 扩展点，再按生命周期顺序实例化、填充并初始化单例。",
+    "entryPoint": "AbstractApplicationContext.refresh()",
+    "document": "/spring/ioc/refresh",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.spring.ioc.SpringIocLifecycleTest",
+    "testMethod": "shouldRunDefinitionAndBeanLifecycleInOrder"
+  }],
   "breakpoints": [
     {
       "method": "AbstractApplicationContext.refresh()",

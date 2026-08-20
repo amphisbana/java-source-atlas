@@ -159,6 +159,31 @@ jobs:
       - name: Run Stream and Spliterator behavior tests
         run: mvn --batch-mode -pl labs/jdk-labs -Dtest=StreamSpliteratorBehaviorTest test
 
+  indexed-behavior-cross-version:
+    name: Indexed behavior Java ${{ matrix.java }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['8', '17', '21']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      - name: Run remaining indexed cross-version behavior tests
+        run: >-
+          mvn --batch-mode -pl labs/jdk-labs
+          -Dtest=HashMapBehaviorTest,ConcurrentHashMapBehaviorTest,ThreadLocalBehaviorTest,CompletableFutureBehaviorTest,ClassLoaderServiceLoaderBehaviorTest
+          test
+
   idea-plugin:
     name: IDEA plugin Java 21 tests
     runs-on: ubuntu-latest
@@ -196,3 +221,6 @@ jobs:
 
       - name: Validate source indexes, build, and check links
         run: npm run verify:docs
+
+      - name: Check community templates
+        run: npm run verify:community

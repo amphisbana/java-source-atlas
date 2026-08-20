@@ -78,6 +78,14 @@
       "purpose": "对后备 TreeMap 的读写实施包含或排他的范围约束"
     }
   ],
+  "evidence": [{
+    "claim": "TreeMap 按比较结果定位键，相同比较结果替换值且不会新增节点。",
+    "entryPoint": "put(K,V)",
+    "document": "/jdk/collections/treemap/#put-的查找、覆盖与接入",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.collection.TreeMapBehaviorTest",
+    "testMethod": "shouldOrderNaturallyAndReplaceExistingValue"
+  }],
   "breakpoints": [
     {
       "method": "put(K,V)",

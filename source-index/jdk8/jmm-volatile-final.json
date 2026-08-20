@@ -75,6 +75,14 @@
       "sourceClass": "sun.misc.Unsafe"
     }
   ],
+  "evidence": [{
+    "claim": "线程启动前的写入通过 start happens-before 规则对新线程可见，join 再把完成结果发布给等待线程。",
+    "entryPoint": "Thread.start()",
+    "document": "/jdk/concurrent/jmm/happens-before#start-与-join-是两条方向相反的边",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.concurrent.JmmVolatileBehaviorTest",
+    "testMethod": "shouldPublishThroughStartAndJoin"
+  }],
   "breakpoints": [
     {
       "method": "JmmVolatileDebugLab.observeVolatilePublication()",

@@ -15,12 +15,18 @@ import java.util.stream.Stream;
  * @param title              专题标题
  * @param primaryVersion     主要讲解版本
  * @param sourceRef          固定源码 Tag
+ * @param designInsight      源码设计亮点
+ * @param focusQuestion      阅读时需要回答的核心问题
+ * @param readingGoal        完成专题后的能力标准
+ * @param recommendedNextTopicId 下一专题编号
+ * @param recommendedNextReason  下一专题推荐理由
  * @param compatibleVersions 可参考的兼容版本
  * @param lab                配套的可运行调试实验
  * @param source             专题主源码类
  * @param relatedSources     关联源码类
  * @param versionComparison  可选的 JDK 版本对比入口
  * @param entryPoints        关键方法入口
+ * @param evidence           可执行证据链
  * @param breakpoints        推荐断点
  */
 public record AtlasTopic(
@@ -28,12 +34,18 @@ public record AtlasTopic(
         String title,
         String primaryVersion,
         String sourceRef,
+        String designInsight,
+        String focusQuestion,
+        String readingGoal,
+        String recommendedNextTopicId,
+        String recommendedNextReason,
         List<String> compatibleVersions,
         AtlasLab lab,
         AtlasSource source,
         List<AtlasSource> relatedSources,
         AtlasVersionComparison versionComparison,
         List<AtlasEntryPoint> entryPoints,
+        List<AtlasEvidence> evidence,
         List<AtlasBreakpoint> breakpoints
 ) {
 
@@ -44,6 +56,7 @@ public record AtlasTopic(
         compatibleVersions = immutableOrEmpty(compatibleVersions);
         relatedSources = immutableOrEmpty(relatedSources);
         entryPoints = immutableOrEmpty(entryPoints);
+        evidence = immutableOrEmpty(evidence);
         breakpoints = immutableOrEmpty(breakpoints);
     }
 

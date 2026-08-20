@@ -162,6 +162,14 @@
       "purpose": "查找并调用局部或全局 @ExceptionHandler 方法"
     }
   ],
+  "evidence": [{
+    "claim": "Spring MVC 会先解析控制器方法参数，调用处理器后再选择返回值处理器写出响应。",
+    "entryPoint": "FrameworkServlet.processRequest(HttpServletRequest,HttpServletResponse)",
+    "document": "/spring/mvc/dispatch-chain",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.spring.mvc.SpringMvcBehaviorTest",
+    "testMethod": "shouldResolveArgumentsAndWriteResponse"
+  }],
   "breakpoints": [
     {
       "method": "DispatcherServlet.doDispatch(HttpServletRequest,HttpServletResponse)",

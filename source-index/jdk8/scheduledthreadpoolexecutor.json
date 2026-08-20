@@ -97,6 +97,14 @@
       "purpose": "按延迟与周期关闭策略筛选、取消队列任务并尝试终止"
     }
   ],
+  "evidence": [{
+    "claim": "普通 execute 命令也会被包装成零延迟 ScheduledFutureTask，统一进入延迟队列。",
+    "entryPoint": "schedule(Runnable,long,TimeUnit)",
+    "document": "/jdk/concurrent/scheduledthreadpoolexecutor/#schedule-的完整调用链",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.concurrent.ScheduledThreadPoolExecutorBehaviorTest",
+    "testMethod": "shouldWrapExecuteCommandAsZeroDelayScheduledFuture"
+  }],
   "breakpoints": [
     {
       "method": "schedule(Runnable,long,TimeUnit)",

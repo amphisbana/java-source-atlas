@@ -87,6 +87,14 @@
       "purpose": "观察碰撞线程如何改变 probe 并选择新槽位"
     }
   ],
+  "evidence": [{
+    "claim": "compareAndSet 只会在当前值等于期望值时提交更新，失配时保持原值。",
+    "entryPoint": "AtomicInteger.compareAndSet(int,int)",
+    "document": "/jdk/concurrent/atomic/atomic-integer#compareandset-的判定边界",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.concurrent.AtomicBehaviorTest",
+    "testMethod": "shouldSucceedAndFailCompareAndSetByExpectedValue"
+  }],
   "breakpoints": [
     {
       "method": "AtomicInteger.compareAndSet(int,int)",

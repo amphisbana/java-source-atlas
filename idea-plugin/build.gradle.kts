@@ -102,6 +102,8 @@ intellijPlatform {
               <li>支持推荐断点一键添加，以及配套 Lab 的打开和 Debug。</li>
               <li>增强重载方法签名与 JDK、Spring Framework、Spring Boot 版本匹配。</li>
               <li>按专题、源码入口和推荐断点分组展示操作按钮，优化窄工具窗口布局。</li>
+              <li>新增学习路径页签，支持本地完成状态、下一专题推荐、关联专题切换和证据数量提示。</li>
+              <li>新增源码调用链复制、推荐断点讲解、专题收藏筛选和最近阅读恢复。</li>
             </ul>
         """.trimIndent()
     }

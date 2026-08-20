@@ -146,6 +146,14 @@
       "purpose": "把饱和或关闭后的任务交给 RejectedExecutionHandler"
     }
   ],
+  "evidence": [{
+    "claim": "工作线程与队列同时达到容量上限后，新任务会进入配置的拒绝策略。",
+    "entryPoint": "runStateOf(int)",
+    "document": "/jdk/concurrent/threadpoolexecutor/#生命周期状态",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.concurrent.ThreadPoolExecutorBehaviorTest",
+    "testMethod": "shouldRejectWhenWorkersAndQueueAreFull"
+  }],
   "breakpoints": [
     {
       "method": "execute(Runnable)",

@@ -19,6 +19,15 @@ export interface SourceBreakpoint {
   sourceClass?: string | null
 }
 
+export interface SourceEvidence {
+  claim: string
+  entryPoint: string
+  document: string
+  labMethod: string
+  testClass: string
+  testMethod: string
+}
+
 export interface SourceVersionComparison {
   id: string
   summary: string
@@ -45,6 +54,7 @@ export interface SourceTopic {
   source: SourceLocation
   relatedSources: SourceLocation[]
   entryPoints: SourceEntryPoint[]
+  evidence: SourceEvidence[]
   breakpoints: SourceBreakpoint[]
 }
 
@@ -76,6 +86,7 @@ interface RawSourceTopic {
   source: SourceLocation & { repository: string }
   relatedSources?: SourceLocation[]
   entryPoints: SourceEntryPoint[]
+  evidence: SourceEvidence[]
   breakpoints?: SourceBreakpoint[]
 }
 
@@ -152,6 +163,7 @@ function normalizeTopic(modulePath: string, rawTopic: RawSourceTopic): SourceTop
     source,
     relatedSources: rawTopic.relatedSources ?? [],
     entryPoints: rawTopic.entryPoints,
+    evidence: rawTopic.evidence,
     breakpoints: rawTopic.breakpoints ?? []
   }
 }

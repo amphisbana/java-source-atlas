@@ -3,7 +3,7 @@
   "$id": "https://java-source-atlas.dev/schema/source-topic.json",
   "title": "Java Source Atlas Topic Index",
   "type": "object",
-  "required": ["schemaVersion", "topicId", "title", "primaryVersion", "sourceRef", "lab", "source", "entryPoints"],
+  "required": ["schemaVersion", "topicId", "title", "primaryVersion", "sourceRef", "lab", "source", "entryPoints", "evidence"],
   "properties": {
     "schemaVersion": { "type": "integer", "const": 1 },
     "topicId": { "type": "string", "minLength": 1 },
@@ -77,6 +77,23 @@
           "document": { "type": "string", "minLength": 1 },
           "purpose": { "type": "string", "minLength": 1 },
           "sourceClass": { "type": ["string", "null"], "minLength": 1 }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["claim", "entryPoint", "document", "labMethod", "testClass", "testMethod"],
+        "properties": {
+          "claim": { "type": "string", "minLength": 1 },
+          "entryPoint": { "type": "string", "minLength": 1 },
+          "document": { "type": "string", "minLength": 1 },
+          "labMethod": { "type": "string", "minLength": 1 },
+          "testClass": { "type": "string", "minLength": 1 },
+          "testMethod": { "type": "string", "minLength": 1 }
         }
       }
     },

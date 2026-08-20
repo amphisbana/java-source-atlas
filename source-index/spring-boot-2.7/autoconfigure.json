@@ -102,6 +102,14 @@
       "purpose": "依据当前 BeanDefinition 可见范围决定默认 Bean 是否回退"
     }
   ],
+  "evidence": [{
+    "claim": "自动配置条件不满足时目标 Bean 不会创建，属性开启后才进入配置绑定与装配。",
+    "entryPoint": "SpringApplication.run(String...)",
+    "document": "/spring/boot-autoconfigure/springapplication-run",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.spring.boot.autoconfigure.AtlasFeatureAutoConfigurationTest",
+    "testMethod": "shouldStayDisabledWhenPropertyIsMissing"
+  }],
   "breakpoints": [
     {
       "method": "SpringApplication.run(String...)",

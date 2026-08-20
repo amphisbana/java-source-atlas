@@ -66,12 +66,18 @@ class AtlasMethodMatcherTest {
                 "示例专题",
                 "示例版本",
                 "v1",
+                null,
+                null,
+                null,
+                null,
+                null,
                 List.of(),
                 new AtlasLab("labs/sample", "sample.SampleLab", "labs/sample/SampleLab.java"),
                 new AtlasSource("sample.Map", "Map.java"),
                 List.of(new AtlasSource("sample.Helper", "Helper.java")),
                 null,
                 List.of(primaryEntry, relatedEntry),
+                List.of(),
                 List.of()
         );
 
@@ -92,11 +98,17 @@ class AtlasMethodMatcherTest {
                 "示例专题",
                 "示例版本",
                 "v1",
+                null,
+                null,
+                null,
+                null,
+                null,
                 List.of(),
                 new AtlasLab("labs/sample", "sample.SampleLab", "labs/sample/SampleLab.java"),
                 new AtlasSource("java.util.ArrayList", "ArrayList.java"),
                 List.of(),
                 null,
+                List.of(),
                 List.of(),
                 List.of()
         );

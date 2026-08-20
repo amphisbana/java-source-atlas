@@ -112,6 +112,14 @@
       "purpose": "在线程构造期间复制父线程可继承绑定并调用 childValue"
     }
   ],
+  "evidence": [{
+    "claim": "ThreadLocal 的值实际保存在各自线程的 ThreadLocalMap 中，不同线程读取互不覆盖。",
+    "entryPoint": "ThreadLocal.get()",
+    "document": "/jdk/concurrent/threadlocal/#get-的当前线程查找链",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLocalBehaviorTest",
+    "testMethod": "shouldIsolateValuesBetweenThreads"
+  }],
   "breakpoints": [
     {
       "method": "ThreadLocal.get()",

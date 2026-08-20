@@ -27,6 +27,16 @@
 
 ```bash
 mvn test
-npm run docs:build
+npm run verify:docs
+npm run verify:community
 ```
 
+## 选择合适的协作入口
+
+- 可复现的文档、索引、Lab 或插件问题：使用 [Bug 报告](https://github.com/amphisbana/java-source-atlas/issues/new?template=bug_report.yml)。
+- 想增加一个源码专题：使用 [新专题建议](https://github.com/amphisbana/java-source-atlas/issues/new?template=topic_request.yml)。
+- 还在比较阅读方向、版本差异或实验设计：使用 GitHub Discussions。
+- 开始实现专题：复用 [新专题模板](docs/guide/topic-template.md)，并同步索引、Lab、测试与导航。
+- 新增或修改 Lab：先阅读 [Lab 编写规范](docs/guide/lab-authoring.md)，确保有触发条件、推荐断点和自动化断言。
+
+提交 Pull Request 时请使用仓库模板，并确认没有提交密码、Token、IDE 配置、构建产物或 `agent.md`。

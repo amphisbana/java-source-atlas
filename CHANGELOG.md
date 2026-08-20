@@ -1,0 +1,26 @@
+# 变更记录
+
+项目遵循“可定位、可运行、可验证”的原则记录重要变化。版本号对应 IDEA 插件和文档站发布节奏，专题内容的版本基线仍以各自索引和页面说明为准。
+
+## 未发布
+
+### 新增
+
+- IDEA 插件支持源码调用链复制、推荐断点讲解、专题收藏和最近阅读。
+- 新增 GitHub Issue、Discussion、Pull Request 模板，以及 Lab 编写规范。
+- 新增路线图和在线反馈页，明确专题提案与问题定位所需信息。
+
+### 改进
+
+- 右键菜单、gutter 图标和工具窗口打开教程时统一记录最近阅读。
+- 文档质量门禁扩展为源码索引、内部链接、社区文件和生产构建检查。
+
+## [0.2.4]
+
+- 统一 Spring Framework Lab 的 IOC、AOP、Transaction 和 MVC 模块。
+- 增加 JDK 8 / 17 / 21 版本对比和跨版本行为 CI。
+- 优化 IDEA 插件的专题导航、推荐断点、Lab 操作和内嵌教程阅读。
+
+## 发布说明
+
+完整插件包和校验和请查看 [GitHub Releases](https://github.com/amphisbana/java-source-atlas/releases)。

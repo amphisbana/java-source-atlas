@@ -53,6 +53,14 @@
       "purpose": "创建共享父列表数据的范围视图"
     }
   ],
+  "evidence": [{
+    "claim": "ArrayList 扩容只改变底层数组容量，不改变已有元素的逻辑顺序。",
+    "entryPoint": "add(E)",
+    "document": "/jdk/collections/arraylist/#add-e-调用链",
+    "labMethod": "main",
+    "testClass": "io.github.javasourceatlas.jdk.collection.ArrayListBehaviorTest",
+    "testMethod": "shouldKeepOrderAfterGrowth"
+  }],
   "breakpoints": [
     {
       "method": "grow(int)",

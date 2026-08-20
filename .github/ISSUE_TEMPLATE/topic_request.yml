@@ -1,0 +1,40 @@
+name: 新专题建议
+description: 建议新增 JDK、Spring 或其他常用 Java 框架源码专题。
+title: "[专题] "
+labels:
+  - enhancement
+  - topic
+body:
+  - type: input
+    id: topic
+    attributes:
+      label: 建议专题
+      description: 填写类名、机制或框架模块。
+      placeholder: java.util.concurrent.Exchanger
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: 想解决的源码问题
+      description: 说明读者会遇到的真实问题，以及希望看到的关键调用链。
+      placeholder: 为什么……？希望能够从……入口跟到……状态变化。
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 版本与证据线索
+      description: 提供目标版本、源码链接、复现案例或断点线索。
+      placeholder: JDK 8 / 17 / 21；源码链接；最小测试……
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已经搜索过现有专题和 Issue。
+          required: true
+        - label: 我愿意补充 Lab、测试或源码入口线索。
+          required: false
