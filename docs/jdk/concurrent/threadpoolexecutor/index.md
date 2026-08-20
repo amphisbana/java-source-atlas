@@ -2,6 +2,12 @@
 
 `ThreadPoolExecutor` 把任务提交、工作线程管理、阻塞队列、生命周期和拒绝策略组合成一个可配置执行器。理解它的入口不是背参数，而是跟踪 `execute` 如何根据状态作出三步决策。
 
+<TopicStudyPanel
+  topic-id="openjdk8-java-util-concurrent-threadpoolexecutor"
+  design-insight="它把任务接收、资源扩张、排队背压和生命周期收口拆成可组合策略，却用一个 ctl 保持关键状态的原子快照。"
+  focus-question="为什么一次 execute 必须在入队后再次检查线程池状态？"
+/>
+
 ## 七个构造参数
 
 | 参数 | 作用 |

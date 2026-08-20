@@ -41,6 +41,7 @@ import SpringBootAutoConfigurationAnimation from './SpringBootAutoConfigurationA
 import SpringMvcDispatchAnimation from './SpringMvcDispatchAnimation.vue'
 import SpringDeepDiveMap from './SpringDeepDiveMap.vue'
 import SourceExplorer from './SourceExplorer.vue'
+import TopicStudyPanel from './TopicStudyPanel.vue'
 import './custom.css'
 
 export default {
@@ -90,5 +91,6 @@ export default {
     app.component('SpringMvcDispatchAnimation', SpringMvcDispatchAnimation)
     app.component('SpringDeepDiveMap', SpringDeepDiveMap)
     app.component('SourceExplorer', SourceExplorer)
+    app.component('TopicStudyPanel', TopicStudyPanel)
   }
 } satisfies Theme

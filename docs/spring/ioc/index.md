@@ -4,6 +4,12 @@
 
 读完本专题后，进入 [Bean、早期引用与最终代理](/spring/deep-dive/bean-proxy-cycle)，把 IOC 生命周期、三级缓存和 AOP 代理身份放到同一个对象时间轴中。
 
+<TopicStudyPanel
+  topic-id="spring-framework-5-3-ioc"
+  design-insight="Spring 没有把对象创建写成一个巨型工厂，而是用定义、模板方法、后处理器和缓存把变化点层层打开。"
+  focus-question="为什么一个 Bean 要经过定义解析、实例化、填充、初始化和缓存迁移这么多阶段？"
+/>
+
 ## 源码入口
 
 - 容器模板：`AbstractApplicationContext.refresh()` / `close()`
