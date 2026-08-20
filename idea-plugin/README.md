@@ -4,7 +4,7 @@
 
 插件面向 IntelliJ IDEA 2024.2 至 2026.2，编译目标为 Java 21。Gradle Toolchain 会在本机没有 JDK 21 时自动获取所需运行时。
 
-## 0.2.4 当前能力
+## 0.2.5 当前能力
 
 - 右侧 `Source Atlas` 工具窗口；
 - 按当前 Java 类和方法自动匹配专题；

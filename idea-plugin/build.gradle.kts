@@ -9,7 +9,7 @@ val localIdeaPath = providers.gradleProperty("atlas.localIdeaPath")
     .orElse("/Applications/IntelliJ IDEA.app")
 
 group = "io.github.java-source-atlas"
-version = "0.2.4"
+version = "0.2.5"
 
 repositories {
     mavenCentral()
