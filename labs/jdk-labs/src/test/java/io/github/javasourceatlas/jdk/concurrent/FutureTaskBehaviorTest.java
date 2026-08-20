@@ -3,6 +3,8 @@ package io.github.javasourceatlas.jdk.concurrent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
@@ -23,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * 验证 FutureTask 专题依赖的公开可观察行为和受保护扩展点。
@@ -319,6 +322,75 @@ class FutureTaskBehaviorTest {
         assertEquals(3, task.get(WAIT_SECONDS, TimeUnit.SECONDS));
         assertEquals(3, callableCalls.get());
         assertEquals(1, task.doneCalls());
+    }
+
+    /**
+     * 在 JDK 19 及以上通过反射验证 Future 新增的非阻塞状态、结果和异常查询，保持测试源码兼容 Java 8。
+     *
+     * @throws Exception 查找或调用目标版本 Future 方法失败时抛出
+     */
+    @Test
+    void shouldExposeNonBlockingObservationApiWhenAvailable() throws Exception {
+        assumeTrue(javaFeatureVersion() >= 19, "Future 非阻塞观察 API 自 JDK 19 提供");
+        Method state = Future.class.getMethod("state");
+        Method resultNow = Future.class.getMethod("resultNow");
+        Method exceptionNow = Future.class.getMethod("exceptionNow");
+
+        FutureTask<Integer> running = new FutureTask<>(() -> 1);
+        assertEquals("RUNNING", state.invoke(running).toString());
+
+        FutureTask<Integer> succeeded = new FutureTask<>(() -> 42);
+        succeeded.run();
+        assertEquals("SUCCESS", state.invoke(succeeded).toString());
+        assertEquals(42, resultNow.invoke(succeeded));
+
+        IllegalStateException failure = new IllegalStateException("模拟失败");
+        FutureTask<Integer> failed = new FutureTask<>(() -> {
+            throw failure;
+        });
+        failed.run();
+        assertEquals("FAILED", state.invoke(failed).toString());
+        assertSame(failure, exceptionNow.invoke(failed));
+
+        FutureTask<Integer> cancelled = new FutureTask<>(() -> 7);
+        assertTrue(cancelled.cancel(false));
+        assertEquals("CANCELLED", state.invoke(cancelled).toString());
+        InvocationTargetException mismatch = assertThrows(
+                InvocationTargetException.class,
+                () -> resultNow.invoke(cancelled)
+        );
+        assertTrue(mismatch.getCause() instanceof IllegalStateException);
+    }
+
+    /**
+     * 验证 JDK 17/21 固定快照的 FutureTask.toString 会输出完成分类，而 JDK 8 仍使用对象标识外观。
+     */
+    @Test
+    void shouldExposeCompletionStateInToStringOnModernJdk() {
+        FutureTask<Integer> task = new FutureTask<>(() -> 42);
+        String pending = task.toString();
+        task.run();
+        String completed = task.toString();
+
+        if (javaFeatureVersion() >= 17) {
+            assertTrue(pending.contains("Not completed"));
+            assertTrue(completed.contains("Completed normally"));
+        } else {
+            assertFalse(pending.contains("Not completed"));
+            assertFalse(completed.contains("Completed normally"));
+        }
+    }
+
+    /**
+     * 返回当前运行时的 Java 主版本，兼容 Java 8 的 1.8 版本字符串格式。
+     *
+     * @return Java 主版本
+     */
+    private static int javaFeatureVersion() {
+        String version = System.getProperty("java.specification.version");
+        return version.startsWith("1.")
+                ? Integer.parseInt(version.substring(2))
+                : Integer.parseInt(version);
     }
 
     /**

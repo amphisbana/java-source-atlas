@@ -28,6 +28,8 @@ Java Source Atlas 是一个开源的 Java 源码学习与调试工作台。项�
 
 当前仓库包含 **29 个源码专题**、**152 篇文档**、**37 个交互演示**、**3 个可运行实验模块**，覆盖 24 个 JDK 核心机制专题，以及 Spring IOC、AOP、Transaction、Boot 自动装配和 MVC 五条主线。
 
+版本阅读工作台已接入 **12 个 JDK 专题**：HashMap、ConcurrentHashMap、ThreadLocal、ThreadPoolExecutor、FutureTask / Future、ByteBuffer / Selector、Reference / WeakHashMap、Stream / Spliterator、synchronized、AQS / ReentrantLock、CompletableFuture、ClassLoader / ServiceLoader，统一对比 JDK 8、17、21 的固定源码快照、关键实现变化和迁移边界。
+
 ## 项目亮点
 
 | 能力 | 你可以得到什么 |
@@ -177,6 +179,15 @@ cd idea-plugin
 ./gradlew test buildPlugin
 ./gradlew runIde
 ```
+
+Gradle 会按项目中的工具链配置查找 Java 21，不会因为系统默认的 Java 17 就自动降级。macOS 如果使用 Homebrew 安装了 keg-only 的 Java 21，可以在当前终端显式指定：
+
+```bash
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+./gradlew test buildPlugin
+```
+
+首次构建需要访问 IntelliJ 平台仓库；如果依赖已经下载到本机、但网络 TLS 暂时不可用，可以使用 `./gradlew test buildPlugin --offline`。这只是复用本地缓存，不能替代第一次依赖下载。
 
 可安装 ZIP 位于 `idea-plugin/build/distributions/`。正式版本也可以从 [GitHub Releases](https://github.com/amphisbana/java-source-atlas/releases) 下载，然后在 IDEA 的 `Settings | Plugins | Install Plugin from Disk...` 中安装。
 

@@ -10,6 +10,12 @@
   "readingGoal": "能画出从强路径消失到 Entry 入队、摘链和 size 更新的时间线，并说明 GC 时机不能作为断言。",
   "recommendedNextTopicId": "openjdk8-java-lang-threadlocal",
   "recommendedNextReason": "继续观察弱 key 与强 value 在 ThreadLocalMap 中如何形成线程池数据残留风险。",
+  "versionComparison": {
+    "id": "reference-weakhashmap",
+    "summary": "ReferenceQueue 通知与 WeakHashMap 弱 key/强 value 协议跨 JDK 8/17/21 保持稳定，GC 清除屏障、pending-list、refersTo、队列等待和类型层级持续演进。",
+    "supportedVersions": ["8", "17", "21"],
+    "migrationHint": "不要把 System.gc、isEnqueued 或一次 size 变化当完成信号；按版本定位 clear0、processPendingReferences、refersTo、ReferenceQueue 锁与 newWeakHashMap。"
+  },
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.reference.ReferenceWeakHashMapDebugLab",
@@ -82,7 +88,7 @@
     {
       "method": "WeakHashMap.get(Object)",
       "sourceClass": "java.util.WeakHashMap",
-      "document": "/jdk/runtime/reference-weakhashmap/weakhashmap#get-的完整路径",
+      "document": "/jdk/runtime/reference-weakhashmap/weakhashmap#jdk-8-get-的完整路径",
       "purpose": "在读取前清队列，再按活 key 的 hash 与 equals 查桶"
     },
     {

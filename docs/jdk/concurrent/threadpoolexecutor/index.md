@@ -6,6 +6,8 @@
   topic-id="openjdk8-java-util-concurrent-threadpoolexecutor"
 />
 
+[打开 JDK 8 / 17 / 21 版本对比 →](/jdk/version-comparison/?topic=thread-pool-executor)，可并排核对 ctl/execute 主协议、finalize 生命周期、动态参数校验与 JDK 21 线程容器的变化。
+
 ## 七个构造参数
 
 | 参数 | 作用 |
@@ -134,6 +136,23 @@ else if (workerCountOf(recheck) == 0) addWorker(null, false);
 使用容量近似无界的 `LinkedBlockingQueue` 时，达到核心线程数后的任务通常都能成功入队，第三步不会发生，因此线程数长期停留在 `corePoolSize`。
 
 这不是最大线程数失效，而是队列策略让“队列满后扩线程”的条件很难出现。无界队列还可能积压大量任务，带来延迟和内存风险。
+
+## JDK 8、17、21：主协议稳定，生命周期边界收紧
+
+三版都保留同一条提交主线：先尝试创建核心 Worker，核心线程已满时 `offer` 入队并再次检查 `ctl`，队列无法接收才尝试创建非核心 Worker，最后交给拒绝策略。`ctl` 仍把高 3 位运行状态和低 29 位 workerCount 放在一个 `AtomicInteger` 中；Worker 仍以不可重入锁区分“正在执行任务”和“可以被 shutdown 中断”。
+
+真正需要按版本重新定位的，是协议周围的资源和诊断边界：
+
+| 观察点 | JDK 8u412 | JDK 17 | JDK 21 |
+| --- | --- | --- | --- |
+| 忘记关闭线程池 | `finalize` 可能按权限调用 `shutdown()` | `finalize` 保留兼容签名但为空 | 空实现并标记 `forRemoval`，不能再当兜底 |
+| 显式资源作用域 | `ExecutorService` 不能用于 try-with-resources | 仍没有 `close()` | 已包含 JDK 19 新增的 `AutoCloseable + close()` |
+| workerCount 回退 | CAS 失败重试的 decrement 循环 | `ctl.addAndGet(-1)` | 延续 JDK 17 |
+| 动态 `setCorePoolSize` | 只检查非负，允许临时超过 max | 强制 `core <= maximumPoolSize` | 延续 JDK 17 |
+| sneaky checked Throwable | 钩子见原异常，向 Worker 外包装成 `Error` | 钩子见原异常，向外原样传播 | 延续 JDK 17 |
+| Worker 启停归属 | 直接 `Thread.start()` | 直接 `Thread.start()` | `SharedThreadContainer.start/close` 管理内部归属 |
+
+这些变化不代表业务代码可以绕过生命周期管理、随意反射 `ctl` 或依赖内部线程容器。JDK 19+ 的 `close()` 会先 `shutdown()` 并等待任务终止；它适合 try-with-resources，但不是立即取消。兼容 JDK 8/17 时仍应在 `finally` 中显式关闭。升级测试应覆盖动态调参、资源收口和异常传播；源码断点则分别进入当前版本的 `finalize`、`ExecutorService.close`、`decrementWorkerCount`、`tryTerminate`、`runWorker` 和 `addWorker`。
 
 ## 常见队列影响
 

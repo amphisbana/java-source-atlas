@@ -19,6 +19,7 @@ import java.util.stream.Stream;
  * @param lab                配套的可运行调试实验
  * @param source             专题主源码类
  * @param relatedSources     关联源码类
+ * @param versionComparison  可选的 JDK 版本对比入口
  * @param entryPoints        关键方法入口
  * @param breakpoints        推荐断点
  */
@@ -31,6 +32,7 @@ public record AtlasTopic(
         AtlasLab lab,
         AtlasSource source,
         List<AtlasSource> relatedSources,
+        AtlasVersionComparison versionComparison,
         List<AtlasEntryPoint> entryPoints,
         List<AtlasBreakpoint> breakpoints
 ) {

@@ -10,6 +10,12 @@
   "readingGoal": "能沿 loadClass、findClass、defineClass 和 ServiceLoader LazyIterator 解释委派、定义、资源查找与 provider 实例化。",
   "recommendedNextTopicId": "openjdk8-reflection-dynamic-proxy",
   "recommendedNextReason": "继续观察类已经加载后，Reflection 和 JDK Dynamic Proxy 如何在运行时读取与生成类型。",
+  "versionComparison": {
+    "id": "classloader-service-loader",
+    "summary": "双亲委派和 META-INF/services 仍可用，JDK 17/21 增加平台类加载器、模块层服务和 Provider 惰性流。",
+    "supportedVersions": ["8", "17", "21"],
+    "migrationHint": "排查 SPI 先确认 load 重载、uses/provides 声明以及 provider 所在模块边界。"
+  },
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.runtime.ClassLoaderServiceLoaderDebugLab",

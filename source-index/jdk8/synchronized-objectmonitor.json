@@ -10,6 +10,12 @@
   "readingGoal": "能区分 owner、入口竞争集合和 WaitSet，并用条件循环处理伪唤醒、中断和超时。",
   "recommendedNextTopicId": "openjdk8-java-util-concurrent-atomic-striped64",
   "recommendedNextReason": "对比 monitor 的互斥路径与 CAS 的无锁更新路径，理解两种协作方式的边界。",
+  "versionComparison": {
+    "id": "synchronized-monitor",
+    "summary": "Java 层 monitorenter、wait、notify 契约保持稳定，但 HotSpot 的偏向锁、ObjectMonitor 竞争和轻量级路径持续重构。",
+    "supportedVersions": ["8", "17", "21"],
+    "migrationHint": "跨版本调试应以 monitor 语义为主线，重新确认 ObjectSynchronizer 和 ObjectMonitor 的私有字段与入口。"
+  },
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.SynchronizedMonitorDebugLab",

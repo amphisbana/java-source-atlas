@@ -2,6 +2,8 @@
 
 `WeakHashMap` 仍是分离链接哈希表。它与 `HashMap` 的核心差别不是桶算法，而是 Entry 本身继承 `WeakReference<Object>`，并把 key 的生命周期交给 GC 与 ReferenceQueue 协作。
 
+版本入口：[JDK 8 / 17 / 21 Reference / WeakHashMap 对比](/jdk/version-comparison/?topic=reference-weakhashmap)。弱 key、强 value 与操作时 expunge 是稳定协议，变化集中在“不强化 referent 地判断身份”和容量构造便利性。
+
 ## Entry 的真实所有权
 
 JDK 8 的 Entry 形态可简化为：
@@ -36,7 +38,7 @@ unmaskNull(NULL_KEY) -> null
 
 `NULL_KEY` 被类静态字段强引用，因此对应 Entry 不会因 GC 自动失效。只有显式 remove、clear 或覆盖结构变化才会删除它。
 
-## get 的完整路径
+## JDK 8 get 的完整路径
 
 ```text
 get(key)
@@ -53,7 +55,7 @@ get(key)
 
 `getTable()` 不是普通 getter。它在返回 table 前先清 ReferenceQueue，因此读操作也可能修改桶链和 size。WeakHashMap 本来就不是线程安全容器，不能把 `get` 当无副作用的并发读取。
 
-`eq` 使用对象身份或 `equals`，所以 key 活着时仍遵循普通 Map 的等价语义。GC 清 referent 后 `entry.get()` 为 null，不会与普通非 null 查询 key 命中。
+JDK 8 的 `eq` 使用对象身份或 `equals`，所以 key 活着时仍遵循普通 Map 的等价语义。GC 清 referent 后 `entry.get()` 为 null，不会与普通非 null 查询 key 命中。JDK 17/21 的入口已改为后文的 `matchesKey + refersTo`，不要拿这段 JDK 8 伪代码定位新版断点。
 
 ## put 为什么先清队列
 
@@ -63,7 +65,7 @@ get(key)
 2. 清理已入队 stale Entry；
 3. 若桶内存在等价 key，只更新 value；
 4. 否则建立 `new Entry(key, value, queue, hash, table[index])`；
-5. size 达阈值时 resize。
+5. size 到达当前版本的触发边界时 resize：JDK 8/17 是 `++size >= threshold`，JDK 21 是 `++size > threshold`。
 
 Entry 构造器把 Map 自己的 `ReferenceQueue<Object>` 传给 WeakReference。GC 后，进入队列的是这个 Entry 本身，所以 expunge 不需要从已清 referent 恢复 key。
 
@@ -97,7 +99,7 @@ WeakHashMap resize 会先把旧桶转移到新桶。转移过程中发现 `entry
 
 ## size 为什么只能是瞬时观察
 
-`size()` 会先 expunge，因此连续两次调用可能在没有显式 remove 的情况下变小。即使一次调用返回 n，下一刻 GC 也可能清除更多 key；公开 Map 契约允许这种行为。
+`size()` 会先 expunge，因此连续两次调用可能在没有显式 remove 的情况下变小。即使一次调用返回 n，下一刻 GC 也可能清除更多 key；这是 WeakHashMap 明确说明的弱键契约，不应推广成所有 Map 的行为。
 
 这不意味着 size 是“近似计数器”。单线程、固定可达性条件下，它仍返回当前表中未 expunge Entry 的数量；只是 key 的生命周期由 GC 异步改变，观察条件不稳定。
 
@@ -141,9 +143,24 @@ key 强可达，Entry 的弱边根本不会生效。间接回指同样危险，�
 | 确定性释放文件/连接 | `AutoCloseable` 与 try-with-resources |
 | ClassLoader 元数据缓存 | 需要同时审计 key、value、Class、Method 与 loader 的引用图 |
 
-## 版本边界
+## 版本边界：get 只在确实需要 equals 时强化 key
 
-JDK 17/21 的 WeakHashMap 总体结构仍是弱 Entry + ReferenceQueue + 操作时 expunge，但 Reference API 增加 `refersTo`、`reachabilityFence` 等能力，GC 与 Reference Handler 私有协作也已重构。
+JDK 8 的桶查询先执行 `entry.get()`，再把结果交给 `eq(maskedKey, referent)`；resize transfer 也用 `entry.get()==null` 判断 stale。JDK 17/21 利用 JDK 16 的 `Reference.refersTo` 重排为：
+
+```text
+matchesKey(entry, query)
+  → entry.refersTo(query)：同一对象，直接命中，不读取 referent
+  → entry.get()：只在需要 query.equals(referent) 时取得强局部变量
+
+transfer(entry)
+  → entry.refersTo(null)：不读取 referent就判断已清除
+```
+
+这减少了 WeakHashMap 自己为了比较而延长 key 强可达窗口，但不改变 Map 的 equals 语义：不同对象只要 equals/hashCode 相同仍可命中。也不要把实现优化反推成 GC 时机保证；一旦 equals 分支需要真实对象，局部强引用依然是正确性所必需。
+
+JDK 21 快照还包含 JDK 19 新增的 `WeakHashMap.newWeakHashMap(numMappings)`。参数表达预期映射数量，内部按默认负载因子换算桶容量；它只减少批量 put 前的扩容，不改变弱 key、强 value、expunge 或线程安全边界。需要 JDK 8/17 兼容的代码不能直接链接该工厂。
+
+另一个容易漏掉的实现边界是 put 后的扩容判断：JDK 8/17 使用 `++size >= threshold`，JDK 21 改为 `++size > threshold`，因此恰好到 threshold 时会晚一个活映射再扩容。键值结果和负载因子含义没有改变，但性能测试若精确统计某次 put 是否分配新 table，需要按目标版本解释。
 
 跨版本稳定的是：普通 key 不被 Map 强持有、value 是强引用、null key 被支持、清理时机不确定、容器非线程安全。不要把 `pending` 字段、队列哨兵或某次 GC 后的精确 size 写成业务契约。
 
@@ -155,4 +172,3 @@ JDK 17/21 的 WeakHashMap 总体结构仍是弱 Entry + ReferenceQueue + 操作�
 4. `WeakHashMap.transfer`：观察 stale Entry 在 resize 中被丢弃。
 5. `WeakHashMap.HashIterator.hasNext`：观察 `nextKey` 怎样形成临时强引用。
 6. `ReferenceQueue.enqueue`：确认队列元素就是 WeakHashMap.Entry。
-

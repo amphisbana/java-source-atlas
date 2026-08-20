@@ -10,6 +10,12 @@
   "readingGoal": "能画出 write/flip/read/compact 的状态变化，并解释 Selector 注册、select 和 SelectionKey 就绪位。",
   "recommendedNextTopicId": "openjdk8-classloader-serviceloader",
   "recommendedNextReason": "从底层 I/O 状态切换到运行时类型发现，继续阅读 JDK 如何延迟解析和装配实现。",
+  "versionComparison": {
+    "id": "bytebuffer-selector",
+    "summary": "Buffer 四指标、Selector 三个 key 集合和非阻塞协议跨 JDK 8/17/21 保持稳定，协变返回、区间切片、Consumer 选择、原子兴趣位和外部内存归属持续演进。",
+    "supportedVersions": ["8", "17", "21"],
+    "migrationHint": "先守住 flip、半包、selectedKeys 消费和 wakeup 不变量；再按最低 JDK 版本选择 slice(index,length)、Consumer select、interestOpsOr/And 与预览 Foreign Memory API。"
+  },
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.nio.NioBufferSelectorDebugLab",
@@ -19,7 +25,7 @@
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.nio.ByteBuffer",
-    "sourcePath": "jdk/src/share/classes/java/nio/ByteBuffer.java"
+    "sourcePath": "jdk/src/share/classes/java/nio/X-Buffer.java.template"
   },
   "relatedSources": [
     {
@@ -28,11 +34,11 @@
     },
     {
       "className": "java.nio.HeapByteBuffer",
-      "sourcePath": "jdk/src/share/classes/java/nio/HeapByteBuffer.java"
+      "sourcePath": "jdk/src/share/classes/java/nio/Heap-X-Buffer.java.template"
     },
     {
       "className": "java.nio.DirectByteBuffer",
-      "sourcePath": "jdk/src/share/classes/java/nio/DirectByteBuffer.java"
+      "sourcePath": "jdk/src/share/classes/java/nio/Direct-X-Buffer.java.template"
     },
     {
       "className": "java.nio.Bits",

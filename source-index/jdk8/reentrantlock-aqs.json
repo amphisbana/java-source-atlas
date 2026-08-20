@@ -10,6 +10,12 @@
   "readingGoal": "能沿 acquire、addWaiter、acquireQueued 和 release 画出节点竞争、阻塞、唤醒与重新获取的路径。",
   "recommendedNextTopicId": "openjdk8-reference-weakhashmap",
   "recommendedNextReason": "从线程协作转入对象生命周期，区分 GC 清除、引用入队和容器清理三个时间点。",
+  "versionComparison": {
+    "id": "aqs-reentrantlock",
+    "summary": "AQS 的 state 与队列协议保持核心职责，但 JDK 17/21 重做节点状态、条件转移和统一获取循环；ReentrantLock 也抽出更明确的快速获取入口。",
+    "supportedVersions": ["8", "17", "21"],
+    "migrationHint": "跨版本断点应先确认 Node 状态模型和 acquire 入口；不要把 waitStatus、ConditionNode 或 cleanQueue 的私有字段当作稳定 API。"
+  },
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.lock.ReentrantLockDebugLab",

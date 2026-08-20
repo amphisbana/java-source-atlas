@@ -10,6 +10,12 @@
   "readingGoal": "能给定线程池参数和任务序列，逐个判断创建线程、入队、扩容、拒绝和关闭收口。",
   "recommendedNextTopicId": "openjdk8-java-util-concurrent-futuretask",
   "recommendedNextReason": "理解线程池中的一个任务如何发布结果并唤醒等待者。",
+  "versionComparison": {
+    "id": "thread-pool-executor",
+    "summary": "ThreadPoolExecutor 的 ctl 编码、execute 三步复查、Worker 锁和五态关闭协议跨 JDK 8/17/21 基本稳定，但 finalization、显式 close、线程容器和部分边界约束持续演进。",
+    "supportedVersions": ["8", "17", "21"],
+    "migrationHint": "业务代码继续依赖 execute、shutdown 和拒绝策略的公开契约；JDK 19+ 可用 close，调试时按版本重新定位 finalize、decrementWorkerCount、runWorker 与 JDK 21 SharedThreadContainer。"
+  },
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ThreadPoolExecutorDebugLab",
@@ -21,6 +27,28 @@
     "className": "java.util.concurrent.ThreadPoolExecutor",
     "sourcePath": "jdk/src/share/classes/java/util/concurrent/ThreadPoolExecutor.java"
   },
+  "relatedSources": [
+    {
+      "className": "java.util.concurrent.AbstractExecutorService",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/AbstractExecutorService.java"
+    },
+    {
+      "className": "java.util.concurrent.ExecutorService",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/ExecutorService.java"
+    },
+    {
+      "className": "java.util.concurrent.BlockingQueue",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/BlockingQueue.java"
+    },
+    {
+      "className": "java.util.concurrent.AbstractQueuedSynchronizer",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/locks/AbstractQueuedSynchronizer.java"
+    },
+    {
+      "className": "java.util.concurrent.ScheduledThreadPoolExecutor",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/ScheduledThreadPoolExecutor.java"
+    }
+  ],
   "entryPoints": [
     {
       "method": "runStateOf(int)",

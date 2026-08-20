@@ -10,6 +10,12 @@
   "readingGoal": "能沿 hash、putVal、resize 和 treeifyBin 复述一次从写入到结构转换的完整路径。",
   "recommendedNextTopicId": "openjdk8-java-util-linkedhashmap",
   "recommendedNextReason": "观察 HashMap 如何通过节点工厂和回调 Hook 叠加出顺序语义。",
+  "versionComparison": {
+    "id": "hashmap",
+    "summary": "数组、链表、红黑树和 putVal → resize 主干保持稳定，变化集中在查询职责、集合视图和反序列化边界。",
+    "supportedVersions": ["8", "17", "21"],
+    "migrationHint": "跨版本断点先确认 getNode、readObject 和 newHashMap 的实际入口。"
+  },
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.collection.HashMapDebugLab",

@@ -7,11 +7,13 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.nio.InvalidMarkException;
 import java.nio.channels.IllegalBlockingModeException;
+import java.nio.channels.Pipe;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -19,6 +21,8 @@ import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -124,6 +128,57 @@ class NioBufferSelectorBehaviorTest {
     }
 
     /**
+     * 验证 JDK 9 起 fluent 状态方法通过协变返回保留具体 ByteBuffer 类型。
+     */
+    @Test
+    void shouldExposeCovariantFluentReturnFromJdk9() {
+        boolean hasByteBufferFlip = java.util.Arrays.stream(ByteBuffer.class.getMethods())
+                .anyMatch(method -> method.getName().equals("flip")
+                        && method.getParameterCount() == 0
+                        && method.getReturnType() == ByteBuffer.class
+                        && !method.isBridge());
+
+        assertEquals(javaMajorVersion() >= 9, hasByteBufferFlip);
+        if (!hasByteBufferFlip) {
+            try {
+                assertEquals(Buffer.class, ByteBuffer.class.getMethod("flip").getReturnType());
+            } catch (NoSuchMethodException exception) {
+                throw new AssertionError("ByteBuffer 应继承 Buffer.flip", exception);
+            }
+        }
+    }
+
+    /**
+     * 验证 JDK 13 起二参 slice 使用绝对索引、保持原游标并创建共享内容的独立视图。
+     *
+     * @throws Exception 反射调用新版 ByteBuffer API 失败
+     */
+    @Test
+    void shouldExposeAbsoluteRangeSliceFromJdk13() throws Exception {
+        if (javaMajorVersion() < 13) {
+            assertThrows(NoSuchMethodException.class,
+                    () -> ByteBuffer.class.getMethod("slice", int.class, int.class));
+            return;
+        }
+
+        ByteBuffer original = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN);
+        for (int index = 0; index < original.capacity(); index++) {
+            original.put(index, (byte) index);
+        }
+        original.position(4);
+        ByteBuffer slice = (ByteBuffer) ByteBuffer.class
+                .getMethod("slice", int.class, int.class)
+                .invoke(original, 1, 3);
+
+        assertBufferState(slice, 0, 3, 3);
+        assertEquals(4, original.position());
+        assertEquals(ByteOrder.BIG_ENDIAN, slice.order());
+        assertEquals((byte) 1, slice.get(0));
+        slice.put(0, (byte) 9);
+        assertEquals((byte) 9, original.get(1));
+    }
+
+    /**
      * 验证阻塞 Channel 不能注册，切换非阻塞后可以注册合法兴趣位和附件。
      *
      * @throws Exception 打开或关闭本地 Channel 失败
@@ -193,6 +248,108 @@ class NioBufferSelectorBehaviorTest {
     }
 
     /**
+     * 验证 JDK 11 起 Consumer 选择直接消费本轮 key，且不把新 key 加入 selected-key set。
+     *
+     * @throws Exception 打开 Pipe、选择或反射调用失败
+     */
+    @Test
+    void shouldConsumeReadyKeyWithActionFromJdk11() throws Exception {
+        if (javaMajorVersion() < 11) {
+            assertThrows(NoSuchMethodException.class,
+                    () -> Selector.class.getMethod("select", Consumer.class, long.class));
+            return;
+        }
+
+        Selector selector = null;
+        Pipe.SourceChannel source = null;
+        Pipe.SinkChannel sink = null;
+        try {
+            selector = Selector.open();
+            Pipe pipe = Pipe.open();
+            source = pipe.source();
+            sink = pipe.sink();
+            source.configureBlocking(false);
+            SelectionKey registered = source.register(selector, SelectionKey.OP_READ);
+            sink.write(ByteBuffer.wrap(new byte[]{1}));
+
+            AtomicInteger actionCalls = new AtomicInteger();
+            Consumer<SelectionKey> action = key -> {
+                assertSame(registered, key);
+                assertTrue(key.isReadable());
+                actionCalls.incrementAndGet();
+            };
+            int selected = (Integer) Selector.class
+                    .getMethod("select", Consumer.class, long.class)
+                    .invoke(selector, action, TimeUnit.SECONDS.toMillis(2));
+
+            assertEquals(1, selected);
+            assertEquals(1, actionCalls.get());
+            assertTrue(selector.selectedKeys().isEmpty());
+        } finally {
+            closeQuietly(sink);
+            closeQuietly(source);
+            closeQuietly(selector);
+        }
+    }
+
+    /**
+     * 验证 JDK 11 起 interestOpsOr/And 原子更新位集合并返回旧值。
+     *
+     * @throws Exception 打开 Channel、注册或反射调用失败
+     */
+    @Test
+    void shouldUpdateInterestBitsAtomicallyFromJdk11() throws Exception {
+        if (javaMajorVersion() < 11) {
+            assertThrows(NoSuchMethodException.class,
+                    () -> SelectionKey.class.getMethod("interestOpsOr", int.class));
+            assertThrows(NoSuchMethodException.class,
+                    () -> SelectionKey.class.getMethod("interestOpsAnd", int.class));
+            return;
+        }
+
+        Selector selector = null;
+        SocketChannel channel = null;
+        try {
+            selector = Selector.open();
+            channel = SocketChannel.open();
+            channel.configureBlocking(false);
+            SelectionKey key = channel.register(selector, SelectionKey.OP_READ);
+
+            int beforeOr = (Integer) SelectionKey.class
+                    .getMethod("interestOpsOr", int.class)
+                    .invoke(key, SelectionKey.OP_WRITE);
+            assertEquals(SelectionKey.OP_READ, beforeOr);
+            assertEquals(SelectionKey.OP_READ | SelectionKey.OP_WRITE, key.interestOps());
+
+            int beforeAnd = (Integer) SelectionKey.class
+                    .getMethod("interestOpsAnd", int.class)
+                    .invoke(key, ~SelectionKey.OP_READ);
+            assertEquals(SelectionKey.OP_READ | SelectionKey.OP_WRITE, beforeAnd);
+            assertEquals(SelectionKey.OP_WRITE, key.interestOps());
+        } finally {
+            closeQuietly(channel);
+            closeQuietly(selector);
+        }
+    }
+
+    /**
+     * 验证 Buffer 类型层级在 JDK 19 起通过 sealed 元数据封闭。
+     *
+     * @throws Exception 反射调用 Class.isSealed 失败
+     */
+    @Test
+    void shouldExposeSealedBufferHierarchyFromJdk19() throws Exception {
+        if (javaMajorVersion() < 17) {
+            assertThrows(NoSuchMethodException.class, () -> Class.class.getMethod("isSealed"));
+            return;
+        }
+
+        java.lang.reflect.Method isSealed = Class.class.getMethod("isSealed");
+        assertEquals(javaMajorVersion() >= 19, isSealed.invoke(Buffer.class));
+        assertEquals(javaMajorVersion() >= 19, isSealed.invoke(ByteBuffer.class));
+    }
+
+    /**
      * 验证 wakeup 在有界时间内让另一个线程的长超时 select 返回。
      *
      * @throws Exception Selector 或线程等待失败
@@ -258,6 +415,19 @@ class NioBufferSelectorBehaviorTest {
         assertEquals(limit, buffer.limit());
         assertEquals(capacity, buffer.capacity());
         assertEquals(limit - position, buffer.remaining());
+    }
+
+    /**
+     * 读取当前 Java 规范主版本，兼容 Java 8 的 1.8 格式。
+     *
+     * @return Java 主版本号
+     */
+    private static int javaMajorVersion() {
+        String specificationVersion = System.getProperty("java.specification.version");
+        if (specificationVersion.startsWith("1.")) {
+            return Integer.parseInt(specificationVersion.substring(2));
+        }
+        return Integer.parseInt(specificationVersion);
     }
 
     /**

@@ -70,6 +70,7 @@ class AtlasMethodMatcherTest {
                 new AtlasLab("labs/sample", "sample.SampleLab", "labs/sample/SampleLab.java"),
                 new AtlasSource("sample.Map", "Map.java"),
                 List.of(new AtlasSource("sample.Helper", "Helper.java")),
+                null,
                 List.of(primaryEntry, relatedEntry),
                 List.of()
         );
@@ -95,6 +96,7 @@ class AtlasMethodMatcherTest {
                 new AtlasLab("labs/sample", "sample.SampleLab", "labs/sample/SampleLab.java"),
                 new AtlasSource("java.util.ArrayList", "ArrayList.java"),
                 List.of(),
+                null,
                 List.of(),
                 List.of()
         );

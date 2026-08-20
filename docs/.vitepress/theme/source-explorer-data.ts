@@ -19,6 +19,13 @@ export interface SourceBreakpoint {
   sourceClass?: string | null
 }
 
+export interface SourceVersionComparison {
+  id: string
+  summary: string
+  supportedVersions: string[]
+  migrationHint: string
+}
+
 export interface SourceTopic {
   schemaVersion: 1
   topicId: string
@@ -30,6 +37,7 @@ export interface SourceTopic {
   readingGoal?: string
   recommendedNextTopicId?: string
   recommendedNextReason?: string
+  versionComparison?: SourceVersionComparison
   platform: SourcePlatform
   platformLabel: string
   repository: string
@@ -63,6 +71,7 @@ interface RawSourceTopic {
   readingGoal?: string
   recommendedNextTopicId?: string
   recommendedNextReason?: string
+  versionComparison?: SourceVersionComparison
   compatibleVersions?: string[]
   source: SourceLocation & { repository: string }
   relatedSources?: SourceLocation[]
@@ -135,6 +144,7 @@ function normalizeTopic(modulePath: string, rawTopic: RawSourceTopic): SourceTop
     readingGoal: rawTopic.readingGoal,
     recommendedNextTopicId: rawTopic.recommendedNextTopicId,
     recommendedNextReason: rawTopic.recommendedNextReason,
+    versionComparison: rawTopic.versionComparison,
     platform: platformMetadata.platform,
     platformLabel: platformMetadata.platformLabel,
     repository: repository.replace(/\/$/, ''),

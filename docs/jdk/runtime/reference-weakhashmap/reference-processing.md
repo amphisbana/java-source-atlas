@@ -2,6 +2,8 @@
 
 `Reference<T>` 看起来只有 `get`、`clear`、`enqueue` 几个方法，真正困难的是它同时被应用线程、GC 和 Reference Handler 访问。阅读时要把“Java 字段状态”和“对象可达性状态”分开：前者是某个 OpenJDK 版本的实现，后者由 Java 语言与 API 规范描述。
 
+版本入口：[JDK 8 / 17 / 21 Reference / WeakHashMap 对比](/jdk/version-comparison/?topic=reference-weakhashmap)。本页以 JDK 8 建主线，并在每个交接边界标出 17/21 的真实迁移位置。
+
 ## JDK 8 的关键字段
 
 ```java
@@ -31,7 +33,7 @@ private static Reference<Object> pending;
 | Enqueued | 不应靠它恢复对象 | `next` 链入 ReferenceQueue | Reference Handler 或显式 enqueue |
 | Inactive | 通常已清 | 已离开队列，不能再次正常入队 | 队列消费者 |
 
-这是 JDK 8 `Reference.java` 注释描述的内部状态机，不是应用可以枚举的公共 enum。业务代码只能通过 `get`、`isEnqueued`、`enqueue`、队列 `poll/remove` 观察有限结果。
+这是 JDK 8 `Reference.java` 注释描述的内部状态机，不是应用可以枚举的公共 enum。JDK 8 业务代码只能通过 `get`、`isEnqueued`、`enqueue`、队列 `poll/remove` 观察有限结果；`isEnqueued` 自 JDK 16 起已弃用且存在状态竞争，新版判断清除用 `refersTo(null)`，取得队列消费所有权则必须真正 `poll/remove` 到 Reference。
 
 ## GC 与 Reference Handler 怎样交接
 
@@ -48,7 +50,7 @@ ReferenceHandler.run
 
 源码特意在从 pending 摘链前执行 `instanceof Cleaner`，并处理潜在 `OutOfMemoryError`。这说明引用处理发生在内存压力附近，清理路径本身也应少分配、可重入、可失败恢复。
 
-JDK 17/21 仍有 Reference Handler 概念，但 pending 列表访问、VM native 入口和 Cleaner 实现已经变化。可移植契约是引用清除与队列通知，不是 `pending`、`discovered` 的精确字段布局。
+JDK 17/21 仍有 Reference Handler 概念，但不再由 Java `tryHandlePending` 在静态 pending 头上逐个摘取。`processPendingReferences()` 先调用 VM 的 `waitForReferencePendingList()`，再在 `processPendingLock` 内一次取得并清空整条列表，随后才循环执行 Cleaner 或入队。VM 交接与 Java 消费因此分层，但可移植契约仍只是引用清除与队列通知，不是 `pending`、`discovered` 的字段布局、批次大小或 Handler 延迟。
 
 ## clear 与 enqueue 不能混为一个动作
 
@@ -67,6 +69,8 @@ reference.enqueue()
 
 因此“clear 不入队”是正确结论，但“enqueue 只改队列、不清 referent”并不正确。GC 入队走的是 VM 与 Reference Handler 的内部协作，不会回调公开 `enqueue()` 方法；调试时也要把这两条路径分开。
 
+JDK 17/21 把两个入口中的直接字段赋值改成 private native `clear0()`。源码明确说明：对于部分垃圾收集器，普通 `referent=null` 不足以表达需要的屏障与通知。公开结果没有变化，变化的是 GC 特殊字段的写入责任被收回到 VM 边界。业务代码不应通过反射清 referent，也不能用“字段已经是 null”推断收集器的内部 reference processing 已完成。
+
 反过来，队列里出现一个 Reference，也不代表业务清理已经完成。队列消费者仍需读取 Reference 子类保存的独立元数据，执行幂等释放，并去掉自己的追踪结构。
 
 ## ReferenceQueue 的三种消费方式
@@ -78,6 +82,25 @@ reference.enqueue()
 | `remove(timeout)` | 有界阻塞 | 可停止的后台服务与测试 |
 
 专用消费者应响应中断，并有明确停止协议。无限循环 `remove()` 却吞掉中断，会使应用关闭时遗留线程。
+
+### 队列内部为什么经历两次变化
+
+JDK 8 的 `ReferenceQueue.enqueue` 先把 `r.queue` 发布为 `ENQUEUED`，再把 r 接到 head。JDK 17 调整为“先完成 next/head，再用 volatile queue 发布 ENQUEUED”，源码原因是避免并发 `isEnqueued` 与 fast-path poll 看到尚未完成的队列结构。出队也相应先发布 inactive 状态，再移动 head。
+
+JDK 21 保留这条发布顺序，但把私有 monitor 和 `Object.wait/notifyAll` 改为 `ReentrantLock + Condition`。这项改造服务于虚拟线程阻塞实现，不改变以下公开结果：空队列 timed remove 返回 null、无限 remove 可被 interrupt、enqueue 会唤醒等待消费者。自动测试应验证这些结果，而不是私有锁类型。
+
+## refersTo：观察身份但不强化 referent
+
+JDK 16 新增 `Reference.refersTo(obj)`。JDK 17/21 快照都已包含它，并同期弃用 `isEnqueued()`：
+
+```text
+reference.refersTo(candidate)  → 当前 referent 是否就是 candidate
+reference.refersTo(null)       → 当前是否已清除
+```
+
+它与 `get() == candidate` 的关键区别是不用先把 referent 读成强局部变量。PhantomReference 的 `get()` 始终为 null，但只要尚未清除，`phantom.refersTo(referent)` 仍可为 true。
+
+JDK 17 直接从 final public 方法调用可覆写 native `refersTo0`；JDK 21 改成 `refersTo → refersToImpl → private native refersTo0`，PhantomReference 覆写 Java impl。源码说明这层 Java 分派是为了避免 native 虚调用使 C2 放弃 intrinsic，公共身份语义没有变化。
 
 ## 四类引用的处理边界
 
@@ -131,7 +154,7 @@ JDK 8：
 4. `ReferenceQueue.enqueue`：观察 `head`、`queueLength`、`next`。
 5. `ReferenceQueue.remove(long)`：观察等待、超时与出队。
 
-JDK 17/21 的 `ReferenceHandler.run` 会进入不同的 native pending-list 协作入口，不能强找 JDK 8 的 `tryHandlePending` 局部变量。
+JDK 17/21 的 `ReferenceHandler.run` 会进入 VM pending-list 协作入口，不能强找 JDK 8 的 `tryHandlePending` 局部变量。JDK 21 还把 `Reference` 声明成 sealed，但允许的 `WeakReference/SoftReference/PhantomReference` 是 non-sealed；正常从具体引用家族扩展仍然可行，直接继承 Reference 本来就不是支持的入口。
 
 ## 常见误判
 

@@ -10,6 +10,12 @@
   "readingGoal": "能沿 get、set、replaceStaleEntry 和 expungeStaleEntry 解释碰撞探测、过期清理与 finally remove 的关系。",
   "recommendedNextTopicId": "openjdk8-java-util-concurrent-concurrenthashmap",
   "recommendedNextReason": "把线程私有的数据结构与并发共享容器对照起来，理解无锁读取、桶锁和协作扩容。",
+  "versionComparison": {
+    "id": "thread-local",
+    "summary": "弱 key、强 value、开放寻址和惰性清理仍是核心边界，JDK 21 额外暴露 carrier 与虚拟线程诊断路径。",
+    "supportedVersions": ["8", "17", "21"],
+    "migrationHint": "虚拟线程不会消除泄漏风险，线程池和上下文复用仍必须在 finally 中 remove。"
+  },
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLocalDebugLab",

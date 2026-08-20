@@ -10,6 +10,12 @@
   "readingGoal": "能分场景说明空桶、普通桶、树桶和迁移桶分别由谁同步，并指出 get 与 put 的关键分流。",
   "recommendedNextTopicId": "openjdk8-java-util-concurrent-copyonwritearraylist",
   "recommendedNextReason": "从共享并发容器转向写时复制快照，比较不同读写负载下的一致性与成本。",
+  "versionComparison": {
+    "id": "concurrent-hashmap",
+    "summary": "无锁读、空桶 CAS、桶头同步和协作扩容协议保持稳定，内部原子 API、视图删除和树桶等待持续演进。",
+    "supportedVersions": ["8", "17", "21"],
+    "migrationHint": "不要把 Unsafe 字段偏移、TreeBin waiter 或视图实现当成公共兼容契约。"
+  },
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentHashMapDebugLab",

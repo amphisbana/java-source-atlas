@@ -317,6 +317,38 @@ function validateUniqueTopicId(document, indexFile, topicOwners, failures) {
 }
 
 /**
+ * 登记版本对比编号并检查跨专题重复，避免对比工作台把两个专题映射到同一份差异数据。
+ *
+ * @param {unknown} document 当前索引文档
+ * @param {string} indexFile 当前索引文件
+ * @param {Map<string, string>} comparisonOwners 已登记的对比编号与文件
+ * @param {string[]} failures 错误收集器
+ */
+function validateVersionComparison(document, indexFile, comparisonOwners, failures) {
+  if (document === null || typeof document !== 'object' || Array.isArray(document)) {
+    return
+  }
+
+  const comparison = document.versionComparison
+  if (comparison === undefined || comparison === null || typeof comparison !== 'object' || Array.isArray(comparison)) {
+    return
+  }
+
+  const comparisonId = comparison.id
+  if (typeof comparisonId !== 'string' || comparisonId.trim() === '') {
+    return
+  }
+
+  const displayPath = relative(projectRoot, indexFile)
+  const previousOwner = comparisonOwners.get(comparisonId)
+  if (previousOwner !== undefined) {
+    failures.push(`${displayPath} #/versionComparison/id: ${comparisonId} 与 ${previousOwner} 重复`)
+    return
+  }
+  comparisonOwners.set(comparisonId, displayPath)
+}
+
+/**
  * 校验下一专题关系的字段是否成对出现，并收集待解析的目标编号。
  * 目标是否存在要等全部索引登记完成后再判断，避免依赖文件扫描顺序。
  *
@@ -573,6 +605,7 @@ const indexFiles = (await collectJsonFiles(sourceIndexRoot))
   .filter((filePath) => filePath !== schemaPath && filePath !== baselinesPath)
 
 const topicOwners = new Map()
+const comparisonOwners = new Map()
 const recommendedReferences = []
 
 if (indexFiles.length === 0) {
@@ -584,6 +617,7 @@ for (const indexFile of indexFiles) {
   const errors = []
   validateValue(schema, document, '#', errors)
   validateUniqueTopicId(document, indexFile, topicOwners, failures)
+  validateVersionComparison(document, indexFile, comparisonOwners, failures)
   collectRecommendedNextReference(document, indexFile, recommendedReferences, failures)
   validateSourceClassReferences(document, indexFile, failures)
   await validateLabMetadata(document, indexFile, failures)

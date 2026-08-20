@@ -14,7 +14,7 @@ labs/jdk-labs/src/test/java/
   io/github/javasourceatlas/jdk/stream/StreamSpliteratorBehaviorTest.java
 ```
 
-实验只使用 Java 8 公共 API，项目以 `--release 8` 编译。它验证稳定行为；stage 私有字段、任务数量、worker 名称和具体拆分树只在调试器中观察，不进入自动化断言。
+实验源码保持 `--release 8` 编译；JDK 9 的 `takeWhile` 和 JDK 16 的 `mapMulti` 只在运行时通过反射调用公开 API，因此同一产物仍可在 Java 8 启动。自动测试验证公开行为与版本可观察特征；stage 私有字段、任务数量、worker 名称和具体拆分树只在调试器中观察，不进入断言。
 
 ## 直接运行
 
@@ -33,7 +33,7 @@ mvn -pl labs/jdk-labs \
   test
 ```
 
-在本机显式切换 Corretto 8 和 17 时，可分别执行：
+在本机显式切换 JDK 8、17、21 时，可分别执行：
 
 ```bash
 JAVA_HOME=/path/to/jdk8 \
@@ -44,6 +44,12 @@ mvn -pl labs/jdk-labs -Dtest=StreamSpliteratorBehaviorTest test
 ```bash
 JAVA_HOME=/path/to/jdk17 \
 PATH=/path/to/jdk17/bin:$PATH \
+mvn -pl labs/jdk-labs -Dtest=StreamSpliteratorBehaviorTest test
+```
+
+```bash
+JAVA_HOME=/path/to/jdk21 \
+PATH=/path/to/jdk21/bin:$PATH \
 mvn -pl labs/jdk-labs -Dtest=StreamSpliteratorBehaviorTest test
 ```
 
@@ -172,6 +178,99 @@ OpenJDK 8 推荐断点：
 
 该实验稳定保证的是结果和有界资源生命周期。把并行流提交到自建 pool 后，当前主流 JDK 实现通常在该 pool 的 worker 中派生 Stream 内部任务，但 Stream API 没有“指定 Executor”的正式参数。不要把线程名称、具体 pool 私有字段或这个实现行为写成跨版本契约。
 
+## 场景七：count 精确尺寸快路径
+
+运行 `observeCountSizeOptimization()`。输入是四元素 List，流水线只增加不改变数量的 `peek`：
+
+```text
+JDK 8u412：count=4，peek 实际调用=4
+JDK 17 GA：count=4，peek 实际调用=0
+JDK 21 GA：count=4，peek 实际调用=0
+```
+
+JDK 8 推荐从 `ReferencePipeline.count` 进入 `mapToLong(e -> 1L).sum()`；JDK 17/21 从同一公开入口进入 `ReduceOps.makeRefCounting`，在 `evaluateSequential` 查看 `helper.exactOutputSizeIfKnown(spliterator)`。若返回 4，方法直接返回，不会构建逐元素 CountingSink。
+
+建议做一次对照：在 `peek` 前加入 `filter(value -> true)`。结果仍是 4，但 filter 清除 SIZED，JDK 17/21 也必须实际遍历。由此可以确认优化条件是“整条流水线可证明精确输出大小”，不是“运行在新 JDK 就一定跳过”。
+
+## 场景八：takeWhile 与取消原因
+
+运行 `observeTakeWhileCancellation()`：
+
+- JDK 8 打印 API 不存在，内部 `copyIntoWithCancel` 返回 `void`；
+- JDK 17/21 通过公开 `takeWhile` 得到 `[1,2]`，谓词调用 3 次；
+- 第三次调用检查的是失败元素 3，它不进入结果，却负责建立停止边界。
+
+新版推荐断点：
+
+| 方法 | 观察内容 |
+| --- | --- |
+| `ReferencePipeline.forEachWithCancel` | `cancelled` 在自然耗尽时为 false、Sink 请求停止时为 true |
+| `AbstractPipeline.copyIntoWithCancel` | boolean 怎样从 source pipeline 返回 helper 调用方 |
+| `WhileOps$TakeWhileTask.doLeaf` | `shortCircuited`、本叶 Node 和 `cancelLaterNodes()` |
+| takeWhile Sink 的 `accept/cancellationRequested` | 谓词首次失败后怎样拒绝当前值并请求停止 |
+
+顺序实验可以稳定断言三次谓词调用。并行 takeWhile 可能有多个叶任务在途，只应断言有序结果前缀，不应断言全局谓词精确调用次数。
+
+## 场景九：skip / limit 的精确尺寸
+
+运行 `observeSliceExactSize()`，流水线为四元素 SIZED 源的 `skip(1).limit(2)`：
+
+```text
+JDK 8u412：exactSize=-1，SIZED=false
+JDK 17 GA：exactSize=2，SIZED=true
+JDK 21 GA：exactSize=2，SIZED=true
+```
+
+JDK 8 在 `SliceOps.flags` 观察 `NOT_SIZED`。JDK 17/21 在同一位置观察 `IS_SIZE_ADJUSTING`，再进入 `AbstractPipeline.exactOutputSizeIfKnown` 和每个 Slice stage 的 `exactOutputSize(previousSize)`：
+
+```text
+4 --skip(1)--> 3 --limit(2)--> 2
+```
+
+不要把这个结论推广到 `filter(...).skip(...).limit(...)`。filter 已让上游尺寸未知，后续切片只能调整“未知值”，无法凭空恢复精确尺寸。
+
+## 场景十：未知尺寸 IteratorSpliterator 批次
+
+运行 `observeUnknownSizeSplit()`。实验用 `spliteratorUnknownSize` 包装四元素 Iterator，并在遍历前记录首个 `trySplit()` 返回值：
+
+| 固定快照 | 实际元素 | estimate | SIZED |
+| --- | --- | ---: | --- |
+| JDK 8u412 | `[1,2,3,4]` | 4 | true |
+| JDK 17 GA | `[1,2,3,4]` | 4 | true |
+| JDK 21 GA | `[1,2,3,4]` | `Long.MAX_VALUE / 2` | false |
+
+JDK 21 快照包含 JDK 19 引入的 JDK-8280915。新版不是不知道数组里有四个元素，而是故意用非精确大估计，让 AbstractTask 面对未知尺寸根节点的巨大 leaf threshold 时，仍能把这个数组批次继续二分。`ArraySpliterator.trySplit` 会同步折半 estimate；既然 estimate 不再精确，SIZED/SUBSIZED 就必须清除。
+
+推荐断点顺序：
+
+1. `Spliterators.spliteratorUnknownSize`：父对象 `est=Long.MAX_VALUE` 且无 SIZED。
+2. `IteratorSpliterator.trySplit`：观察 `batch/n/j` 和复制出的数组。
+3. JDK 8/17 的四参 `ArraySpliterator` 构造器：自动加入 SIZED/SUBSIZED。
+4. JDK 21 的五参 `ArraySpliterator` 构造器：清除尺寸特征并保存启发式 estimate。
+5. JDK 21 `ArraySpliterator.trySplit`：观察 estimate 与索引范围同时折半。
+
+## 场景十一：真正触发并行 forEachOrdered
+
+运行 `observeParallelForEachOrdered()`。实验在 parallelism=2 的受控 ForkJoinPool 中，对 `0..15` 调用并行 `forEachOrdered`，action 输出必须保持 `[0,1,...,15]`。这次终止操作会进入 `ForEachOps$ForEachOrderedTask`，不是用有序 `collect` 间接说明顺序。
+
+| 固定快照 | 拆分时观察 | 完成时观察 |
+| --- | --- | --- |
+| JDK 8u412 / 17 GA | `completionMap.put/replace`、`leftPredecessor`、pending count | `completionMap.remove(this)` 后释放 successor |
+| JDK 21 GA | `leftChild.next=rightChild`、`NEXT.compareAndSet`、pending count | `NEXT.getAndSet(this,null)` 后释放 successor |
+
+某个右侧 Node 可以先算完，但不能越过左前驱执行 action。稳定测试只断言 action 的遇见顺序；任务实际完成顺序、执行 action 的线程和私有依赖字段只在固定源码断点中观察。
+
+## 场景十二：mapMulti 零到多映射
+
+运行 `observeMapMulti()`：JDK 8 打印 API 不存在；JDK 17/21 把偶数输入展开为自身和十倍值，得到 `[2,20,4,40]`。
+
+建议同时打开两个入口：
+
+- `Stream.mapMulti`：默认实现为每个输入创建 `SpinedBuffer`，再交给 flatMap，保证第三方 Stream 实现兼容；
+- `ReferencePipeline.mapMulti`：标准流水线覆盖默认实现，在 Sink 的 `accept` 中把 downstream Consumer 直接交给 mapper。
+
+在 `begin` 观察下游收到 `-1`，因为 mapper 对每个输入可能输出零个或多个元素，无法保留 SIZED。不要把 downstream Consumer 保存到字段、异步任务或 mapper 调用之后；公开规范明确该用法结果未定义。
+
 ## 动画案例怎样映射到断点
 
 页面动画前八步与场景二使用同一条顺序流水线：
@@ -196,16 +295,18 @@ Arrays.asList(1, 2, 3, 4).stream()
 
 动画后两步改用独立的 `[0,8)` 分区示例说明 `trySplit` 与有序归并。两段图不是同一次真实执行：前者解释 Sink 融合短路，后者解释并行分区，页面正文已显式标明边界。
 
-## JDK 8 与 JDK 17/21 的断点差异
+## JDK 8、17、21 的断点差异
 
-| 目标 | OpenJDK 8u | OpenJDK 17/21 |
-| --- | --- | --- |
-| pipeline 主干 | AbstractPipeline、PipelineHelper、Sink | 架构保持，私有方法签名可能调整 |
-| `count()` | 常见 SIZED 流仍走遍历 | Java 9+ 可直接读取精确大小，`peek` 可能完全不执行 |
-| ArrayList Spliterator | getFence、trySplit、tryAdvance、forEachRemaining | 语义稳定，内部字段访问和循环组织可能变化 |
-| 叶阈值 | 8u 更新之间已有差异；8u432 可识别当前 ForkJoin worker pool | 以实际运行版本的 AbstractTask 为准 |
-| 有序输出 | ForEachOrderedTask completionMap/Node 缓冲 | 实现可重构，不依赖私有字段名称 |
-| 并行短路 | AbstractShortCircuitTask sharedResult/canceled | 协作取消思想保持，任务类细节可变化 |
+| 目标 | JDK 8u412 | JDK 17 GA | JDK 21 GA |
+| --- | --- | --- | --- |
+| pipeline 主干 | AbstractPipeline、PipelineHelper、Sink | 架构保持 | 架构保持 |
+| `count()` | `mapToLong(1).sum`，实际遍历 | `ReduceOps.makeRefCounting` 可直接读精确尺寸 | 与 17 相同 |
+| 取消结果 | `forEachWithCancel/copyIntoWithCancel` 返回 void | 返回 boolean，WhileOps 消费结果 | 与 17 相同 |
+| 切片尺寸 | `SliceOps.NOT_SIZED` | `SIZE_ADJUSTING + exactOutputSize` | 与 17 相同 |
+| 未知尺寸批次 | SIZED，estimate 为实际批次 | 与 8 相同 | JDK 19 起非 SIZED，使用启发式大估计 |
+| 叶阈值 | 8u412 已识别当前 ForkJoin worker pool | 固定快照保持，但仍是私有启发式 | 同样不能当 API |
+| 有序输出 | completionMap + Node 缓冲 | 与 8 相同 | next/VarHandle + Node 缓冲 |
+| 零到多映射 | 无 mapMulti | Stream 默认回退 + ReferencePipeline 直接推送 | 与 17 相同 |
 
 不要用 `peek(...).count()` 比较 JDK 8/17 的“正确性”。Java 9+ 允许在结果只依赖已知大小时省略元素遍历；peek 本来就只适合调试观察，不是业务回调保证。
 
@@ -218,13 +319,15 @@ Arrays.asList(1, 2, 3, 4).stream()
 | 顺序 findFirst 返回首个遇见元素 | 并行谓词精确调用次数 |
 | ArrayList 拆分两部分无丢失、无重复 | 固定拆分次数、固定任务树形状 |
 | SIZED 分区大小之和保持 | leaf target 的精确数值 |
+| 未知尺寸批次实际元素无丢失、无重复 | `trySplit` 子结果跨版本一定带 SIZED 或 estimate 等于实际数量 |
 | 绑定后结构修改尽力抛 CME | CME 发生前 action 已调用几次的跨版本固定值 |
 | 有序 collect 返回遇见顺序 | 中间 lambda 的线程和执行先后 |
+| 并行 forEachOrdered action 保持遇见顺序 | completionMap/next 字段作为业务接口 |
 | 自建 pool 总能被关闭且有限等待结束 | worker 名称、steal 次数、commonPool parallelism |
 
 ## 自动化测试覆盖
 
-`StreamSpliteratorBehaviorTest` 共覆盖七类行为：
+`StreamSpliteratorBehaviorTest` 共覆盖十三类行为：
 
 1. 惰性求值与一次消费。
 2. 顺序 findFirst 的确定性短路。
@@ -233,6 +336,12 @@ Arrays.asList(1, 2, 3, 4).stream()
 5. 一次 trySplit 两部分的完整覆盖、大小与特征。
 6. fence 绑定后的结构修改检测。
 7. 有界自建 ForkJoinPool 中的并行有序归并结果。
+8. JDK 8 与新版 JDK 的 `peek + count` 遍历差异。
+9. JDK 9 起 `takeWhile` 的公开前缀与停止边界。
+10. JDK 17/21 的 `skip/limit` 精确尺寸调整。
+11. JDK 19 起未知尺寸批次的估计与特征变化。
+12. 内部依赖重构前后的并行 `forEachOrdered` 公开顺序。
+13. JDK 16 起 `mapMulti` 的零到多结果。
 
 测试不访问 JDK 私有字段，不使用反射打开模块，不依赖 sleep、线程名、固定拆分数或私有任务类型，因此可以在 JDK 8 与 17/21 上作为公开行为回归。
 
@@ -245,4 +354,7 @@ Arrays.asList(1, 2, 3, 4).stream()
 - 能从 AbstractTask 的拆分循环追到叶 doLeaf 和父节点 combine。
 - 能区分任务完成顺序、上游 lambda 执行顺序、结果遇见顺序和 forEachOrdered action 顺序。
 - 能说明自建 ForkJoinPool 实验的价值，同时不把当前执行池选择写成 Stream API 契约。
+- 能根据 SIZED、SIZE_ADJUSTING 和终止操作解释 count 是否真正遍历。
+- 能并排说明未知尺寸批次的实际元素、estimate 和 characteristics，不把估计当计数。
+- 能画出 forEachOrdered 的前驱依赖，并区分 8/17 completionMap 与 21 next/VarHandle。
 - 调试结束后所有自建 pool 均已 shutdown，进程没有遗留教学任务。

@@ -6,10 +6,13 @@
 
 <TopicStudyPanel topic-id="openjdk8-java-util-concurrent-futuretask" />
 
+[打开 JDK 8 / 17 / 21 版本对比 →](/jdk/version-comparison/?topic=future-task)，可并排核对 Unsafe 到 VarHandle、定时等待边界、`toString` 诊断与 JDK 21 `Future.State/resultNow/exceptionNow`。
+
 ## 源码入口
 
 | 类型 | OpenJDK 8u 源文件 | 本专题关注入口 |
 | --- | --- | --- |
+| `Future` | [`java/util/concurrent/Future.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/concurrent/Future.java) | `get`、`cancel`、`isDone`；JDK 21 另有非阻塞观察 API |
 | `FutureTask` | [`java/util/concurrent/FutureTask.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/concurrent/FutureTask.java) | `run`、`set`、`setException`、`get`、`cancel` |
 | `RunnableFuture` | [`java/util/concurrent/RunnableFuture.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/concurrent/RunnableFuture.java) | `Runnable` 与 `Future` 的组合接口 |
 | `AbstractExecutorService` | [`java/util/concurrent/AbstractExecutorService.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/concurrent/AbstractExecutorService.java) | `newTaskFor`、`submit` |

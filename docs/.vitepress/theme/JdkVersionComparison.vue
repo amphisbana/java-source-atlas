@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { withBase } from 'vitepress'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   differenceKindForDirection,
   findJdkSource,
@@ -15,6 +16,7 @@ import {
   type JdkSourceCoordinate,
   type JdkVersionDifference
 } from './jdk-version-comparison-data'
+import { topicHomeUrl } from './source-explorer-data'
 
 interface DirectionalDifference {
   difference: JdkVersionDifference
@@ -42,6 +44,7 @@ const activeKinds = ref<Record<JdkDifferenceKind, boolean>>({
   signature: true,
   implementation: true
 })
+const showOnlyChanged = ref(true)
 const demoIndex = ref(0)
 const isDemoPlaying = ref(false)
 let demoTimer: ReturnType<typeof setInterval> | undefined
@@ -52,6 +55,11 @@ let demoTimer: ReturnType<typeof setInterval> | undefined
 const selectedTopic = computed<JdkComparisonTopic>(() => (
   jdkComparisonTopics.find((topic) => topic.id === selectedTopicId.value) ?? jdkComparisonTopics[0]
 ))
+
+/**
+ * 返回当前专题对应的 source-index 元数据，供页面入口和迁移提示复用。
+ */
+const selectedSourceTopic = computed(() => selectedTopic.value.sourceTopic)
 
 /**
  * 判断当前是向新版本迁移、反向回看还是同版本核对。
@@ -88,11 +96,12 @@ const comparisonSides = computed<ComparisonSide[]>(() => [
  */
 const directionalDifferences = computed<DirectionalDifference[]>(() => (
   selectedTopic.value.differences
-    .filter((difference) => hasDifferenceBetween(difference, leftVersion.value, rightVersion.value))
     .map((difference) => ({
       difference,
       kind: differenceKindForDirection(difference, leftVersion.value, rightVersion.value)
     }))
+    .filter(({ difference }) => !showOnlyChanged.value
+      || hasDifferenceBetween(difference, leftVersion.value, rightVersion.value))
 ))
 
 /**
@@ -123,6 +132,18 @@ const currentDemoStep = computed(() => (
  */
 function toggleKind(kind: JdkDifferenceKind): void {
   activeKinds.value = { ...activeKinds.value, [kind]: !activeKinds.value[kind] }
+}
+
+/**
+ * 一次开启或关闭四类差异，方便读者在“只看变化”和全量核对之间切换。
+ */
+function setAllKinds(enabled: boolean): void {
+  activeKinds.value = {
+    added: enabled,
+    removed: enabled,
+    signature: enabled,
+    implementation: enabled
+  }
 }
 
 /**
@@ -252,6 +273,15 @@ function resetInteractiveState(): void {
 }
 
 watch([selectedTopicId, leftVersion, rightVersion], resetInteractiveState)
+/**
+ * 支持从源码索引或 IDEA 插件通过 ?topic=... 直接打开对应版本对比专题。
+ */
+onMounted(() => {
+  const requestedTopicId = new URLSearchParams(window.location.search).get('topic')
+  if (requestedTopicId !== null && jdkComparisonTopics.some((topic) => topic.id === requestedTopicId)) {
+    selectedTopicId.value = requestedTopicId
+  }
+})
 onBeforeUnmount(stopDemo)
 </script>
 
@@ -311,6 +341,10 @@ onBeforeUnmount(stopDemo)
     </div>
 
     <div class="jdk-compare__filters" aria-label="差异类型筛选">
+      <label class="jdk-compare__changed-toggle">
+        <input v-model="showOnlyChanged" type="checkbox" />
+        <span>只看发生变化</span>
+      </label>
       <button
         v-for="option in kindOptions"
         :key="option.kind"
@@ -323,15 +357,27 @@ onBeforeUnmount(stopDemo)
         <span>{{ option.label }}</span>
         <strong>{{ differenceCounts[option.kind] }}</strong>
       </button>
+      <button type="button" class="jdk-compare__filter-reset" @click="setAllKinds(true)">全部类型</button>
     </div>
 
     <section class="jdk-compare__topic-intro">
       <div>
         <span>{{ selectedTopic.packageName }}</span>
         <h3>{{ selectedTopic.title }}</h3>
+        <div v-if="selectedSourceTopic" class="jdk-compare__topic-links">
+          <a :href="withBase(topicHomeUrl(selectedSourceTopic))">专题主线</a>
+          <a :href="withBase(`/source-explorer/?topic=${selectedSourceTopic.topicId}`)">源码索引</a>
+          <span>索引已接入 {{ selectedSourceTopic.versionComparison?.supportedVersions.join(' / ') }}</span>
+        </div>
       </div>
       <p>{{ selectedTopic.question }}</p>
-      <strong>{{ selectedTopic.conclusion }}</strong>
+      <div class="jdk-compare__topic-conclusion">
+        <strong>{{ selectedTopic.conclusion }}</strong>
+        <span v-if="selectedSourceTopic?.versionComparison" class="jdk-compare__index-summary">
+          索引摘要：{{ selectedSourceTopic.versionComparison.summary }}
+        </span>
+        <span v-if="selectedSourceTopic?.versionComparison">迁移提示：{{ selectedSourceTopic.versionComparison.migrationHint }}</span>
+      </div>
     </section>
 
     <ol class="jdk-compare__timeline" aria-label="JDK 版本时间线">
@@ -519,6 +565,8 @@ onBeforeUnmount(stopDemo)
 
 <style scoped>
 .jdk-compare {
+  container-name: jdk-compare;
+  container-type: inline-size;
   margin: 24px 0 40px;
   border: 1px solid var(--atlas-line);
   border-radius: 6px;
@@ -670,13 +718,33 @@ onBeforeUnmount(stopDemo)
 
 .jdk-compare__filters {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(150px, 1.2fr) repeat(4, minmax(72px, 1fr)) auto;
   gap: 1px;
   margin: 14px 24px 24px;
   border: 1px solid var(--atlas-line);
   border-radius: 4px;
   overflow: hidden;
   background: var(--atlas-line);
+}
+
+.jdk-compare__changed-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 11px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-2);
+  cursor: pointer;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.jdk-compare__changed-toggle input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--vp-c-brand-1);
 }
 
 .jdk-compare__filters button {
@@ -715,6 +783,19 @@ onBeforeUnmount(stopDemo)
   font-size: 0.68rem;
 }
 
+.jdk-compare__filter-reset {
+  min-height: 40px;
+  border: 0;
+  border-left: 1px solid var(--atlas-line);
+  background: var(--vp-c-bg);
+  color: var(--vp-c-brand-1);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
 .jdk-compare__topic-intro {
   display: grid;
   grid-template-columns: minmax(150px, 0.55fr) minmax(220px, 1.15fr) minmax(220px, 1.1fr);
@@ -736,16 +817,53 @@ onBeforeUnmount(stopDemo)
   font-size: 1rem;
 }
 
+.jdk-compare__topic-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 9px;
+  color: var(--vp-c-text-3);
+  font-size: 0.68rem;
+}
+
+.jdk-compare__topic-links a {
+  color: var(--vp-c-brand-1);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.jdk-compare__topic-links a:hover {
+  text-decoration: underline;
+}
+
+.jdk-compare__topic-links span {
+  color: var(--vp-c-text-3);
+}
+
 .jdk-compare__topic-intro p,
-.jdk-compare__topic-intro > strong {
+.jdk-compare__topic-conclusion {
   color: var(--vp-c-text-2);
   font-size: 0.78rem;
   font-weight: 500;
   line-height: 1.7;
 }
 
-.jdk-compare__topic-intro > strong {
+.jdk-compare__topic-conclusion {
+  display: grid;
+  gap: 7px;
+}
+
+.jdk-compare__topic-conclusion strong {
   color: var(--vp-c-text-1);
+}
+
+.jdk-compare__topic-conclusion span {
+  color: var(--atlas-coral);
+  font-size: 0.72rem;
+}
+
+.jdk-compare__topic-conclusion .jdk-compare__index-summary {
+  color: var(--vp-c-text-2);
 }
 
 .jdk-compare__timeline {
@@ -958,6 +1076,7 @@ onBeforeUnmount(stopDemo)
 }
 
 .jdk-diff__location code { overflow-wrap: anywhere; color: var(--vp-c-text-3); font-size: 0.6rem; }
+.jdk-diff__location span { overflow-wrap: anywhere; }
 
 .jdk-diff pre {
   min-height: 150px;
@@ -1035,7 +1154,7 @@ onBeforeUnmount(stopDemo)
   border-top: 1px solid var(--atlas-line);
 }
 
-.jdk-demo__actions { display: grid; grid-template-columns: repeat(3, 34px); gap: 6px; }
+.jdk-demo__actions { display: grid; flex: 0 0 auto; grid-template-columns: repeat(3, 34px); gap: 6px; }
 .jdk-demo__actions button { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--atlas-line); border-radius: 4px; background: var(--vp-c-bg); color: var(--vp-c-text-1); cursor: pointer; font-size: 0.9rem; }
 .jdk-demo__actions button:hover { border-color: var(--vp-c-brand-1); color: var(--vp-c-brand-1); }
 
@@ -1096,8 +1215,23 @@ onBeforeUnmount(stopDemo)
 
 @media (max-width: 820px) {
   .jdk-compare__topic-intro { grid-template-columns: 1fr 1fr; }
-  .jdk-compare__topic-intro > strong { grid-column: 1 / -1; }
+  .jdk-compare__topic-conclusion { grid-column: 1 / -1; }
   .jdk-compare__migration { grid-template-columns: 1fr; }
+}
+
+@container jdk-compare (max-width: 760px) {
+  .jdk-compare__topic-intro { grid-template-columns: 1fr 1fr; }
+  .jdk-compare__topic-conclusion { grid-column: 1 / -1; }
+  .jdk-compare__migration { grid-template-columns: 1fr; }
+}
+
+/* VitePress 双侧栏会在宽视口下继续压缩正文，因此交互控件按组件宽度切换布局。 */
+@container jdk-compare (max-width: 600px) {
+  .jdk-compare__controls { grid-template-columns: 1fr; }
+  .jdk-compare__direction { height: 40px; }
+  .jdk-compare__direction > span { transform: rotate(90deg); }
+  .jdk-compare__filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jdk-compare__filter-reset { border-left: 0; }
 }
 
 @media (max-width: 680px) {
@@ -1111,11 +1245,12 @@ onBeforeUnmount(stopDemo)
   .jdk-compare__direction { height: 40px; }
   .jdk-compare__direction > span { transform: rotate(90deg); }
   .jdk-compare__filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jdk-compare__filter-reset { border-left: 0; }
   .jdk-compare__topic-intro,
   .jdk-compare__coordinate-grid,
   .jdk-diff__panes,
   .jdk-compare__migration ol { grid-template-columns: 1fr; }
-  .jdk-compare__topic-intro > strong { grid-column: auto; }
+  .jdk-compare__topic-conclusion { grid-column: auto; }
   .jdk-compare__timeline { grid-template-columns: 1fr; gap: 16px; }
   .jdk-compare__timeline li::before { top: 34px; bottom: -16px; left: 16px; right: auto; width: 1px; height: auto; }
   .jdk-compare__timeline li:last-child::before { display: none; }

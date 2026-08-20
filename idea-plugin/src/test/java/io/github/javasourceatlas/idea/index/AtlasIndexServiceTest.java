@@ -1,10 +1,13 @@
 package io.github.javasourceatlas.idea.index;
 
 import io.github.javasourceatlas.idea.model.AtlasTopic;
+import io.github.javasourceatlas.idea.model.AtlasVersionComparison;
 import org.junit.jupiter.api.Test;
 
 import java.io.InputStream;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -16,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AtlasIndexServiceTest {
 
     /**
-     * 验证 29 个专题、HashMap 入口和 Spring IOC 关联类均进入插件资源。
+     * 验证 29 个专题、12 个版本对比元数据、HashMap 入口和 Spring IOC 关联类均进入插件资源。
      */
     @Test
     void shouldLoadGeneratedTopicIndex() throws Exception {
@@ -26,6 +29,32 @@ class AtlasIndexServiceTest {
 
             assertEquals(29, topics.size());
             assertTrue(topics.stream().allMatch(topic -> topic.lab() != null));
+
+            // 2026-08-20：版本对比数据由 source-index 生成，必须确认插件资源没有丢失或错配。
+            Set<String> comparisonIds = topics.stream()
+                    .map(AtlasTopic::versionComparison)
+                    .filter(comparison -> comparison != null)
+                    .map(AtlasVersionComparison::id)
+                    .collect(Collectors.toSet());
+            assertEquals(Set.of(
+                    "hashmap",
+                    "concurrent-hashmap",
+                    "thread-local",
+                    "synchronized-monitor",
+                    "completable-future",
+                    "classloader-service-loader",
+                    "aqs-reentrantlock",
+                    "thread-pool-executor",
+                    "future-task",
+                    "bytebuffer-selector",
+                    "reference-weakhashmap",
+                    "stream-spliterator"
+            ), comparisonIds);
+            assertTrue(topics.stream()
+                    .map(AtlasTopic::versionComparison)
+                    .filter(comparison -> comparison != null)
+                    .allMatch(comparison -> comparison.supportedVersions().containsAll(List.of("8", "17", "21"))));
+
             AtlasTopic hashMap = findTopic(topics, "openjdk8-java-util-hashmap");
             assertTrue(hashMap.entryPoints().stream().anyMatch(entry -> "putVal".equals(entry.simpleMethodName())));
             assertEquals(

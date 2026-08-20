@@ -9,6 +9,8 @@ Java NIO 最容易被两个表象误导：`ByteBuffer` 看起来只是带游标�
 
 本专题以 **OpenJDK 8u** 为源码基线，讲清公开契约和 8u 的典型实现。JDK 17/21 仍保持 Buffer 四指标、SelectionKey 三个集合和非阻塞 Channel 的核心语义，但 `sun.nio.ch` 中的 provider、轮询器、唤醒管道、更新队列与内部字段都可能随平台和版本变化，不能把它们当成业务代码可依赖的 API。
 
+[打开 JDK 8 / 17 / 21 版本对比 →](/jdk/version-comparison/?topic=bytebuffer-selector)，可并排核对协变返回、绝对区间切片、Consumer 选择、原子兴趣位、sealed 层级和 Foreign Memory 桥接。
+
 <TopicStudyPanel topic-id="openjdk8-bytebuffer-selector" />
 
 ## 源码入口
@@ -16,9 +18,9 @@ Java NIO 最容易被两个表象误导：`ByteBuffer` 看起来只是带游标�
 | 层次 | OpenJDK 8u 源文件 | 本专题关注入口 |
 | --- | --- | --- |
 | Buffer 状态 | [`java/nio/Buffer.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/nio/Buffer.java) | `mark/position/limit/capacity`、`clear/flip/rewind`、相对索引推进 |
-| 字节缓冲区 | [`java/nio/ByteBuffer.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/nio/ByteBuffer.java) | heap/direct 分配、字节序、类型视图、`compact` 抽象契约 |
-| 堆实现 | [`java/nio/HeapByteBuffer.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/nio/HeapByteBuffer.java) | `hb + offset`、`System.arraycopy`、切片与压缩 |
-| 直接内存实现 | [`java/nio/DirectByteBuffer.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/nio/DirectByteBuffer.java) | native address、Cleaner、slice/duplicate 附着关系 |
+| 字节缓冲区模板 | [`java/nio/X-Buffer.java.template`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/nio/X-Buffer.java.template) | 生成 ByteBuffer 等具体类型；分配、字节序、类型视图、`compact` 抽象契约 |
+| 堆实现模板 | [`java/nio/Heap-X-Buffer.java.template`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/nio/Heap-X-Buffer.java.template) | 生成 HeapByteBuffer；`hb + offset`、数组复制、切片与压缩 |
+| 直接内存模板 | [`java/nio/Direct-X-Buffer.java.template`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/nio/Direct-X-Buffer.java.template) | 生成 DirectByteBuffer；native address、Cleaner、slice/duplicate 附着关系 |
 | Selector 门面 | [`java/nio/channels/Selector.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/nio/channels/Selector.java) | 三个 key 集合、三阶段选择、`select/selectNow/wakeup` |
 | 注册协议 | [`java/nio/channels/spi/AbstractSelectableChannel.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/nio/channels/spi/AbstractSelectableChannel.java) | 非阻塞检查、`validOps`、复用或创建 SelectionKey |
 | provider | [`java/nio/channels/spi/SelectorProvider.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/nio/channels/spi/SelectorProvider.java) | provider 定位、`openSelector/openSocketChannel` |
@@ -26,6 +28,8 @@ Java NIO 最容易被两个表象误导：`ByteBuffer` 看起来只是带游标�
 | Linux 8u 示例 | [`sun/nio/ch/EPollSelectorImpl.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/solaris/classes/sun/nio/ch/EPollSelectorImpl.java) | `epoll` 等待、fd 到 key 的映射、pipe 唤醒 |
 
 OpenJDK 源码采用 GPLv2 with Classpath Exception。本专题只整理字段关系、公开语义、调用链和等价伪代码；完整许可边界以项目源码许可说明为准。
+
+这里必须区分两种源码视图：IDE 附加 JDK `src.zip` 时通常能打开构建生成后的 `ByteBuffer.java`；OpenJDK Git 仓库的固定 Tag 并不提交该文件，而由 `X-Buffer.java.template` 生成 ByteBuffer、CharBuffer 等类型，Heap/Direct 实现也来自对应模板。因此版本对比链接必须锚定模板，模板中的 `$Type$/$type$` 占位符会在构建期展开，不是实际 Java 类名。
 
 ## 先把两套状态机接起来
 
@@ -115,16 +119,20 @@ buffer.compact();                           // 未写完内容移到头部，p=r
 
 读完后应当能回答：为什么半包必须保留、`clear` 为什么不清零、`compact` 为什么改变 position、`selectedKeys` 为什么必须移除、`OP_WRITE` 为什么不能常驻，以及修改 `interestOps` 后为什么跨线程通常还要 `wakeup()`。
 
-## JDK 8、17、21 边界
+## JDK 8、17、21：协议稳定，操作边界更明确
 
 | 观察点 | OpenJDK 8u | JDK 17/21 |
 | --- | --- | --- |
 | Buffer 核心状态 | 四指标与相对/绝对访问协议 | 语义保持 |
-| Fluent 返回类型 | `Buffer.flip/clear/position` 等返回 `Buffer` | ByteBuffer 等子类增加协变覆盖，链式调用更自然 |
-| ByteBuffer API | 基础 slice/duplicate、相对与绝对单值/批量操作 | 增加 `slice(index,length)`、绝对批量 get/put、`mismatch`、对齐相关 API 等 |
-| DirectBuffer 内部 | `Unsafe` 分配、`Bits.reserveMemory`、Cleaner 回收的 8u 实现 | 内部清理器、内存会话关联和实现字段继续演进，不依赖私有类 |
-| Selector 处理方式 | 取得 `selectedKeys()` 后应用迭代删除 | 公开集合方式仍可用；较新 JDK 还提供基于 action 的 select 重载 |
+| Fluent 返回类型 | `Buffer.flip/clear/position` 等为 final，返回 `Buffer` | 已包含 JDK 9 协变覆盖，返回 ByteBuffer 等具体类型 |
+| ByteBuffer 切片 | `slice()` 只取当前 remaining | 已包含 JDK 13 `slice(index,length)`，直接指定 limit 内绝对区间 |
+| Selector 处理方式 | select 后由应用迭代并删除 `selectedKeys()` | 传统方式仍可用；已包含 JDK 11 Consumer action 重载，本轮 key 不加入 selected set |
+| interestOps 更新 | 读取、按位计算、整体写回 | 已包含 JDK 11 `interestOpsOr/And` 原子位更新，返回旧值 |
+| Buffer 类型层级 | 普通 abstract class | 17 仍普通；21 快照包含 JDK 19 sealed 层级 |
+| Foreign Memory | 无 MemorySegment 桥接 | 17 是 incubator + 内部 proxy；21 接入仍为预览的 `java.lang.foreign` |
 | 平台轮询器 | Linux epoll、Solaris event port、Windows selector 等 8u 实现 | 平台实现和唤醒机制有重构；macOS 常见 kqueue，Linux 仍通常基于 epoll |
 | 新并发模型 | 平台线程 | JDK 21 虚拟线程改善大量阻塞式连接的另一种选择，但不改变 Selector 公开契约 |
+
+这些 API 解决的是“如何更准确地表达同一状态操作”，不是新的 I/O 状态机：`slice(index,length)` 仍共享内容，Consumer handler 仍需短小，原子 interest 位更新后若要打断当前阻塞 select 仍需 `wakeup()`。JDK 21 的 `java.lang.foreign` 在该固定快照中还是预览 API，不能当作无需启动参数的稳定接口。
 
 跨版本回归应断言公开行为：边界变化、数据完整、key 集合纪律、超时和资源关闭。不要断言 provider 私有类名、底层 fd 数量、一次 select 返回的精确 key 顺序或内部轮询系统调用次数。

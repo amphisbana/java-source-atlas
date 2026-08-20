@@ -15,6 +15,21 @@
     "readingGoal": { "type": "string", "minLength": 1 },
     "recommendedNextTopicId": { "type": "string", "minLength": 1 },
     "recommendedNextReason": { "type": "string", "minLength": 1 },
+    "versionComparison": {
+      "type": "object",
+      "required": ["id", "summary", "supportedVersions", "migrationHint"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "supportedVersions": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "migrationHint": { "type": "string", "minLength": 1 }
+      }
+    },
     "compatibleVersions": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 },

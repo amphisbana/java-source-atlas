@@ -286,6 +286,15 @@ function sourceLink(topic: SourceTopic, source: SourceLocation | undefined): str
 }
 
 /**
+ * 为已接入版本对比的专题生成带筛选参数的工作台入口。
+ */
+function versionComparisonUrl(topic: SourceTopic): string {
+  return topic.versionComparison === undefined
+    ? ''
+    : withBase(`/jdk/version-comparison/?topic=${topic.versionComparison.id}`)
+}
+
+/**
  * 返回索引项最终定位到的完整类名，便于读者在进入 GitHub 前确认源码归属。
  */
 function sourceOwnerLabel(
@@ -358,6 +367,13 @@ async function copyBreakpoint(topicId: string, method: string, variables: string
  */
 onMounted(() => {
   progressByTopic.value = loadLearningProgress()
+  const requestedTopicId = new URLSearchParams(window.location.search).get('topic')
+  const requestedTopic = sourceTopics.find((topic) => (
+    topic.topicId === requestedTopicId || topic.versionComparison?.id === requestedTopicId
+  ))
+  if (requestedTopic !== undefined) {
+    selectedTopic.value = requestedTopic.topicId
+  }
 })
 
 /**
@@ -449,6 +465,7 @@ onBeforeUnmount(() => {
           <span class="source-topic__identity">
             <span class="source-topic__meta">
               {{ topic.platformLabel }} · {{ topic.primaryVersion }} · 源码 {{ topic.sourceRef }}
+              <em v-if="topic.versionComparison"> · 已接入版本对比</em>
             </span>
             <strong>{{ topic.title }}</strong>
             <code>{{ topic.source.className }}</code>
@@ -462,6 +479,7 @@ onBeforeUnmount(() => {
           <div class="source-topic__actions">
             <a :href="withBase(topicHomeUrl(topic))">专题主线</a>
             <a :href="withBase(topicLabUrl(topic))">断点实验</a>
+            <a v-if="versionComparisonUrl(topic)" :href="versionComparisonUrl(topic)">版本对比</a>
             <a :href="githubSourceUrl(topic, topic.source)" target="_blank" rel="noreferrer">固定版本源码</a>
           </div>
 
@@ -743,6 +761,11 @@ onBeforeUnmount(() => {
   color: var(--vp-c-text-3);
   font-size: 0.74rem;
   font-weight: 700;
+}
+
+.source-topic__meta em {
+  color: var(--vp-c-brand-1);
+  font-style: normal;
 }
 
 .source-topic__body {

@@ -10,6 +10,12 @@
   "readingGoal": "能沿 complete、postComplete、uniApply、biApply 和异常包装复述一条异步链的完成传播。",
   "recommendedNextTopicId": "openjdk8-java-util-concurrent-forkjoinpool",
   "recommendedNextReason": "理解异步阶段默认执行器背后的工作窃取与任务分治机制。",
+  "versionComparison": {
+    "id": "completable-future",
+    "summary": "JDK 8 奠定 Completion 栈与 result 状态机，后续版本补充执行器定制、超时和非阻塞状态观察。",
+    "supportedVersions": ["8", "17", "21"],
+    "migrationHint": "区分修改当前 future 的超时方法、创建下游阶段的方法和 Future.State 观察 API。"
+  },
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.CompletableFutureDebugLab",

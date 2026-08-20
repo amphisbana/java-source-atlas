@@ -2,6 +2,8 @@
 
 `Buffer` 不知道“现在处于读模式还是写模式”。它只维护四个边界，读写 API 根据这些边界推进。所谓切换模式，是调用者用 `flip/clear/compact/rewind` 重新解释同一片存储区域。
 
+版本入口：[JDK 8 / 17 / 21 ByteBuffer / Selector 对比](/jdk/version-comparison/?topic=bytebuffer-selector)。先掌握本页稳定的四指标协议，再看新版 API 如何减少临时修改边界和丢失具体类型的问题。
+
 ## 四个指标的准确含义
 
 ```text
@@ -155,6 +157,45 @@ bytes.order(ByteOrder.LITTLE_ENDIAN).putInt(0x01020304);
 - 视图在创建时采用 ByteBuffer 当前字节序；之后修改原 ByteBuffer 的 order，不应拿来推断既有视图会同步切换。
 
 `slice()` 和 `duplicate()` 同样共享内容并拥有独立边界。要避免“谁拥有存储、谁拥有游标”的混淆：Buffer 对象拥有状态，底层内存可能被多个 Buffer 共同引用。
+
+## 版本演进：便利 API 没有改变四指标
+
+### JDK 9 协变返回解决的是静态类型
+
+JDK 8 的 `Buffer.flip/clear/position/limit` 等方法是 `final` 并返回 `Buffer`，所以这段源码不能以 JDK 8 为目标编译：
+
+```java
+ByteBuffer readable = buffer.flip(); // JDK 9+ 才能保留 ByteBuffer 静态类型
+```
+
+JDK 17/21 的 `X-Buffer.java.template` 会为 ByteBuffer 等具体类型生成覆盖方法：先调用 `super.flip()`，再返回 `this`。因此改变的是链式调用的返回类型，`limit=旧 position、position=0、mark 丢弃` 的协议仍只在 `Buffer.flip` 中实现。`javap` 同时显示具体返回方法和 `Buffer` 返回的 synthetic bridge，不能据此误判为两次状态变更。
+
+### JDK 13 二参 slice 解决的是状态污染
+
+JDK 17/21 已包含 `slice(int index, int length)`：
+
+```text
+原 Buffer: position=4, limit=8
+slice(1, 3)
+  → index 取逻辑绝对索引 1，不是 position+1
+  → 新视图 position=0, limit=capacity=3
+  → 原 Buffer position 仍为 4
+  → 内容共享；任一视图写入都能从另一侧观察
+```
+
+范围校验以原 Buffer 的当前 `limit` 为上界。兼容 JDK 8 时，应先 `duplicate()`，再在副本上调整 position/limit 并 `slice()`，不要临时修改原 Buffer 后再尝试手工恢复；异常或并发读取很容易留下错误边界。
+
+### JDK 21 sealed 与 MemorySegment 是两条边界
+
+JDK 17 的 `Buffer` 仍是普通抽象类，并用内部 `MemorySegmentProxy` 记录 Foreign Memory 生成 Buffer 的访问作用域。JDK 21 固定快照中：
+
+- `Buffer` 和 `ByteBuffer` 已是 sealed 层级，这项变化实际自 JDK 19 出现；
+- `Buffer.segment` 改为 `java.lang.foreign.MemorySegment`，派生 ByteBuffer 继承 segment 的 session；
+- `MemorySegment.asByteBuffer()` 与 `MemorySegment.ofBuffer(buffer)` 共享内存，后者只覆盖原 Buffer 的 `[position, limit)`；
+- Arena/session 关闭后，访问关联 Buffer 会失败；这与普通 `ByteBuffer.allocate/allocateDirect` 的生命周期不同；
+- JDK 21 的 `java.lang.foreign` 仍是预览 API，需要对应编译和启动参数，不能按稳定 API 直接发布兼容库。
+
+sealed 主要把 JDK 原本受包级构造器限制的实现层级写入类型系统，不会改变 `mark <= position <= limit <= capacity`，也不意味着业务代码之前存在一个受支持的自定义 Buffer 扩展点。
 
 ## 一次正确的半包处理
 

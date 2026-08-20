@@ -22,7 +22,22 @@ mvn -pl labs/jdk-labs \
   -Dtest=SynchronizedMonitorBehaviorTest test
 ```
 
-项目以 `--release 8` 编译；同一组测试应分别在 Java 8 与 Java 17 运行，验证公开行为不依赖某一代 HotSpot 的对象头布局。
+项目以 `--release 8` 编译；同一组测试应分别在 Java 8、Java 17 与 Java 21 运行，验证公开行为不依赖某一代 HotSpot 的对象头布局。三套 JDK 只改变运行时实现，不改变本实验的 Java 层断言。
+
+### 跨版本运行矩阵
+
+```bash
+# 每次运行前把 JAVA_HOME 指向目标 JDK
+mvn -pl labs/jdk-labs -Dtest=SynchronizedMonitorBehaviorTest test
+```
+
+| 运行版本 | 必须保持的结果 | 不应写进断言的内容 |
+| --- | --- | --- |
+| JDK 8 | 5 个测试通过；`WAITING`、`BLOCKED`、重入恢复和中断清除语义成立 | 对象头 mark word 的具体位布局、`ObjectMonitor` 地址 |
+| JDK 17 | 5 个测试通过；`notify` 后仍需重新竞争 monitor | HotSpot 膨胀/去膨胀的私有方法名和精确线程调度时序 |
+| JDK 21 | 5 个测试通过；平台线程上的 monitor 契约不变 | 虚拟线程调度器内部类名、poll/park 的具体实现路径 |
+
+如果某个版本只是在断点暂停时出现 `RUNNABLE` 而不是 `BLOCKED`，先恢复程序再判断；线程状态是调度观察值，不能替代 `CountDownLatch` 闸门。真正跨版本稳定的证据是：wait 完整释放、通知后重新竞争、重入层数恢复，以及 wait 抛异常前清除中断标记。
 
 ## 实验一：同一 monitor 可重入
 

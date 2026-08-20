@@ -2,6 +2,8 @@
 
 ## Worker 的三重职责
 
+跨版本对照入口：[JDK 8 / 17 / 21 ThreadPoolExecutor 版本对比](/jdk/version-comparison/?topic=thread-pool-executor)。Worker 的 AQS 锁和 `runWorker` 主循环在三版保持稳定，但异常转发方式与 JDK 21 的线程容器启动边界需要按目标源码重新定位。
+
 JDK 8 的内部类 `Worker`：
 
 - 实现 `Runnable`，线程启动后进入 `runWorker(this)`；
@@ -94,7 +96,15 @@ processWorkerExit(worker, completedAbruptly)
 
 可靠的 `afterExecute` 监控应先调用 `super.afterExecute`，再仅对“已完成的 Future”执行 `get()`，分别处理取消、`ExecutionException` 和中断。在线程池自己的 worker 中，`afterExecute` 发生在 `FutureTask.run` 返回后，所以这个 Future 已完成；如果把同一段逻辑抽成通用工具用于别处，仍应显式检查 `isDone()`，避免阻塞。
 
-`beforeExecute` 自己抛出异常时，用户任务根本不会执行，Worker 也会异常退出；`afterExecute` 自己抛出异常同样会让 Worker 退出，并可能覆盖任务原先抛出的异常。因此钩子适合轻量、可靠的清理和观测，不应包含会阻塞或频繁失败的业务操作。
+`beforeExecute` 自己抛出异常时，用户任务根本不会执行，Worker 也会异常退出；`afterExecute` 自己抛出异常同样会让 Worker 退出，并可能覆盖任务原先抛出的异常。因此钩子适合轻量、可靠的清理和观测，不应包含会阻塞或频繁失败的业务操作。JDK 17/21 还把成功路径的 `afterExecute(task, null)` 放在统一 `try` 内：若该调用自身抛错，会进入 `catch`，随后再次执行 `afterExecute(task, ex)`。钩子若不可靠，甚至可能执行两次并让第二个异常遮盖第一个。
+
+### JDK 17/21 的异常路径变化
+
+JDK 8 在 `runWorker` 中分别捕获 `RuntimeException`、`Error` 和其他 `Throwable`。这里必须分清两个观察位置：局部变量 `thrown` 保存并传给 `afterExecute` 的始终是原异常；只有非 `RuntimeException/Error` 的罕见 Throwable（通常只能通过 sneaky throw 制造）向 Worker 外传播时，才包装成 `Error`。JDK 17/21 用一个 `catch (Throwable ex)` 收敛路径，钩子仍看到原异常，之后原对象也直接向外传播。因此真正的跨版本差异出现在 Worker 线程的 `UncaughtExceptionHandler`，而不是 `afterExecute`。
+
+常规 `Runnable` 抛出的 `RuntimeException/Error`、`execute` 导致 Worker 异常退出、`submit` 由 `FutureTask` 保存异常，这三条公开主线没有变化。不要为了利用边缘传播差异在业务代码中使用 sneaky throw；它只适合帮助理解编译期 throws 边界和运行时真实异常对象并非一回事。
+
+JDK 21 还在 `addWorker` 中通过 `SharedThreadContainer.start(t)` 登记线程，并在池进入 `TERMINATED` 的 finally 中关闭容器。它是 JDK 内部运行时细节，不是自定义 ThreadFactory 或 Executor 的扩展点。
 
 ## processWorkerExit
 

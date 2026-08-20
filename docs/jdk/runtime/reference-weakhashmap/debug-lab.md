@@ -1,5 +1,7 @@
 # Reference / WeakHashMap 断点实验手册
 
+版本入口：[JDK 8 / 17 / 21 Reference / WeakHashMap 对比](/jdk/version-comparison/?topic=reference-weakhashmap)。同一组行为测试会通过反射探测新 API，同时保持 Java 8 编译目标。
+
 调试入口：
 
 ```text
@@ -45,7 +47,7 @@ direct-enqueue：queue.remove(timeout) 返回同一个 WeakReference
 - `ReferenceQueue.enqueue`
 - `ReferenceQueue.remove(long)`
 
-这条场景完全确定，不依赖 GC。它同时验证了两个方向：`clear()` 不会自动入队，而 JDK 8 的 `enqueue()` 会先清 referent 再入队。
+这条场景完全确定，不依赖 GC。它同时验证了两个方向：`clear()` 不会自动入队，而三版 `enqueue()` 都会先清 referent 再入队；实现差异是 JDK 8 直接写字段，JDK 17/21 改走 GC 感知的 `clear0()`。
 
 ## 场景二：观察 WeakHashMap 弱键
 
@@ -56,7 +58,7 @@ key 本次被清除：触发 map.size()，观察 expunge 后 size
 key 本次未清除：打印“GC 只是建议”，实验仍正常结束
 ```
 
-即使第一行已经显示 `key 已清除=true`，本次 `map.size()` 仍可能暂时得到 `1`。`WeakReference.get()` 变成 `null`、Entry 进入 `ReferenceQueue`、`expungeStaleEntries()` 从桶链摘除 Entry 是三个先后协作的动作；如果 size 调用恰好落在清除 referent 与 Entry 入队之间，它还没有可消费的队列元素。再次访问 Map 后通常会完成清理，但程序不能依赖固定次数或固定时延。
+即使第一行已经显示 `key 已清除=true`，本次 `map.size()` 仍可能暂时得到 `1`。`WeakReference.get()` 变成 `null`、Entry 进入 `ReferenceQueue`、`expungeStaleEntries()` 从桶链摘除 Entry 是三个先后协作的动作；如果 size 调用恰好落在清除 referent 与 Entry 入队之间，它还没有可消费的队列元素。后续 Map 访问只能清理届时已经入队的 Entry，不能促使 Reference Handler 入队；程序不能依赖访问次数或固定时延推进这条链。
 
 推荐断点：
 
@@ -104,7 +106,7 @@ WeakHashMap -> Entry -> OwnerMetadata -> key
 | `WeakHashMap.transfer` | `key`、`src`、`dest` | resize 中怎样丢弃 stale Entry |
 | `WeakHashMap.HashIterator.hasNext` | `nextKey`、`currentKey` | 迭代器怎样暂时保活 key |
 
-JDK 17/21 的 Reference pending 处理已重构；WeakHashMap 断点名称大体仍可用，但应以当前 SDK 附带源码为准。
+JDK 17/21 的 Reference pending 处理已重构：从 `tryHandlePending` 改看 `processPendingReferences` 与 VM pending-list 入口；clear/enqueue 改看 `clear0`；WeakHashMap 的 key 匹配与 stale 判断改看 `matchesKey/refersTo`。JDK 21 的 ReferenceQueue 等待锁也已从 monitor 改为 ReentrantLock/Condition。WeakHashMap 其余断点名称大体仍可用，但应以当前 SDK 附带源码为准。
 
 ## 自动测试覆盖
 
@@ -116,6 +118,10 @@ JDK 17/21 的 Reference pending 处理已重构；WeakHashMap 断点名称大体
 | `shouldUseEqualsWhileKeysAreAlive` | 活 key 仍按 equals 进行 Map 查找 |
 | `shouldKeepKeyReachableThroughValueBackReference` | Map 的强 value 回指能保活 key |
 | `shouldRemoveMappingsExplicitly` | 显式 remove/clear 仍遵循普通 Map 语义 |
+| `shouldInspectReferentIdentityFromJdk16` | JDK 16+ 的 refersTo 不通过 get 判断身份，PhantomReference 也可判断 |
+| `shouldCreateWeakHashMapForExpectedMappingsFromJdk19` | JDK 19+ 工厂正常创建并拒绝负数，旧版入口不存在 |
+| `shouldExposeSealedReferenceHierarchyFromJdk19` | JDK 21 快照的 Reference sealed，具体公开引用类仍 non-sealed |
+| `shouldKeepReferenceQueueWaitContractAcrossVersions` | timed remove、enqueue 唤醒与 interrupt 契约跨版本稳定 |
 
 ## 实验通过标准
 

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
@@ -19,6 +20,7 @@ import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -327,6 +329,74 @@ class ThreadPoolExecutorBehaviorTest {
     }
 
     /**
+     * 验证动态核心线程数约束在 JDK 8 与后续版本之间的真实差异。
+     */
+    @Test
+    void shouldValidateCoreSizeAgainstMaximumAccordingToJdkVersion() {
+        ThreadPoolExecutor pool = newPool(1, 1, 1, new ThreadPoolExecutor.AbortPolicy());
+        try {
+            if (javaMajorVersion() <= 8) {
+                pool.setCorePoolSize(2);
+                assertEquals(2, pool.getCorePoolSize());
+            } else {
+                assertThrows(IllegalArgumentException.class, () -> pool.setCorePoolSize(2));
+                assertEquals(1, pool.getCorePoolSize());
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    /**
+     * 验证 afterExecute 始终获得原异常，而 Worker 外层对 sneaky checked Throwable 的传播随版本变化。
+     *
+     * @throws InterruptedException 等待 Worker 的未捕获异常处理器时被中断
+     */
+    @Test
+    void shouldExposeSneakyCheckedThrowableAtBothObservationBoundaries() throws InterruptedException {
+        AtomicReference<Throwable> uncaughtFailure = new AtomicReference<>();
+        CountDownLatch uncaughtObserved = new CountDownLatch(1);
+        ThreadFactory factory = runnable -> {
+            Thread thread = new Thread(runnable, "sneaky-throw-test");
+            thread.setUncaughtExceptionHandler((failedThread, throwable) -> {
+                uncaughtFailure.compareAndSet(null, throwable);
+                uncaughtObserved.countDown();
+            });
+            return thread;
+        };
+        ThrowableTrackingExecutor pool = new ThrowableTrackingExecutor(factory);
+        Exception originalFailure = new Exception("checked-failure");
+
+        try {
+            pool.execute(() -> ThreadPoolExecutorBehaviorTest.<RuntimeException>sneakyThrow(originalFailure));
+            assertTrue(pool.awaitAfterExecuteFailure(5, TimeUnit.SECONDS));
+            assertTrue(uncaughtObserved.await(5, TimeUnit.SECONDS));
+
+            assertSame(originalFailure, pool.afterExecuteFailure());
+            if (javaMajorVersion() <= 8) {
+                assertTrue(uncaughtFailure.get() instanceof Error);
+                assertSame(originalFailure, uncaughtFailure.get().getCause());
+            } else {
+                assertSame(originalFailure, uncaughtFailure.get());
+            }
+        } finally {
+            shutdownNowAndAwait(pool);
+        }
+    }
+
+    /**
+     * 验证 ExecutorService 自 JDK 19 起才公开 AutoCloseable close 方法。
+     */
+    @Test
+    void shouldExposeExecutorServiceCloseFromJdk19() {
+        boolean hasCloseMethod = java.util.Arrays.stream(ExecutorService.class.getMethods())
+                .anyMatch(method -> method.getName().equals("close") && method.getParameterCount() == 0);
+
+        assertEquals(javaMajorVersion() >= 19, hasCloseMethod);
+        assertEquals(javaMajorVersion() >= 19, AutoCloseable.class.isAssignableFrom(ExecutorService.class));
+    }
+
+    /**
      * 创建使用有界队列的测试线程池。
      *
      * @param coreSize    核心线程数
@@ -347,6 +417,31 @@ class ThreadPoolExecutorBehaviorTest {
                 TimeUnit.SECONDS,
                 new ArrayBlockingQueue<>(queueSize),
                 handler);
+    }
+
+    /**
+     * 读取当前 Java 规范主版本，兼容 Java 8 的 1.8 格式与后续整数格式。
+     *
+     * @return Java 主版本号
+     */
+    private static int javaMajorVersion() {
+        String specificationVersion = System.getProperty("java.specification.version");
+        if (specificationVersion.startsWith("1.")) {
+            return Integer.parseInt(specificationVersion.substring(2));
+        }
+        return Integer.parseInt(specificationVersion);
+    }
+
+    /**
+     * 绕过编译期 checked exception 声明，只用于验证 runWorker 的真实运行时传播边界。
+     *
+     * @param throwable 需要原样抛出的异常
+     * @param <E> 由调用点推断的异常类型
+     * @throws E 原样抛出的异常
+     */
+    @SuppressWarnings("unchecked")
+    private static <E extends Throwable> void sneakyThrow(Throwable throwable) throws E {
+        throw (E) throwable;
     }
 
     /**
@@ -439,6 +534,57 @@ class ThreadPoolExecutorBehaviorTest {
                 awaitGate(continueOffer);
             }
             return accepted;
+        }
+    }
+
+    /**
+     * 同时记录 afterExecute 原始异常的测试线程池。
+     */
+    private static final class ThrowableTrackingExecutor extends ThreadPoolExecutor {
+        private final AtomicReference<Throwable> afterExecuteFailure = new AtomicReference<>();
+        private final CountDownLatch afterExecuteObserved = new CountDownLatch(1);
+
+        /**
+         * 创建单 Worker 测试线程池。
+         *
+         * @param threadFactory 可记录未捕获异常的线程工厂
+         */
+        private ThrowableTrackingExecutor(ThreadFactory threadFactory) {
+            super(1, 1, 30, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), threadFactory);
+        }
+
+        /**
+         * 记录 runWorker 交给钩子的原始异常对象。
+         *
+         * @param runnable 已完成的任务
+         * @param throwable 任务直接抛出的异常
+         */
+        @Override
+        protected void afterExecute(Runnable runnable, Throwable throwable) {
+            super.afterExecute(runnable, throwable);
+            afterExecuteFailure.compareAndSet(null, throwable);
+            afterExecuteObserved.countDown();
+        }
+
+        /**
+         * 等待 afterExecute 观察到任务失败。
+         *
+         * @param timeout 超时时间
+         * @param unit 时间单位
+         * @return 是否在超时前完成观察
+         * @throws InterruptedException 等待时被中断
+         */
+        private boolean awaitAfterExecuteFailure(long timeout, TimeUnit unit) throws InterruptedException {
+            return afterExecuteObserved.await(timeout, unit);
+        }
+
+        /**
+         * 返回 afterExecute 记录的异常对象。
+         *
+         * @return 原始任务异常
+         */
+        private Throwable afterExecuteFailure() {
+            return afterExecuteFailure.get();
         }
     }
 }

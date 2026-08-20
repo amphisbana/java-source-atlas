@@ -2,6 +2,8 @@
 
 `AbstractQueuedSynchronizer`（AQS）不直接定义“锁”或“许可”，而是提供同步状态、FIFO 等待队列以及独占/共享获取模板。`ReentrantLock`、`CountDownLatch` 和 `Semaphore` 都把公开 API 交给各自的内部 `Sync`，但对同一个 `state` 给出完全不同的业务含义。
 
+[打开 JDK 8 / 17 / 21 版本对比 →](/jdk/version-comparison/?topic=aqs-reentrantlock)，可并排核对 Node 状态位、统一 acquire、ConditionNode 和 ReentrantLock 初始快速路径的变化。
+
 <TopicStudyPanel topic-id="openjdk8-reentrantlock-aqs" />
 
 ```text

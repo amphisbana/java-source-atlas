@@ -114,16 +114,22 @@ Callable 捕获 InterruptedException、记录观察结果并退出，这属于�
 
 这与 `cancel(true)` 不同：这里中断的是等待结果的线程，不是执行 Callable 的 runner。建议同时观察 `WaitNode.thread` 被清空和清理循环的重试，不要把等待者中断解释成任务中断。
 
-## JDK 8 与 JDK 17/21 断点差异
+## 跨版本自动验证：JDK 19+ 非阻塞状态观察
 
-| 目标 | OpenJDK 8u | OpenJDK 17/21 |
-| --- | --- | --- |
-| state CAS | `UNSAFE.compareAndSwapInt` | `STATE.compareAndSet` |
-| runner CAS | `UNSAFE.compareAndSwapObject` | `RUNNER.compareAndSet` |
-| waiters CAS | `UNSAFE.compareAndSwapObject` | `WAITERS.weakCompareAndSet` |
-| 最终状态发布 | `UNSAFE.putOrderedInt` | `STATE.setRelease` |
-| timed await 局部变量 | `deadline`、`nanos` | `startTime`、`elapsed`、`parkNanos` |
-| JDK 21 新查询 | 无 | `resultNow`、`exceptionNow`、`state` 只在 JDK 21 可见 |
+`FutureTaskBehaviorTest.shouldExposeNonBlockingObservationApiWhenAvailable` 在 JDK 19 及以上通过反射调用 `Future.state()`、`resultNow()` 和 `exceptionNow()`，同时让整个 Lab 继续以 Java 8 为编译目标。测试覆盖：未完成映射为 `RUNNING`、正常完成返回 `SUCCESS` 与结果、异常完成返回 `FAILED` 与原异常、取消映射为 `CANCELLED`，以及状态不匹配时抛 `IllegalStateException`。
+
+这里用反射只是为了同一份跨版本测试产物；面向 JDK 21 的真实业务可以直接调用公开方法。兼容 JDK 8/17 的库则需要保持旧 API 路径，不能只因为 CI 在 JDK 21 运行就把新符号写入 Java 8 字节码。
+
+## JDK 8、17、21 断点差异
+
+| 目标 | OpenJDK 8u | OpenJDK 17 | OpenJDK 21 |
+| --- | --- | --- | --- |
+| state CAS | `UNSAFE.compareAndSwapInt` | `STATE.compareAndSet` | `STATE.compareAndSet` |
+| runner CAS | `UNSAFE.compareAndSwapObject` | `RUNNER.compareAndSet` | `RUNNER.compareAndSet` |
+| waiters CAS | `UNSAFE.compareAndSwapObject` | `WAITERS.weakCompareAndSet` | `WAITERS.weakCompareAndSet` |
+| 最终状态发布 | `UNSAFE.putOrderedInt` | `STATE.setRelease` | `STATE.setRelease` |
+| timed await 局部变量 | `deadline`、`nanos` | `startTime`、`elapsed`、`parkNanos` | 延续 JDK 17 |
+| JDK 19+ 新查询 | 无 | 无 | 固定快照已包含 `resultNow`、`exceptionNow`、`state` |
 
 私有字段名目前相对稳定，但 IDE 断点应以正在运行的 SDK 源码为准。Java 8 实验代码不能直接调用 JDK 21 新增方法，否则项目的 `--release 8` 编译会失败。
 

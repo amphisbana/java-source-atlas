@@ -4,7 +4,7 @@
 
 本页以 OpenJDK 8u 的 `ArrayListSpliterator`、`AbstractTask` 和 `ReduceTask` 为主线。`Spliterator` 的公开契约是跨版本依据；任务类、阈值公式和具体执行池选择属于实现细节，不能当作业务接口。
 
-## 四个核心入口各自回答什么
+## 五个核心入口各自回答什么
 
 | 入口 | 回答的问题 | 调用方应依赖的边界 |
 | --- | --- | --- |
@@ -92,6 +92,31 @@ ArrayList 返回的是左侧前缀，原 Spliterator 留下右侧后缀。这个
 
 ArrayList 分区是连续索引区间，所以拆分开销低、大小精确且通常较均衡，能够声明 `ORDERED | SIZED | SUBSIZED`。链表、I/O、生成器或未知大小来源可能难以做到这一点。
 
+## 未知尺寸 Iterator 拆分为何在 JDK 21 改变
+
+`Spliterators.spliteratorUnknownSize(iterator, characteristics)` 不知道还剩多少元素，因此父对象在三版都满足：
+
+```text
+estimateSize() = Long.MAX_VALUE
+characteristics 去掉 SIZED 和 SUBSIZED
+```
+
+它仍支持有限并行：`IteratorSpliterator.trySplit()` 每次把一批元素复制进数组，批次上限按 1024、2048、3072……递增，最大不超过 `1 << 25`。变化发生在“已经复制出的数组批次怎样继续表示大小”：
+
+| 固定快照 | 首个四元素批次 | 对并行任务树的影响 |
+| --- | --- | --- |
+| JDK 8u412 | 普通 `ArraySpliterator`，SIZED/SUBSIZED，estimate=4 | 批次是精确尺寸，但面对从根 `Long.MAX_VALUE` 推导的巨大叶阈值，批次内部通常不再拆 |
+| JDK 17 GA | 与 JDK 8 相同 | 同一批次通常作为一个叶任务处理 |
+| JDK 21 GA | 专用 `ArraySpliterator`，清除 SIZED/SUBSIZED，estimate=`Long.MAX_VALUE/2` | 数组按启发式 estimate 继续折半，使同一批次还能形成更多叶任务 |
+
+JDK 21 快照包含 JDK 19 引入的 JDK-8280915。它不是因为旧数组批次的“4”不精确：数组里确实只有四个元素；目标是让未知尺寸来源获得更好的并行化。新版故意让 estimate 不等于实际元素数，然后在每次数组二分时把估计也折半，所以必须清除 SIZED。
+
+调用方只能按特征解释估计值：
+
+- 不带 SIZED 时，`estimateSize()` 只是估计，可能远大于实际剩余数量；
+- `trySplit()` 返回非 null 只表示得到不重叠分区，不承诺分区特征与父对象或旧 JDK 一样；
+- 若业务算法必须知道批次精确数量，应自己遍历计数或使用真正的 SIZED 来源，不能把 JDK 8/17 的数组包装细节当契约。
+
 ## fail-fast 是尽力检测，不是事务回滚
 
 绑定后，ArrayListSpliterator 会用 `expectedModCount` 检测结构性修改。但检查时机不保证发生在每个副作用前：
@@ -123,7 +148,7 @@ Spliterator 的一般并行使用模型是：一个线程拥有某个实例并�
 
 多数并行归约任务基于 `AbstractTask`。根任务持有 `PipelineHelper` 和 source Spliterator；子任务继承 helper、目标叶大小，并分别持有一个分区。
 
-OpenJDK 8u432 的 `compute()` 主干可以概括为：
+OpenJDK 8u412 的 `compute()` 主干可以概括为：
 
 ```text
 rs = 当前 Spliterator
@@ -153,7 +178,7 @@ tryComplete()
 
 `suggestTargetSize(sizeEstimate)` 通常把初始估计除以一个约为并行度数倍的 leaf target，并把下限限制为 1。目的不是严格生成固定数量的叶子，而是适度过度分区，为工作窃取留出负载均衡空间。
 
-不同 8u 更新的实现并不完全一样：较早代码可直接基于缓存的 common-pool parallelism；本机 Corretto 8u432 在当前线程是 `ForkJoinWorkerThread` 时，会从该 worker 所属 pool 取得 parallelism，否则回退到 common-pool 基线。JDK 17/21 仍可继续调整这些内部公式。
+不同 8u 更新的实现并不完全一样：较早代码可直接基于缓存的 common-pool parallelism；本专题固定的 8u412 在当前线程是 `ForkJoinWorkerThread` 时，会从该 worker 所属 pool 取得 parallelism，否则回退到 common-pool 基线。JDK 17/21 的固定快照保持这条判断，但它仍是内部启发式，不是 Stream API。
 
 因此不要测试：
 
@@ -205,7 +230,28 @@ OpenJDK 8 的 `ReduceTask.onCompletion` 取 left child 的 sink，再 `combine(r
 | `forEach` | 不保证遇见顺序，action 可并发发生 | 更容易直接消费叶分区 |
 | `forEachOrdered` | action 按遇见顺序执行，并建立前一元素 action 对后一元素 action 的 happens-before | 需要依赖协调，部分叶结果可能先缓冲 |
 
-`forEachOrdered` 保证的是终止 action 的顺序。上游 `map/filter/peek` 的 lambda 仍可能在不同叶任务并发执行，不能据此实现有序外部副作用。OpenJDK 8 的 `ForEachOrderedTask` 使用 completion map 和 pending count 表达左分区先于右分区，未轮到输出的叶子可先写入 Node，等前驱完成后再倾倒到 action。
+`forEachOrdered` 保证的是终止 action 的顺序。上游 `map/filter/peek` 的 lambda 仍可能在不同叶任务并发执行，不能据此实现有序外部副作用。未轮到输出的叶子可以先完成计算并写入 Node，等前驱完成后再把结果倾倒给 action。
+
+JDK 源码注释用下面的叶任务关系说明完成依赖：
+
+```text
+计算树：          需要建立的 action 前驱：
+      a           d → e
+     / \          b → f
+    b   c         f → g
+   / \ / \
+  d  e f  g
+```
+
+任务完成顺序可以是 `g、d、f、e`，action 输出仍必须是 `d、e、f、g`。三版保持这个公开结果，但依赖的存储方式不同：
+
+| 固定快照 | 前驱到后继的存储 | 建立与释放 |
+| --- | --- | --- |
+| JDK 8u412 | 共享 `ConcurrentHashMap<task, successor>` | `put/replace` 建边，`onCompletion` 中 `remove(this)` 后 `successor.tryComplete()` |
+| JDK 17 GA | 与 JDK 8 相同 | completionMap 与 pending count 协作 |
+| JDK 21 GA | 每个任务的 `next` 字段和静态 `VarHandle NEXT` | 普通写建立新节点关系，CAS 改接前驱，`getAndSet(null)` 摘取后继 |
+
+JDK 21 把一条直接任务边从全局哈希表移回任务对象，减少表分配、哈希和共享竞争；pending count、Node 缓冲和 happens-before 目标没有改变。调试 8/17 看 `completionMap/leftPredecessor`，调试 21 看 `next/NEXT/leftPredecessor`。本专题 Lab 会真实调用并行 `forEachOrdered`，可以进入该任务，而不是用有序 `collect` 代替。
 
 要求稳定顺序时，优先让流水线计算纯结果，再在边界串行执行真正的外部动作。并行 `forEachOrdered` 并不会把副作用天然变成事务。
 
@@ -264,14 +310,14 @@ JDK API 只公开 `parallel()` 切换求值模式，并没有让调用者为某�
 
 ## JDK 8、17、21 的实现边界
 
-| 观察点 | OpenJDK 8u | OpenJDK 17/21 |
-| --- | --- | --- |
-| ArrayListSpliterator | fence 延迟绑定，索引中点拆分，末端 modCount 检查 | 公开特征和整体语义稳定，内部辅助方法及循环可调整 |
-| AbstractTask | CountedCompleter 任务树，目标叶大小启发式，交替 fork | 架构仍在，但私有字段和启发式不是兼容接口 |
-| 当前 worker pool 影响 leaf target | 早期 8u 与较新更新存在实现差异；8u432 会识别当前 ForkJoin worker | 继续以所运行版本源码为准 |
-| `count()` 对 SIZED 流 | JDK 8 常见路径会实际遍历 | Java 9+ 可直接使用已知大小并跳过不影响结果的 stage，包括 `peek` |
-| 新 Stream API | 初始 API | 9 增加 takeWhile/dropWhile/ofNullable；16 增加 mapMulti/toList 等 |
-| 私有任务类 | ReduceTask、ForEachTask、FindTask 等 | 类族可能重构，断点方法需按当前 src.zip 重新定位 |
+| 观察点 | JDK 8u412 | JDK 17 GA | JDK 21 GA |
+| --- | --- | --- | --- |
+| ArrayListSpliterator | fence 延迟绑定、中点拆分、modCount 检查 | 公开语义稳定 | 公开语义稳定 |
+| AbstractTask | CountedCompleter 任务树，8u412 已识别当前 worker pool | 主架构与 leaf target 公式保持 | 主架构保持，仍属私有启发式 |
+| 未知尺寸 Iterator 批次 | 数组批次 SIZED，estimate 为实际批次 | 与 JDK 8 相同 | JDK 19 起使用非 SIZED 的启发式大估计以继续二分 |
+| `forEachOrdered` | completionMap + pending count | 与 JDK 8 相同 | next + VarHandle + pending count |
+| `count()` 对 SIZED 流 | 实际遍历 | 可直接使用已知大小并跳过 `peek` | 保持尺寸快路径 |
+| 新 Stream API | 初始 API | 已包含 takeWhile/dropWhile、mapMulti/toList | API 保持，内部实现继续演进 |
 
 跨版本测试只断言公开返回值和规范保证。需要研究内部调度时，应把 IDE 附加到实际运行 JDK 的 `src.zip`，不要用 JDK 8 行号去调试 JDK 17 类。
 
@@ -281,11 +327,12 @@ JDK API 只公开 `parallel()` 切换求值模式，并没有让调用者为某�
 | --- | --- | --- |
 | source 绑定 | `ArrayList$ArrayListSpliterator.getFence` | `fence`、`expectedModCount`、`list.size/modCount` |
 | source 拆分 | `ArrayList$ArrayListSpliterator.trySplit` | `lo`、`hi`、`mid`、两侧 index/fence |
+| 未知尺寸拆分 | `Spliterators$IteratorSpliterator.trySplit` | `est`、`batch`、`j`、返回分区 characteristics/estimate |
 | 任务阈值 | `AbstractTask.suggestTargetSize/getTargetSize` | `sizeEstimate`、leaf target、`targetSize` |
 | 构建任务树 | `AbstractTask.compute` | `rs`、`ls`、`forkRight`、left/right child、pending count |
 | 叶计算 | 具体任务的 `doLeaf` | leaf Spliterator、wrapped Sink、local result |
 | 归并 | `ReduceOps$ReduceTask.onCompletion` | left/right local result、combine 前后状态 |
-| 有序输出 | `ForEachOps$ForEachOrderedTask` | completionMap、leftPredecessor、pending count、node |
+| 有序输出 | `ForEachOps$ForEachOrderedTask.compute/onCompletion` | 8/17 看 completionMap；21 看 next/NEXT；共同观察 leftPredecessor、pending count、node |
 | 并行短路 | `AbstractShortCircuitTask.compute/shortCircuit/cancelLaterNodes` | sharedResult、canceled、右侧兄弟 |
 
 下一步按 [断点实验手册](./debug-lab.md) 先验证公开行为，再进入这些私有方法。Fork/Join 的 WorkQueue、steal 和 join 帮助机制见 [ForkJoinPool 专题](/jdk/concurrent/forkjoinpool/)。

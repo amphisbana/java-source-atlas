@@ -3,16 +3,22 @@ package io.github.javasourceatlas.jdk.reference;
 import org.junit.jupiter.api.Test;
 
 import java.lang.ref.PhantomReference;
+import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Map;
 import java.util.WeakHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -129,6 +135,157 @@ class ReferenceWeakHashMapBehaviorTest {
         assertEquals(1, map.size());
         map.clear();
         assertTrue(map.isEmpty());
+    }
+
+    /**
+     * 验证 JDK 16 起 refersTo 可以判断 referent 身份与已清除状态，包括 get 恒为 null 的 PhantomReference。
+     *
+     * @throws Exception 反射调用新版 Reference API 失败
+     */
+    @Test
+    void shouldInspectReferentIdentityFromJdk16() throws Exception {
+        if (javaMajorVersion() < 16) {
+            assertThrows(NoSuchMethodException.class,
+                    () -> Reference.class.getMethod("refersTo", Object.class));
+            return;
+        }
+
+        java.lang.reflect.Method refersTo = Reference.class.getMethod("refersTo", Object.class);
+        Object referent = new Object();
+        WeakReference<Object> weak = new WeakReference<>(referent);
+        assertEquals(Boolean.TRUE, refersTo.invoke(weak, referent));
+        assertEquals(Boolean.FALSE, refersTo.invoke(weak, new Object()));
+        weak.clear();
+        assertEquals(Boolean.TRUE, refersTo.invoke(weak, new Object[]{null}));
+
+        Object phantomReferent = new Object();
+        PhantomReference<Object> phantom = new PhantomReference<>(
+                phantomReferent, new ReferenceQueue<>());
+        assertNull(phantom.get());
+        assertEquals(Boolean.TRUE, refersTo.invoke(phantom, phantomReferent));
+        assertNotNull(phantomReferent);
+    }
+
+    /**
+     * 验证 JDK 19 起 newWeakHashMap 按预期映射数创建容器并拒绝负数。
+     *
+     * @throws Exception 反射调用新版 WeakHashMap API 失败
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldCreateWeakHashMapForExpectedMappingsFromJdk19() throws Exception {
+        if (javaMajorVersion() < 19) {
+            assertThrows(NoSuchMethodException.class,
+                    () -> WeakHashMap.class.getMethod("newWeakHashMap", int.class));
+            return;
+        }
+
+        java.lang.reflect.Method factory = WeakHashMap.class.getMethod("newWeakHashMap", int.class);
+        Map<Object, String> map = (Map<Object, String>) factory.invoke(null, 2);
+        Object first = new Object();
+        Object second = new Object();
+        map.put(first, "first");
+        map.put(second, "second");
+        assertEquals("first", map.get(first));
+        assertEquals("second", map.get(second));
+        assertEquals(2, map.size());
+
+        InvocationTargetException failure = assertThrows(
+                InvocationTargetException.class,
+                () -> factory.invoke(null, -1));
+        assertTrue(failure.getCause() instanceof IllegalArgumentException);
+    }
+
+    /**
+     * 验证 Reference 自 JDK 19 起 sealed，而公开具体引用家族仍可扩展。
+     *
+     * @throws Exception 反射调用 Class.isSealed 失败
+     */
+    @Test
+    void shouldExposeSealedReferenceHierarchyFromJdk19() throws Exception {
+        if (javaMajorVersion() < 17) {
+            assertThrows(NoSuchMethodException.class, () -> Class.class.getMethod("isSealed"));
+            return;
+        }
+
+        java.lang.reflect.Method isSealed = Class.class.getMethod("isSealed");
+        assertEquals(javaMajorVersion() >= 19, isSealed.invoke(Reference.class));
+        assertEquals(Boolean.FALSE, isSealed.invoke(WeakReference.class));
+        assertEquals(Boolean.FALSE, isSealed.invoke(PhantomReference.class));
+    }
+
+    /**
+     * 验证 ReferenceQueue 的超时、显式入队唤醒和中断契约跨版本保持稳定。
+     *
+     * @throws InterruptedException 主测试线程等待辅助线程时被中断
+     */
+    @Test
+    void shouldKeepReferenceQueueWaitContractAcrossVersions() throws InterruptedException {
+        ReferenceQueue<Object> timeoutQueue = new ReferenceQueue<>();
+        assertNull(timeoutQueue.remove(50L));
+
+        ReferenceQueue<Object> wakeupQueue = new ReferenceQueue<>();
+        Object expectedReferent = new Object();
+        WeakReference<Object> expected = new WeakReference<>(expectedReferent, wakeupQueue);
+        CountDownLatch waitingStarted = new CountDownLatch(1);
+        AtomicReference<Reference<?>> dequeued = new AtomicReference<>();
+        AtomicReference<Throwable> wakeupFailure = new AtomicReference<>();
+        Thread waiter = new Thread(() -> {
+            waitingStarted.countDown();
+            try {
+                dequeued.set(wakeupQueue.remove());
+            } catch (Throwable throwable) {
+                wakeupFailure.set(throwable);
+            }
+        }, "reference-queue-wakeup-test");
+        waiter.start();
+        assertTrue(waitingStarted.await(2, TimeUnit.SECONDS));
+        assertTrue(expected.enqueue());
+        joinThread(waiter);
+        assertNull(wakeupFailure.get());
+        assertSame(expected, dequeued.get());
+        assertNotNull(expectedReferent);
+
+        ReferenceQueue<Object> interruptQueue = new ReferenceQueue<>();
+        CountDownLatch interruptStarted = new CountDownLatch(1);
+        AtomicReference<Throwable> interruptedFailure = new AtomicReference<>();
+        Thread interruptedWaiter = new Thread(() -> {
+            interruptStarted.countDown();
+            try {
+                interruptQueue.remove();
+            } catch (Throwable throwable) {
+                interruptedFailure.set(throwable);
+            }
+        }, "reference-queue-interrupt-test");
+        interruptedWaiter.start();
+        assertTrue(interruptStarted.await(2, TimeUnit.SECONDS));
+        interruptedWaiter.interrupt();
+        joinThread(interruptedWaiter);
+        assertTrue(interruptedFailure.get() instanceof InterruptedException);
+    }
+
+    /**
+     * 读取当前 Java 规范主版本，兼容 Java 8 的 1.8 格式。
+     *
+     * @return Java 主版本号
+     */
+    private static int javaMajorVersion() {
+        String specificationVersion = System.getProperty("java.specification.version");
+        if (specificationVersion.startsWith("1.")) {
+            return Integer.parseInt(specificationVersion.substring(2));
+        }
+        return Integer.parseInt(specificationVersion);
+    }
+
+    /**
+     * 等待辅助线程退出，并确保测试不会遗留非守护线程。
+     *
+     * @param thread 需要等待的线程
+     * @throws InterruptedException 等待时被中断
+     */
+    private static void joinThread(Thread thread) throws InterruptedException {
+        thread.join(TimeUnit.SECONDS.toMillis(2));
+        assertFalse(thread.isAlive());
     }
 
     /**

@@ -84,6 +84,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     private final JBTabbedPane navigationTabs = new JBTabbedPane();
     private final JButton openDocumentationButton = new JButton("IDE 内阅读", AtlasIcons.DOCUMENTATION);
     private final JButton openExternalDocumentationButton = new JButton("浏览器打开");
+    private final JButton openVersionComparisonButton = new JButton("版本对比");
     private final JButton navigateSourceButton = new JButton("定位源码", AtlasIcons.SOURCE);
     private final JButton addAllBreakpointsButton = new JButton("添加全部断点");
     private final JButton openLabButton = new JButton("打开 Lab");
@@ -191,6 +192,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         topicTypeFilter.addActionListener(ignored -> rebuildTopicList(searchField.getText()));
         openDocumentationButton.addActionListener(ignored -> openDocumentationInIde());
         openExternalDocumentationButton.addActionListener(ignored -> openDocumentationExternally());
+        openVersionComparisonButton.addActionListener(ignored -> openVersionComparison());
         navigateSourceButton.addActionListener(ignored -> navigateToSource());
         addAllBreakpointsButton.addActionListener(ignored -> addAllBreakpoints());
         openLabButton.addActionListener(ignored -> openLab());
@@ -202,6 +204,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         openDocumentationButton.putClientProperty("JButton.buttonType", "default");
         openDocumentationButton.setToolTipText("在 IDEA 内打开当前源码入口对应的教程");
         openExternalDocumentationButton.setToolTipText("在系统浏览器中打开当前教程");
+        openVersionComparisonButton.setToolTipText("打开当前专题的 JDK 8 / 17 / 21 版本差异");
         navigateSourceButton.setToolTipText("跳转到项目或依赖中的源码类和方法");
         addAllBreakpointsButton.setToolTipText("添加当前专题的全部推荐断点");
         openLabButton.setToolTipText("打开当前专题的 Lab 主类");
@@ -336,7 +339,11 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         sectionHeader.setLayout(new javax.swing.BoxLayout(sectionHeader, javax.swing.BoxLayout.Y_AXIS));
 
         // 2026-08-19：专题页保留教程操作按钮，并把搜索与筛选放在按钮正下方，符合“先选专题、再查专题”的阅读顺序。
-        JComponent actionBar = createTabActionBar(openDocumentationButton, openExternalDocumentationButton);
+        JComponent actionBar = createTabActionBar(
+                openDocumentationButton,
+                openExternalDocumentationButton,
+                openVersionComparisonButton
+        );
         actionBar.setAlignmentX(Component.LEFT_ALIGNMENT);
         sectionHeader.add(actionBar);
         sectionHeader.add(javax.swing.Box.createVerticalStrut(JBUI.scale(6)));
@@ -604,6 +611,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         AtlasBreakpoint breakpoint = breakpointList.getSelectedValue();
         openDocumentationButton.setEnabled(topic != null && entryPoint != null);
         openExternalDocumentationButton.setEnabled(topic != null && entryPoint != null);
+        openVersionComparisonButton.setEnabled(topic != null && topic.versionComparison() != null);
         addAllBreakpointsButton.setEnabled(topic != null && !topic.breakpoints().isEmpty());
         navigateSourceButton.setEnabled(false);
         openLabButton.setEnabled(false);
@@ -696,6 +704,18 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         if (entryPoint != null) {
             BrowserUtil.browse(AtlasSettingsState.getInstance().documentationUrl(entryPoint.document()));
         }
+    }
+
+    /**
+     * 打开当前专题对应的 JDK 版本对比工作台，并携带稳定专题编号。
+     */
+    private void openVersionComparison() {
+        AtlasTopic topic = topicList.getSelectedValue();
+        if (topic == null || topic.versionComparison() == null) {
+            return;
+        }
+        String path = "/jdk/version-comparison/?topic=" + topic.versionComparison().id();
+        BrowserUtil.browse(AtlasSettingsState.getInstance().documentationUrl(path));
     }
 
     /**

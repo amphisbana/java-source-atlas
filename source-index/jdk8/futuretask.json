@@ -10,6 +10,12 @@
   "readingGoal": "能画出正常、异常和取消三条终态路径，并指出 get 如何注册等待节点、park 和被唤醒。",
   "recommendedNextTopicId": "openjdk8-java-util-concurrent-scheduledthreadpoolexecutor",
   "recommendedNextReason": "观察周期任务如何复用 FutureTask 的 runAndReset，在每轮成功后重新进入延迟队列。",
+  "versionComparison": {
+    "id": "future-task",
+    "summary": "FutureTask 的七状态、runner 执行权和 WaitNode 完成协议保持稳定；JDK 17 用 VarHandle 和更稳健的定时等待替代 Unsafe 路径，JDK 21 再增加非阻塞状态、结果和异常查询。",
+    "supportedVersions": ["8", "17", "21"],
+    "migrationHint": "跨版本调试先区分私有 int state 与 JDK 21 Future.State；Java 8/17 代码不能直接调用 resultNow、exceptionNow 和 state。"
+  },
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.FutureTaskDebugLab",
@@ -22,6 +28,10 @@
     "sourcePath": "jdk/src/share/classes/java/util/concurrent/FutureTask.java"
   },
   "relatedSources": [
+    {
+      "className": "java.util.concurrent.Future",
+      "sourcePath": "jdk/src/share/classes/java/util/concurrent/Future.java"
+    },
     {
       "className": "java.util.concurrent.RunnableFuture",
       "sourcePath": "jdk/src/share/classes/java/util/concurrent/RunnableFuture.java"

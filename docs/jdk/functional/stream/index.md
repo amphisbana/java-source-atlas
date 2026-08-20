@@ -2,7 +2,7 @@
 
 Java Stream 不是保存元素的新集合，而是围绕一个数据源组装处理阶段，并在终止操作到来时驱动遍历。`Spliterator` 则描述“剩余元素怎样逐个推进、怎样拆成互不重叠的分区、规模和顺序具有什么特征”。两者合在一起，构成顺序融合遍历和并行任务分解的基础。
 
-本专题以 OpenJDK 8u 为主基线。JDK 17/21 延续 `AbstractPipeline + Sink + Spliterator + ForkJoinTask` 的核心架构，但公开 API、大小优化和部分内部任务实现已有变化；不要把 JDK 8 的私有类签名当成跨版本接口。
+本专题以固定快照 `openjdk/jdk8u@jdk8u412-b08` 为主基线。JDK 17/21 延续 `AbstractPipeline + Sink + Spliterator + ForkJoinTask` 的核心架构，但公开 API、尺寸推理和内部任务依赖已经变化；不要把 JDK 8 的私有类签名当成跨版本接口。六组精选差异可在 [JDK 版本对比工作台](/jdk/version-comparison/?topic=stream-spliterator) 中切换左右版本并逐步播放。
 
 <TopicStudyPanel topic-id="openjdk8-java-util-stream-spliterator" />
 
@@ -10,14 +10,21 @@ Java Stream 不是保存元素的新集合，而是围绕一个数据源组装�
 
 | 类型 | OpenJDK 8u 源文件 | 本专题关注入口 |
 | --- | --- | --- |
+| `Stream` | [`java/util/stream/Stream.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/stream/Stream.java) | 公开中间/终止操作契约；JDK 16 起新增 `mapMulti` |
 | `AbstractPipeline` | [`java/util/stream/AbstractPipeline.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/stream/AbstractPipeline.java) | stage 链、flags、`evaluate`、`wrapSink`、`copyInto` |
 | `ReferencePipeline` | [`java/util/stream/ReferencePipeline.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/stream/ReferencePipeline.java) | `filter`、`map`、`peek`、`forEachWithCancel` |
 | `Sink` | [`java/util/stream/Sink.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/stream/Sink.java) | `begin`、`accept`、`cancellationRequested`、`end` |
 | `StreamOpFlag` | [`java/util/stream/StreamOpFlag.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/stream/StreamOpFlag.java) | 特征的设置、清除与组合 |
 | `Spliterator` | [`java/util/Spliterator.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/Spliterator.java) | `tryAdvance`、`trySplit`、`estimateSize`、characteristics |
+| `Spliterators` | [`java/util/Spliterators.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/Spliterators.java) | `IteratorSpliterator` 的递增批次和未知尺寸拆分 |
 | `ArrayList` | [`java/util/ArrayList.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/ArrayList.java) | `ArrayListSpliterator` 的延迟绑定和 fail-fast |
+| `ReduceOps` | [`java/util/stream/ReduceOps.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/stream/ReduceOps.java) | 归约 Sink；新版 `makeRefCounting` 尺寸快路径 |
+| `SliceOps` | [`java/util/stream/SliceOps.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/stream/SliceOps.java) | `skip/limit` 的 flags、Sink 计数与并行 SliceTask |
+| `ForEachOps` | [`java/util/stream/ForEachOps.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/stream/ForEachOps.java) | `ForEachOrderedTask` 的完成依赖、Node 缓冲与 action 输出 |
 | `AbstractTask` | [`java/util/stream/AbstractTask.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/stream/AbstractTask.java) | 目标叶大小、二叉任务树、叶结果 |
 | `AbstractShortCircuitTask` | [`java/util/stream/AbstractShortCircuitTask.java`](https://github.com/openjdk/jdk8u/blob/jdk8u412-b08/jdk/src/share/classes/java/util/stream/AbstractShortCircuitTask.java) | 共享结果与后续节点取消 |
+
+JDK 8 尚无 `WhileOps`。调试 `takeWhile/dropWhile` 时应打开固定的 [JDK 17 WhileOps](https://github.com/openjdk/jdk/blob/jdk-17%2B35/src/java.base/share/classes/java/util/stream/WhileOps.java) 或 [JDK 21 WhileOps](https://github.com/openjdk/jdk/blob/jdk-21%2B35/src/java.base/share/classes/java/util/stream/WhileOps.java)，不要在 8u 源码中搜索一个不存在的类。
 
 OpenJDK 源码采用 GPLv2 with Classpath Exception。本专题只保留定位所需的字段关系、调用链和伪代码，统一许可说明见站点源码许可页。
 
@@ -132,18 +139,21 @@ Stream 函数应当不修改数据源，并尽量无状态：
 1. [AbstractPipeline 与 Sink 链](./pipeline-sink.md)：理解 stage 组装、flags、反向包装与正向推送。
 2. [终止遍历与短路](./short-circuit.md)：理解 `copyIntoWithCancel`、match/find/limit 和副作用边界。
 3. [Spliterator 与并行任务树](./parallel-spliterator.md)：理解特征、延迟绑定、拆分、叶计算和有序归并。
-4. [断点实验手册](./debug-lab.md)：在 JDK 8/17 上运行可重复行为案例，再进入私有实现观察。
+4. [断点实验手册](./debug-lab.md)：在 JDK 8、17、21 上运行可重复行为案例，再进入私有实现观察。
 
 ArrayList 的集合结构与普通迭代器可先阅读 [ArrayList：迭代器与版本差异](/jdk/collections/arraylist/iterator-version)。ForkJoin 工作队列、窃取和 join 的内部机制由独立 ForkJoinPool 专题继续展开。
 
-## JDK 8、17、21 的版本边界
+## JDK 8、17、21 的六条演进主线
 
-| 观察点 | OpenJDK 8u | OpenJDK 17/21 |
-| --- | --- | --- |
-| 核心架构 | AbstractPipeline stage、Sink 链、Spliterator、ForkJoin tasks | 总体保持 |
-| 常用新增 API | 初始 Stream API | Java 9 增加 `takeWhile/dropWhile/ofNullable` 等；Java 16 增加 `mapMulti/toList` |
-| `count()` | 通常通过遍历归约 | 对保持 `SIZED` 的流水线可直接读取已知大小，可能跳过 `peek` |
-| ArrayList Spliterator | 延迟绑定 fence，ORDERED/SIZED/SUBSIZED，modCount 检查 | 核心语义稳定，内部循环和辅助方法可调整 |
-| 并行任务 | CountedCompleter/AbstractTask 家族 | 类族仍在演进，私有任务结构不是 API |
+| 观察点 | JDK 8u412 | JDK 17 GA | JDK 21 GA |
+| --- | --- | --- | --- |
+| `count()` | `mapToLong(e -> 1L).sum()`，逐元素遍历 | `exactOutputSizeIfKnown` 成功时直接返回 | 保持尺寸快路径 |
+| 取消遍历 | `forEachWithCancel/copyIntoWithCancel` 返回 `void` | 返回 `boolean`，`takeWhile` 用它区分谓词失败与自然耗尽 | 协作取消协议保持 |
+| `skip/limit` | `NOT_SIZED`，丢失精确输出尺寸 | `IS_SIZE_ADJUSTING`，顺序 SIZED 流可计算切片尺寸 | 保持尺寸调整协议 |
+| 未知尺寸 `trySplit` | 数组批次报告精确大小并带 SIZED | 与 JDK 8 相同 | 批次使用 `Long.MAX_VALUE / 2` 启发式估计并清除 SIZED，以便继续二分 |
+| `forEachOrdered` | `completionMap + pending count` | 与 JDK 8 相同 | `next + VarHandle + pending count` |
+| 零到多映射 | 没有 `mapMulti`，通常使用 `flatMap` | JDK 16 API 已汇入，标准流水线直接向下游 Sink 推送 | API 与直接推送路径保持 |
 
-尤其不要写依赖“`peek` 在 `count` 前一定执行”的跨版本测试。Stream 规范允许实现省略不影响结果的 stage 遍历，公开返回值和副作用约束比 JDK 8 的某条内部路径更稳定。
+这些差异不会推翻 Stream 的返回值契约，却会改变“是否真的推进元素”“尺寸特征还能否使用”以及“断点应落在哪个私有字段”。尤其不要写依赖“`peek` 在 `count` 前一定执行”的跨版本测试，也不要假设未知尺寸来源拆出的子 Spliterator 永远带 `SIZED`。
+
+完整源码片段、固定 Tag 链接、迁移检查和自动播放分镜见 [Stream / Spliterator 版本对比](/jdk/version-comparison/?topic=stream-spliterator)。

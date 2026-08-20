@@ -7,6 +7,22 @@ mvn -pl labs/jdk-labs exec:java \
   -Dexec.mainClass=io.github.javasourceatlas.jdk.lock.ReentrantLockDebugLab
 ```
 
+## 跨版本运行边界
+
+Lab 以 `--release 8` 编译，同一组公开行为测试应在 JDK 8、17、21 各运行一次：
+
+```bash
+mvn -pl labs/jdk-labs -Dtest=ReentrantLockBehaviorTest test
+```
+
+| 版本 | 优先定位的入口 | 不应直接照搬的 JDK 8 名称 |
+| --- | --- | --- |
+| JDK 8 | `addWaiter`、`acquireQueued`、`doAcquireShared`、`transferForSignal` | 无 |
+| JDK 17 | 统一 `acquire`、`cleanQueue`、`ConditionNode.enableWait/doSignal` | `waitStatus`、`acquireQueued`、`transferForSignal` |
+| JDK 21 | 统一 `acquire`、`cleanQueue`、`ConditionNode`，必要时查看 OOME 退避分支 | JDK 8 的 Node 常量和字段布局 |
+
+三版都必须保持：重入层数完整恢复、取消后后继最终可获取、`signal` 后仍需重新获取锁、CountDownLatch 归零后共享传播、Semaphore 许可数不为负。队列长度、节点地址、私有字段名和某次唤醒的精确顺序不属于跨版本断言。
+
 ## 推荐断点
 
 | 类与方法 | 观察变量 | 目标 |

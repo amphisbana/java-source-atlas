@@ -3,20 +3,27 @@ package io.github.javasourceatlas.jdk.stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.ConcurrentModificationException;
 import java.util.List;
 import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -68,6 +75,66 @@ class StreamSpliteratorBehaviorTest {
 
         assertEquals(7, first);
         assertEquals(7, visited.get());
+    }
+
+    /**
+     * 验证 JDK 8 会逐元素执行 SIZED 流水线的 count，而 JDK 9 起可直接读取精确尺寸。
+     */
+    @Test
+    void shouldUseVersionSpecificCountPathForSizedPipeline() {
+        AtomicInteger peekCalls = new AtomicInteger();
+        long count = Arrays.asList(1, 2, 3, 4).stream()
+                .peek(ignored -> peekCalls.incrementAndGet())
+                .count();
+
+        assertEquals(4L, count);
+        assertEquals(javaMajorVersion() >= 9 ? 0 : 4, peekCalls.get());
+    }
+
+    /**
+     * 验证 JDK 9 起公开 takeWhile 在首个失败元素处停止。
+     *
+     * @throws Exception 反射调用新版 Stream API 失败
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldExposeTakeWhileFromJdk9() throws Exception {
+        if (javaMajorVersion() < 9) {
+            assertThrows(NoSuchMethodException.class,
+                    () -> Stream.class.getMethod("takeWhile", Predicate.class));
+            return;
+        }
+
+        AtomicInteger tested = new AtomicInteger();
+        Predicate<Integer> predicate = value -> {
+            tested.incrementAndGet();
+            return value < 3;
+        };
+        Method takeWhile = Stream.class.getMethod("takeWhile", Predicate.class);
+        Stream<Integer> prefix = (Stream<Integer>) takeWhile.invoke(
+                Arrays.asList(1, 2, 3, 4).stream(), predicate);
+
+        assertEquals(Arrays.asList(1, 2), prefix.collect(Collectors.toList()));
+        assertEquals(3, tested.get());
+    }
+
+    /**
+     * 验证 JDK 17/21 能为顺序 SIZED 流水线推导 skip/limit 的精确输出尺寸。
+     */
+    @Test
+    void shouldAdjustExactSliceSizeFromJdk17() {
+        Spliterator<Integer> sliced = Arrays.asList(1, 2, 3, 4).stream()
+                .skip(1)
+                .limit(2)
+                .spliterator();
+
+        if (javaMajorVersion() >= 17) {
+            assertEquals(2L, sliced.getExactSizeIfKnown());
+            assertTrue(sliced.hasCharacteristics(Spliterator.SIZED));
+        } else {
+            assertEquals(-1L, sliced.getExactSizeIfKnown());
+            assertFalse(sliced.hasCharacteristics(Spliterator.SIZED));
+        }
     }
 
     /**
@@ -128,6 +195,33 @@ class StreamSpliteratorBehaviorTest {
     }
 
     /**
+     * 验证未知尺寸 Iterator 的首个数组批次在 JDK 19 起改用非 SIZED 的启发式大估计。
+     */
+    @Test
+    void shouldUseVersionSpecificEstimateForUnknownSizeSplit() {
+        Spliterator<Integer> unknown = Spliterators.spliteratorUnknownSize(
+                Arrays.asList(1, 2, 3, 4).iterator(), Spliterator.ORDERED);
+        Spliterator<Integer> prefix = unknown.trySplit();
+        assertNotNull(prefix);
+
+        long estimateBeforeTraversal = prefix.estimateSize();
+        boolean sized = prefix.hasCharacteristics(Spliterator.SIZED);
+        List<Integer> observed = new ArrayList<>();
+        prefix.forEachRemaining(observed::add);
+        assertEquals(Arrays.asList(1, 2, 3, 4), observed);
+
+        if (javaMajorVersion() >= 19) {
+            assertFalse(sized);
+            assertFalse(prefix.hasCharacteristics(Spliterator.SUBSIZED));
+            assertEquals(Long.MAX_VALUE / 2, estimateBeforeTraversal);
+        } else {
+            assertTrue(sized);
+            assertTrue(prefix.hasCharacteristics(Spliterator.SUBSIZED));
+            assertEquals(4L, estimateBeforeTraversal);
+        }
+    }
+
+    /**
      * 验证 ArrayList Spliterator 绑定后遇到结构性修改会尽力快速失败。
      */
     @Test
@@ -165,6 +259,47 @@ class StreamSpliteratorBehaviorTest {
     }
 
     /**
+     * 验证并行 forEachOrdered 在内部依赖重构后仍保持公开遇见顺序。
+     */
+    @Test
+    void shouldKeepForEachOrderedContractAcrossInternalRewrite() {
+        List<Integer> ordered = Collections.synchronizedList(new ArrayList<>());
+        IntStream.range(0, 16)
+                .parallel()
+                .boxed()
+                .forEachOrdered(ordered::add);
+        assertEquals(IntStream.range(0, 16).boxed().collect(Collectors.toList()), ordered);
+    }
+
+    /**
+     * 验证 JDK 16 起 mapMulti 可由一个输入直接产生零到多个输出。
+     *
+     * @throws Exception 反射调用新版 Stream API 失败
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldExposeMapMultiFromJdk16() throws Exception {
+        if (javaMajorVersion() < 16) {
+            assertThrows(NoSuchMethodException.class,
+                    () -> Stream.class.getMethod("mapMulti", BiConsumer.class));
+            return;
+        }
+
+        BiConsumer<Integer, Consumer<Integer>> mapper = (value, downstream) -> {
+            if (value % 2 == 0) {
+                downstream.accept(value);
+                downstream.accept(value * 10);
+            }
+        };
+        Method mapMulti = Stream.class.getMethod("mapMulti", BiConsumer.class);
+        Stream<Integer> mapped = (Stream<Integer>) mapMulti.invoke(
+                Arrays.asList(1, 2, 3, 4).stream(), mapper);
+
+        assertEquals(Arrays.asList(2, 20, 4, 40),
+                mapped.collect(Collectors.toList()));
+    }
+
+    /**
      * 立即关闭自建 ForkJoinPool，并等待工作线程退出。
      *
      * @param pool 需要关闭的 ForkJoinPool
@@ -174,5 +309,18 @@ class StreamSpliteratorBehaviorTest {
         pool.shutdownNow();
         assertTrue(pool.awaitTermination(WAIT_SECONDS, TimeUnit.SECONDS),
                 "Stream 测试线程池未在预期时间内终止");
+    }
+
+    /**
+     * 读取当前 Java 规范主版本，兼容 Java 8 的 1.8 格式。
+     *
+     * @return Java 主版本号
+     */
+    private static int javaMajorVersion() {
+        String specificationVersion = System.getProperty("java.specification.version");
+        if (specificationVersion.startsWith("1.")) {
+            return Integer.parseInt(specificationVersion.substring(2));
+        }
+        return Integer.parseInt(specificationVersion);
     }
 }

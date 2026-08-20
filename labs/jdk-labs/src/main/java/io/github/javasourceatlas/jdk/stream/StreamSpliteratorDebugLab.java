@@ -1,15 +1,21 @@
 package io.github.javasourceatlas.jdk.stream;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.ConcurrentModificationException;
 import java.util.List;
 import java.util.OptionalInt;
 import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -51,6 +57,24 @@ public final class StreamSpliteratorDebugLab {
 
         printHeader("受控 ForkJoinPool 中的并行归并");
         observeParallelReduction();
+
+        printHeader("count 精确尺寸快路径");
+        observeCountSizeOptimization();
+
+        printHeader("takeWhile 与取消结果");
+        observeTakeWhileCancellation();
+
+        printHeader("skip / limit 精确尺寸");
+        observeSliceExactSize();
+
+        printHeader("未知尺寸 IteratorSpliterator 拆分");
+        observeUnknownSizeSplit();
+
+        printHeader("并行 forEachOrdered 完成依赖");
+        observeParallelForEachOrdered();
+
+        printHeader("mapMulti 零到多映射");
+        observeMapMulti();
     }
 
     /**
@@ -115,6 +139,59 @@ public final class StreamSpliteratorDebugLab {
     }
 
     /**
+     * 比较 JDK 8 的逐元素 count 与新版 JDK 对 SIZED 流水线的直接尺寸返回。
+     */
+    static void observeCountSizeOptimization() {
+        AtomicInteger peekCalls = new AtomicInteger();
+        long count = Arrays.asList(1, 2, 3, 4).stream()
+                .peek(ignored -> peekCalls.incrementAndGet())
+                .count();
+
+        System.out.printf("Java %d：count=%d，peek 实际调用=%d%n",
+                javaMajorVersion(), count, peekCalls.get());
+    }
+
+    /**
+     * 通过反射兼容 Java 8 编译目标，并观察 JDK 9 起 takeWhile 在首个失败元素处停止。
+     *
+     * @throws Exception 查找或调用新版 Stream API 失败
+     */
+    @SuppressWarnings("unchecked")
+    static void observeTakeWhileCancellation() throws Exception {
+        if (javaMajorVersion() < 9) {
+            System.out.println("Java 8：没有 takeWhile，内部 copyIntoWithCancel 返回 void");
+            return;
+        }
+
+        AtomicInteger tested = new AtomicInteger();
+        Predicate<Integer> predicate = value -> {
+            tested.incrementAndGet();
+            return value < 3;
+        };
+        Method takeWhile = Stream.class.getMethod("takeWhile", Predicate.class);
+        Stream<Integer> prefix = (Stream<Integer>) takeWhile.invoke(
+                Arrays.asList(1, 2, 3, 4).stream(), predicate);
+
+        System.out.printf("takeWhile 结果=%s，谓词调用=%d，首个失败元素也会被检查%n",
+                prefix.collect(Collectors.toList()), tested.get());
+    }
+
+    /**
+     * 比较 JDK 8 清除切片尺寸与 JDK 17/21 通过 SIZE_ADJUSTING 推导精确尺寸。
+     */
+    static void observeSliceExactSize() {
+        Spliterator<Integer> sliced = Arrays.asList(1, 2, 3, 4).stream()
+                .skip(1)
+                .limit(2)
+                .spliterator();
+
+        System.out.printf("Java %d：切片 exactSize=%d，SIZED=%s%n",
+                javaMajorVersion(),
+                sliced.getExactSizeIfKnown(),
+                sliced.hasCharacteristics(Spliterator.SIZED));
+    }
+
+    /**
      * 在首次绑定前修改 ArrayList，并验证一次 trySplit 后两部分无丢失地覆盖全部元素。
      */
     static void observeLateBindingAndSplit() {
@@ -138,6 +215,26 @@ public final class StreamSpliteratorDebugLab {
                 source.spliterator().hasCharacteristics(Spliterator.ORDERED),
                 source.spliterator().hasCharacteristics(Spliterator.SIZED),
                 source.spliterator().hasCharacteristics(Spliterator.SUBSIZED));
+    }
+
+    /**
+     * 观察未知尺寸 Iterator 拆出的数组批次在 JDK 8/17 与 JDK 21 的特征差异。
+     */
+    static void observeUnknownSizeSplit() {
+        Spliterator<Integer> unknown = Spliterators.spliteratorUnknownSize(
+                Arrays.asList(1, 2, 3, 4).iterator(), Spliterator.ORDERED);
+        Spliterator<Integer> prefix = unknown.trySplit();
+        if (prefix == null) {
+            throw new IllegalStateException("四元素未知尺寸来源应能拆出首个批次");
+        }
+
+        long estimateBeforeTraversal = prefix.estimateSize();
+        boolean sized = prefix.hasCharacteristics(Spliterator.SIZED);
+        List<Integer> actual = new ArrayList<>();
+        prefix.forEachRemaining(actual::add);
+
+        System.out.printf("Java %d：批次实际元素=%s，estimate=%d，SIZED=%s%n",
+                javaMajorVersion(), actual, estimateBeforeTraversal, sized);
     }
 
     /**
@@ -181,6 +278,55 @@ public final class StreamSpliteratorDebugLab {
     }
 
     /**
+     * 在受控线程池中真实触发 ForEachOrderedTask，并验证 action 保持遇见顺序。
+     *
+     * @throws Exception 等待并行任务失败或被中断
+     */
+    static void observeParallelForEachOrdered() throws Exception {
+        ForkJoinPool pool = new ForkJoinPool(2);
+        try {
+            Future<List<Integer>> result = pool.submit(() -> {
+                List<Integer> ordered = Collections.synchronizedList(new ArrayList<>());
+                IntStream.range(0, 16)
+                        .parallel()
+                        .boxed()
+                        .forEachOrdered(ordered::add);
+                return ordered;
+            });
+            System.out.printf("forEachOrdered action 顺序=%s%n",
+                    result.get(WAIT_SECONDS, TimeUnit.SECONDS));
+        } finally {
+            shutdownNowAndAwait(pool);
+        }
+    }
+
+    /**
+     * 通过反射兼容 Java 8 编译目标，展示 JDK 16 起一个输入直接推送零到多个输出。
+     *
+     * @throws Exception 查找或调用新版 Stream API 失败
+     */
+    @SuppressWarnings("unchecked")
+    static void observeMapMulti() throws Exception {
+        if (javaMajorVersion() < 16) {
+            System.out.println("当前 JDK 没有 mapMulti，可使用 flatMap 表达同一结果");
+            return;
+        }
+
+        BiConsumer<Integer, Consumer<Integer>> mapper = (value, downstream) -> {
+            if (value % 2 == 0) {
+                downstream.accept(value);
+                downstream.accept(value * 10);
+            }
+        };
+        Method mapMulti = Stream.class.getMethod("mapMulti", BiConsumer.class);
+        Stream<Integer> mapped = (Stream<Integer>) mapMulti.invoke(
+                Arrays.asList(1, 2, 3, 4).stream(), mapper);
+
+        System.out.printf("mapMulti 偶数展开结果=%s%n",
+                mapped.collect(Collectors.toList()));
+    }
+
+    /**
      * 立即关闭自建 ForkJoinPool，并在限定时间内等待工作线程退出。
      *
      * @param pool 需要关闭的 ForkJoinPool
@@ -191,6 +337,19 @@ public final class StreamSpliteratorDebugLab {
         if (!pool.awaitTermination(WAIT_SECONDS, TimeUnit.SECONDS)) {
             throw new IllegalStateException("Stream 实验线程池未在预期时间内终止");
         }
+    }
+
+    /**
+     * 读取当前 Java 规范主版本，兼容 Java 8 的 1.8 格式。
+     *
+     * @return Java 主版本号
+     */
+    private static int javaMajorVersion() {
+        String specificationVersion = System.getProperty("java.specification.version");
+        if (specificationVersion.startsWith("1.")) {
+            return Integer.parseInt(specificationVersion.substring(2));
+        }
+        return Integer.parseInt(specificationVersion);
     }
 
     /**

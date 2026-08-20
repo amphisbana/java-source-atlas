@@ -1,13 +1,21 @@
 import { defineConfig } from 'vitepress'
 
+const configuredBase = process.env.DOCS_BASE || '/atlas/'
+const siteBase = configuredBase.endsWith('/') ? configuredBase : `${configuredBase}/`
+
 export default defineConfig({
   lang: 'zh-CN',
   title: 'Java Source Atlas',
   description: '用调用链、断点和可运行案例学习 Java 源码',
-  base: process.env.DOCS_BASE || '/atlas/',
+  // 2026-08-20：保留原先只为 VitePress 设置 base 的写法，站点资源路径现在复用同一规范值。
+  // base: process.env.DOCS_BASE || '/atlas/',
+  base: siteBase,
   cleanUrls: true,
   lastUpdated: true,
   head: [
+    // 2026-08-20：原逻辑固定为 /atlas/favicon.svg，DOCS_BASE 改变时会指向错误部署目录。
+    // ['link', { rel: 'icon', href: '/atlas/favicon.svg', type: 'image/svg+xml' }],
+    ['link', { rel: 'icon', href: `${siteBase}favicon.svg`, type: 'image/svg+xml' }],
     ['meta', { name: 'theme-color', content: '#0f766e' }],
     ['meta', { name: 'viewport', content: 'width=device-width, initial-scale=1.0' }]
   ],

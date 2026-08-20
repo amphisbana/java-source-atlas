@@ -27,6 +27,157 @@ jobs:
       - name: Test Java labs
         run: mvn --batch-mode test
 
+  synchronized-cross-version:
+    name: synchronized behavior Java ${{ matrix.java }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['8', '17', '21']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      - name: Run synchronized cross-version behavior test
+        run: mvn --batch-mode -pl labs/jdk-labs -Dtest=SynchronizedMonitorBehaviorTest test
+
+  aqs-cross-version:
+    name: AQS behavior Java ${{ matrix.java }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['8', '17', '21']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      - name: Run AQS and ReentrantLock behavior test
+        run: mvn --batch-mode -pl labs/jdk-labs -Dtest=ReentrantLockBehaviorTest test
+
+  executor-future-cross-version:
+    name: Executor and Future behavior Java ${{ matrix.java }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['8', '17', '21']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      - name: Run ThreadPoolExecutor and FutureTask behavior tests
+        run: mvn --batch-mode -pl labs/jdk-labs -Dtest=ThreadPoolExecutorBehaviorTest,FutureTaskBehaviorTest test
+
+  nio-cross-version:
+    name: ByteBuffer and Selector behavior Java ${{ matrix.java }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['8', '17', '21']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      - name: Run ByteBuffer and Selector behavior tests
+        run: mvn --batch-mode -pl labs/jdk-labs -Dtest=NioBufferSelectorBehaviorTest test
+
+  reference-cross-version:
+    name: Reference and WeakHashMap behavior Java ${{ matrix.java }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['8', '17', '21']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      - name: Run Reference and WeakHashMap behavior tests
+        run: mvn --batch-mode -pl labs/jdk-labs -Dtest=ReferenceWeakHashMapBehaviorTest test
+
+  stream-cross-version:
+    name: Stream and Spliterator behavior Java ${{ matrix.java }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['8', '17', '21']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      - name: Run Stream and Spliterator behavior tests
+        run: mvn --batch-mode -pl labs/jdk-labs -Dtest=StreamSpliteratorBehaviorTest test
+
+  idea-plugin:
+    name: IDEA plugin Java 21 tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Test and package IDEA plugin
+        working-directory: idea-plugin
+        run: ./gradlew test buildPlugin --no-daemon
+
   docs-quality:
     name: Documentation quality
     runs-on: ubuntu-latest

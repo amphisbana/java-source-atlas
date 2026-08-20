@@ -8,6 +8,8 @@
 2. GC 何时清除 `Reference.referent`，并把引用对象送入 `ReferenceQueue`；
 3. 容器或清理线程何时消费队列，真正解除 value、native handle 等资源。
 
+[打开 JDK 8 / 17 / 21 版本对比 →](/jdk/version-comparison/?topic=reference-weakhashmap)，可并排核对 GC 感知清除、pending-list 交接、`refersTo`、队列等待、sealed 层级与 `newWeakHashMap`。
+
 <TopicStudyPanel topic-id="openjdk8-reference-weakhashmap" />
 
 ## 源码地图
@@ -103,6 +105,19 @@ GC 只负责到“清除 referent、安排入队”附近。如何处理队列�
 - 多线程高并发读写。
 
 确定性资源管理仍应优先使用 `try-with-resources` / `AutoCloseable`。ReferenceQueue 或 Cleaner 只能作为遗漏关闭后的兜底，不应替代清晰的所有权。
+
+## JDK 8、17、21：四阶段稳定，交接机制演进
+
+| 阶段 | JDK 8u412 | JDK 17 | JDK 21 |
+| --- | --- | --- | --- |
+| 显式清 referent | `clear/enqueue` 直接写 `referent=null` | native `clear0` 保留 GC 屏障 | 延续 `clear0` |
+| GC → Handler | Java `pending + lock` 每次摘一个 | VM 交出整条 pending-list | 延续 VM 批量交接 |
+| 身份/清除判断 | `get()` 与 `isEnqueued()` | `refersTo` 已可用，`isEnqueued` 弃用 | `refersToImpl` 帮助 C2 intrinsic |
+| 队列发布与等待 | 先发布 ENQUEUED，再接链；Object.wait | 先接链再发布；Object.wait | 同一发布顺序；ReentrantLock + Condition |
+| WeakHashMap 匹配 | `Entry.get()` 后比较/null 判断 | `refersTo` 先判断身份与 stale | 延续；新增预期映射数工厂 |
+| 类型层级 | 普通 abstract Reference | 仍是普通抽象类 | sealed Reference，具体公开家族 non-sealed |
+
+表中的实现变化都不能缩短公开时间线：失去强路径只是让对象“有资格”被处理；清 referent 不等于入队；入队不等于队列已被消费；WeakHashMap 只有在后续操作 poll 到 Entry 后才会摘桶和清 value。任何一个版本都不保证一次 `System.gc()` 完成整条链。
 
 ## 阅读与实验顺序
 

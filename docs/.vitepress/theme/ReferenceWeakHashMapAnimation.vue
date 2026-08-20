@@ -91,7 +91,7 @@ const snapshots: ReferenceSnapshot[] = [
   { scenario: '普通弱键', root: '无 Map 强路径', key: '已回收', entry: '可回收', state: 'inactive', value: '可回收', queue: '空', handler: '等待', table: '空表，size=0', action: '弱键生命周期完成' },
   { scenario: 'null key', root: 'WeakHashMap.NULL_KEY', key: 'null（API 视图）', entry: 'Entry.get() = NULL_KEY', state: 'active', value: 'null-value', queue: '空', handler: '等待', table: 'bucket → Entry，size=1', action: '不会因 GC 自动消失' },
   { scenario: 'value 回指 key', root: 'map → Entry → Value', key: 'Value.owner = Key#7', entry: 'Entry 弱引用 Key#7', state: 'active', value: '强引用 Key#7', queue: '空', handler: '等待', table: 'bucket → Entry，size=1', action: '形成 Map 到 key 的强路径' },
-  { scenario: '显式队列消费', root: '消费者线程', key: 'referent 已清除', entry: 'WeakReference<Resource>', state: 'enqueued', value: 'metadata: resourceId=9', queue: 'remove() 返回 Reference', handler: '已入队', table: '不涉及 Map', action: '不能重新取得 referent' },
+  { scenario: '显式队列消费', root: '消费者线程', key: 'referent 已清除', entry: 'WeakReference<Resource>', state: 'inactive', value: 'metadata: resourceId=9', queue: 'remove() 已返回，引用已出队', handler: '等待', table: '不涉及 Map', action: '不能重新取得 referent' },
   { scenario: '虚引用清理', root: '强持有 PhantomReference', key: 'Resource referent', entry: 'phantom.get() = null', state: 'active', value: 'metadata: nativeHandle=18', queue: '空', handler: '等待 GC 判定', table: '不涉及 Map', action: '只观察清理阶段' },
   { scenario: '虚引用清理', root: '清理工作线程', key: 'referent 不可恢复', entry: 'PhantomReference', state: 'inactive', value: 'metadata 已清空', queue: '已消费', handler: '等待', table: '不涉及 Map', action: 'close(handle) 幂等完成' }
 ]

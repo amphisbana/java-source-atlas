@@ -2,6 +2,8 @@
 
 Selector 的价值不是让 I/O 本身变快，而是让一个线程等待多组 Channel 的就绪条件，并把每个连接的实际进度保存在附件和 Buffer 中。理解它要同时跟踪 provider、Channel 注册、SelectionKey 位集合、三个 key 集合和跨线程唤醒。
 
+版本入口：[JDK 8 / 17 / 21 ByteBuffer / Selector 对比](/jdk/version-comparison/?topic=bytebuffer-selector)。传统 selected-key set 是三版共同基线，Consumer 选择和原子兴趣位是建立在它之上的新入口。
+
 ## `Selector.open()` 如何落到平台实现
 
 OpenJDK 8u 的公开入口很短：
@@ -86,6 +88,19 @@ finishConnect 成功且有首包：OP_WRITE
 - connectable 要调用 `finishConnect()` 才完成或暴露连接错误；
 - acceptable 后 `accept()` 在非阻塞模式仍应判空，状态可能在通知与调用间变化。
 
+### JDK 11 原子兴趣位不是自动 wakeup
+
+JDK 17/21 快照已经包含 JDK 11 的两个组合入口：
+
+```java
+int old = key.interestOpsOr(SelectionKey.OP_WRITE);
+int previous = key.interestOpsAnd(~SelectionKey.OP_READ);
+```
+
+它们都返回更新前的 interest set。默认实现同步执行“读取 → OR/AND → 写回”，内建 SelectionKey 则可以使用 VarHandle 位操作；公开原子性只保证相对于其他并发 `interestOpsOr/And`。`Or` 会像整体 setter 一样拒绝 Channel 不支持的位，`And` 故意允许补码，以便不枚举其他位就清除某个标志。
+
+这不改变选择时间边界：修改仍只保证被后续 selection operation 观察。如果 Selector 线程正阻塞，而另一个线程希望立刻应用新兴趣位，仍要先把控制命令放入线程安全队列，再调用 `wakeup()`。
+
 ## 三个 key 集合怎样变化
 
 ### 注册集合 `keys`
@@ -146,6 +161,26 @@ while (running) {
 ```
 
 若 `selectNow()` 放在无节流的 while 中，本来就是主动轮询，会占满 CPU。若阻塞 `select()` 持续异常快速返回 0，应记录 provider、JDK/OS、interestOps、注册数、wakeup/interrupt 调用来源，再采用有界退避或重建 Selector 等经过证据支持的策略，不能把“重建”当成无条件模板。
+
+### JDK 11 Consumer 选择的所有权
+
+JDK 17/21 还提供 `select(Consumer)`、`select(Consumer,long)` 和 `selectNow(Consumer)`。对于本轮新发现的 ready key，Selector 直接调用 action，不把它新增到 selected-key set：
+
+```java
+selector.selectNow(key -> {
+    if (key.isReadable()) {
+        handleRead(key);
+    }
+});
+```
+
+这减少了忘记 `iterator.remove()` 的机会，但有三个边界不能省略：
+
+1. action 在 Selector 与 selected-key set 的同步边界内执行，应短小、非阻塞，并避免重入同一个 Selector；内建实现会拒绝 select 重入，规范也不承诺其他 provider 的重入行为。
+2. “本轮 key 不加入集合”不等于该方法替应用清空历史债务。调用前已经留在 `selectedKeys()` 中的 key 仍由应用负责。
+3. action 仍只得到就绪通知，Channel read/write 的 `0`、部分进度、EOF 和异常处理完全不变。
+
+需要兼容 JDK 8 时继续使用迭代器模板更清晰；只有最低版本允许时，再选择 action 形式统一事件所有权。
 
 ## `wakeup()` 是一次许可，不是事件队列
 
@@ -245,7 +280,7 @@ Client: OP_READ(PING)  → 完成
 ## JDK 17/21 的边界
 
 - 公开的 register、interestOps/readyOps、selectedKeys、wakeup 和非阻塞 Channel 语义保持稳定；
-- 较新 JDK 的 Selector 增加接收 `Consumer<SelectionKey>` 的选择重载，可以由实现按选择过程传递 key，但不应把 17 的内部队列结构倒推到 8u；
+- JDK 17/21 已包含 JDK 11 的 `Consumer<SelectionKey>` 选择重载和 `interestOpsOr/And`；前者不把本轮新 key 加入 selected set，后者也不会自动 wakeup；
 - `sun.nio.ch.SelectorImpl` 在较新版本中可见注册更新队列、不同的锁组织和平台 poller，类与字段都不是兼容接口；
 - JDK 21 虚拟线程让“一连接一阻塞任务”在部分场景重新具有吸引力，但 Selector 仍适合需要集中背压、协议状态机和明确事件线程所有权的系统；选择应基于负载、延迟、调试复杂度和依赖库，而不是版本口号。
 
