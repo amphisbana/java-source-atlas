@@ -8,8 +8,6 @@
 
 <TopicStudyPanel
   topic-id="openjdk8-java-util-hashmap"
-  design-insight="它把容量、哈希扰动、冲突结构和扩容迁移压缩进一套可演进的桶协议。"
-  focus-question="为什么扩容时不重新计算完整 hash，也能把节点稳定地拆到两个新桶？"
 />
 
 ## 从一次 put 看全局

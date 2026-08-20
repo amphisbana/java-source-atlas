@@ -5,6 +5,11 @@
   "title": "synchronized、ObjectMonitor 与 wait-notify 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "它把互斥、重入和条件等待放在同一个 monitor 协议中，并用完全释放后重新竞争保证 wait 的语义闭环。",
+  "focusQuestion": "notify 已经执行后，被通知线程为什么仍不能立刻从 wait 的下一行继续？",
+  "readingGoal": "能区分 owner、入口竞争集合和 WaitSet，并用条件循环处理伪唤醒、中断和超时。",
+  "recommendedNextTopicId": "openjdk8-java-util-concurrent-atomic-striped64",
+  "recommendedNextReason": "对比 monitor 的互斥路径与 CAS 的无锁更新路径，理解两种协作方式的边界。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.SynchronizedMonitorDebugLab",

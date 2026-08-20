@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 LinkedHashMap 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "它不重写 HashMap 的桶算法，而是用 before/after 链表和节点工厂、回调 Hook 叠加出顺序语义。",
+  "focusQuestion": "为什么 accessOrder=true 时，一次 get 也可能改变链表结构并触发迭代器失效？",
+  "readingGoal": "能区分桶内 next 与顺序链 before/after，并解释插入顺序、访问顺序和 LRU 淘汰的职责边界。",
+  "recommendedNextTopicId": "openjdk8-java-util-treemap",
+  "recommendedNextReason": "对比哈希表提供的近似常数查找与红黑树提供的稳定有序导航。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.collection.LinkedHashMapDebugLab",

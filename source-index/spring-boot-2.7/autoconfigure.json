@@ -5,6 +5,9 @@
   "title": "Spring Boot 2.7 自动装配源码解析",
   "primaryVersion": "Spring Boot 2.7.18",
   "sourceRef": "v2.7.18",
+  "designInsight": "Boot 把候选配置发现、条件过滤、属性绑定和 BeanDefinition 注册接到 Spring IOC，而不是另造一套容器。",
+  "focusQuestion": "一个自动配置候选要经过哪些条件，才会从 classpath 上的资源变成真正生效的 Bean？",
+  "readingGoal": "能沿 SpringApplication.run、EnableAutoConfiguration 导入、条件评估、配置绑定和 refresh 解释自动装配决策。",
   "lab": {
     "module": "labs/spring-boot-lab",
     "mainClass": "io.github.javasourceatlas.spring.boot.autoconfigure.SpringBootAutoConfigurationDebugLab",

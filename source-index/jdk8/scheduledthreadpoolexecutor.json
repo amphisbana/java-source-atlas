@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 ScheduledThreadPoolExecutor 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "它没有让每个任务自己 sleep，而是把触发时间编码进 RunnableScheduledFuture，并交给延迟堆统一决定谁到期、谁等待。",
+  "focusQuestion": "周期任务为什么要在本轮正常完成后重新计算时间并入队，而不是复制一个新 Future？",
+  "readingGoal": "能沿 schedule、DelayedWorkQueue、getTask 和周期重排解释延迟、固定速率、取消和异常终止。",
+  "recommendedNextTopicId": "openjdk8-java-util-concurrent-completablefuture",
+  "recommendedNextReason": "从时间驱动的任务调度进入依赖图驱动的异步组合。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ScheduledThreadPoolExecutorDebugLab",

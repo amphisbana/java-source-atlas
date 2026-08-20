@@ -4,6 +4,8 @@
 
 读完候选发现与条件装配后，进入 [Boot 怎样进入 refresh](/spring/deep-dive/startup-refresh)，把 `SpringApplication.run`、配置类解析、基础设施后处理器和业务单例创建连成一条启动调用链。
 
+<TopicStudyPanel topic-id="spring-boot-2-7-autoconfiguration" />
+
 ## 一句话理解自动装配
 
 自动装配不是“把某个包里的类全部扫描成 Bean”，而是：

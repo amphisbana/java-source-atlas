@@ -5,6 +5,11 @@
   "title": "Spring Framework 5.3 IOC 源码解析",
   "primaryVersion": "Spring Framework 5.3.39",
   "sourceRef": "v5.3.39",
+  "designInsight": "Spring 没有把对象创建写成一个巨型工厂，而是用定义、模板方法、后处理器和缓存把变化点层层打开。",
+  "focusQuestion": "为什么一个 Bean 要经过定义解析、实例化、填充、初始化和缓存迁移这么多阶段？",
+  "readingGoal": "能从 refresh 进入 getBean 和 doCreateBean，并解释后处理器、三级缓存与生命周期回调的职责边界。",
+  "recommendedNextTopicId": "spring-framework-5-3-aop",
+  "recommendedNextReason": "观察 Bean 生命周期中的代理创建如何改变对象身份。",
   "lab": {
     "module": "labs/spring-framework-lab",
     "mainClass": "io.github.javasourceatlas.spring.ioc.SpringIocDebugLab",

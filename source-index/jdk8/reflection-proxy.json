@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 Reflection 与 JDK Dynamic Proxy 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "Reflection 用 Method 元数据和 accessor 延迟执行调用，Dynamic Proxy 则通过 WeakCache、代理类生成和 InvocationHandler 把接口调用统一分派。",
+  "focusQuestion": "反射调用的 accessor inflation 和动态代理的代理类缓存，分别在解决什么性能与复用问题？",
+  "readingGoal": "能沿 Method.invoke、accessor 获取、ProxyClassFactory 和 handler.invoke 解释一次运行时调用。",
+  "recommendedNextTopicId": "spring-framework-5-3-ioc",
+  "recommendedNextReason": "把 JDK 动态代理的运行时分派连接到 Spring Bean 创建和代理扩展点。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.runtime.ReflectionProxyDebugLab",

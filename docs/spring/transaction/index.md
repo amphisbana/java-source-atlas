@@ -4,6 +4,8 @@
 
 完成单独事务主线后，沿 [MVC 请求怎样进入事务代理](/spring/deep-dive/request-transaction) 跟踪 Controller 到 Service proxy，再用 [异常、传播与清理边界](/spring/deep-dive/failure-boundaries) 区分事务完成、资源解绑和 HTTP 异常解析的先后。
 
+<TopicStudyPanel topic-id="spring-framework-5-3-transaction" />
+
 ## 先给出一句话结论
 
 `@Transactional` 不是“看到注解就自动开启数据库事务”。它只提供元数据；真正的运行链是：

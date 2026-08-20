@@ -4,6 +4,8 @@ Java 内存模型（Java Memory Model，JMM）不描述某一颗 CPU 的缓存�
 
 本专题以 **Java Language Specification 8 第 17 章**和 OpenJDK `jdk8u412-b08` 为主基线，并用 JDK 17/21 的 `VarHandle` 解释后续版本如何把不同内存顺序变成公开 API。读源码时要把规范保证、Java 类库实现和 HotSpot/JIT 的平台实现分开。
 
+<TopicStudyPanel topic-id="openjdk8-jmm-volatile-final" />
+
 ## 为什么要先学这一层
 
 本站已有并发类都在依赖 JMM，但它们解决的问题不同：

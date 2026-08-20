@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 CompletableFuture 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "它把结果、Completion 栈和依赖传播拆开，使同一个阶段既能同步完成，也能在完成后按图触发后续动作。",
+  "focusQuestion": "thenCompose、thenCombine 和 allOf 分别如何改变依赖图，异常又沿哪条边传播？",
+  "readingGoal": "能沿 complete、postComplete、uniApply、biApply 和异常包装复述一条异步链的完成传播。",
+  "recommendedNextTopicId": "openjdk8-java-util-concurrent-forkjoinpool",
+  "recommendedNextReason": "理解异步阶段默认执行器背后的工作窃取与任务分治机制。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.CompletableFutureDebugLab",

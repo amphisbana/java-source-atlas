@@ -5,6 +5,11 @@
   "title": "Spring Framework 5.3 声明式事务源码解析",
   "primaryVersion": "Spring Framework 5.3.39",
   "sourceRef": "v5.3.39",
+  "designInsight": "事务拦截器把注解元数据、传播行为、线程资源绑定和提交回滚统一到 PlatformTransactionManager 模板中。",
+  "focusQuestion": "REQUIRES_NEW 为什么必须挂起外层资源，异常又如何分别影响当前事务和全局回滚标记？",
+  "readingGoal": "能沿 TransactionInterceptor、getTransaction、invocation.proceed、commit/rollback 和 cleanup 画出事务边界。",
+  "recommendedNextTopicId": "spring-framework-5-3-mvc",
+  "recommendedNextReason": "把事务代理放回真实请求链，观察 MVC Controller 如何进入 Service 事务边界。",
   "lab": {
     "module": "labs/spring-framework-lab",
     "mainClass": "io.github.javasourceatlas.spring.transaction.SpringTransactionDebugLab",

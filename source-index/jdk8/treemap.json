@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 TreeMap 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "它用 Comparator 定义键序，再用旋转与重着色限制红黑树高度，让有序查询、范围视图和更新共享一棵结构。",
+  "focusQuestion": "红黑树的颜色约束如何阻止递增插入退化成链表？",
+  "readingGoal": "能沿 put、fixAfterInsertion、旋转和导航视图解释有序映射的结构不变量。",
+  "recommendedNextTopicId": "openjdk8-jmm-volatile-final",
+  "recommendedNextReason": "从集合结构转入并发源码前，先建立可见性、有序性和安全发布的判断标准。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.collection.TreeMapDebugLab",

@@ -4,6 +4,8 @@
 
 本专题以 OpenJDK 8u 为主基线。JDK 17/21 延续了七个内部状态、`runner` 执行权、WaitNode Treiber 栈和完成清理协议，但原子字段访问已从 `sun.misc.Unsafe` 迁移到 `VarHandle`，定时等待的局部实现也经过调整。文中会把公开契约和版本相关私有实现分开说明。
 
+<TopicStudyPanel topic-id="openjdk8-java-util-concurrent-futuretask" />
+
 ## 源码入口
 
 | 类型 | OpenJDK 8u 源文件 | 本专题关注入口 |

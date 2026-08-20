@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 FutureTask 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "它用一个状态机把 Runnable 执行权、结果发布、等待者 Treiber 栈和取消中断连接起来，让执行器与调用者共享同一对象。",
+  "focusQuestion": "cancel(true) 成功为什么不代表任务代码已经停止，INTERRUPTING 又为什么必须过渡到 INTERRUPTED？",
+  "readingGoal": "能画出正常、异常和取消三条终态路径，并指出 get 如何注册等待节点、park 和被唤醒。",
+  "recommendedNextTopicId": "openjdk8-java-util-concurrent-scheduledthreadpoolexecutor",
+  "recommendedNextReason": "观察周期任务如何复用 FutureTask 的 runAndReset，在每轮成功后重新进入延迟队列。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.FutureTaskDebugLab",

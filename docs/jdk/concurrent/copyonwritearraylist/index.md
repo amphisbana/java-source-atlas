@@ -4,6 +4,8 @@
 
 本专题以 OpenJDK 8u 的 `java.util.concurrent.CopyOnWriteArrayList` 为主基线，并单独说明 JDK 17/21 的锁实现变化。稳定契约来自公开 API，`lock` 类型和批量操作的内部算法属于版本相关实现。
 
+<TopicStudyPanel topic-id="openjdk8-java-util-concurrent-copyonwritearraylist" />
+
 ## 先建立三条不变量
 
 1. `array` 指向一份发布后不再原位修改的 `Object[]`。

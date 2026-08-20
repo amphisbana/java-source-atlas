@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 ClassLoader 与 ServiceLoader 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "ClassLoader 把双亲委派、命名空间和定义校验组合成类型身份边界，ServiceLoader 再用配置文件把接口与实现解耦成可插拔发现流程。",
+  "focusQuestion": "为什么同一个二进制类名由不同 ClassLoader 加载后，仍然不是同一个 Java 类型？",
+  "readingGoal": "能沿 loadClass、findClass、defineClass 和 ServiceLoader LazyIterator 解释委派、定义、资源查找与 provider 实例化。",
+  "recommendedNextTopicId": "openjdk8-reflection-dynamic-proxy",
+  "recommendedNextReason": "继续观察类已经加载后，Reflection 和 JDK Dynamic Proxy 如何在运行时读取与生成类型。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.runtime.ClassLoaderServiceLoaderDebugLab",

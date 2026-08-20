@@ -4,6 +4,8 @@
 
 本专题以 OpenJDK 8u 为主基线，同时标出 JDK 17/21 的实现边界。`ArrayBlockingQueue`、`LinkedBlockingQueue` 和 `SynchronousQueue` 都实现同一接口，但存储结构、锁粒度以及“容量”的含义完全不同。
 
+<TopicStudyPanel topic-id="openjdk8-java-util-concurrent-blockingqueue" />
+
 ## 源码入口
 
 | 类型 | OpenJDK 8u 源文件 | 本专题关注入口 |

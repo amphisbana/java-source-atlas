@@ -6,6 +6,8 @@
 
 [打开 JDK 8 / 17 / 21 版本对比 →](/jdk/version-comparison/)，可并排查看弱引用身份判断、载体线程内部入口和虚拟线程诊断支持。
 
+<TopicStudyPanel topic-id="openjdk8-java-lang-threadlocal" />
+
 ## 源码入口
 
 | 类型 | OpenJDK 8u 源文件 | 本专题关注入口 |

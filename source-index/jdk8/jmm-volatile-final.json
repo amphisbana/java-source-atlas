@@ -5,6 +5,11 @@
   "title": "JMM、volatile、final 与 VarHandle 内存语义",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "JMM 不规定某台机器的缓存实现，而是用 happens-before 和发布规则把并发程序允许观察到的结果约束成可推理的契约。",
+  "focusQuestion": "为什么 volatile 能保证可见性和顺序，却不能让 count++ 这样的复合操作原子？",
+  "readingGoal": "能画出 start、join、volatile、final 和 monitor 的 happens-before 边界，并识别仍存在的数据竞争。",
+  "recommendedNextTopicId": "openjdk8-synchronized-objectmonitor",
+  "recommendedNextReason": "把内存模型中的 monitor 语义落到字节码、重入和 wait-notify 的具体执行路径。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.JmmVolatileDebugLab",

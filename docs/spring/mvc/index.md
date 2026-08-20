@@ -4,6 +4,8 @@
 
 完成 MVC 内部策略链后，进入 [MVC 请求怎样进入事务代理](/spring/deep-dive/request-transaction) 继续跟到 Service、DAO 和线程资源；异常路径则在 [异常、传播与清理边界](/spring/deep-dive/failure-boundaries) 中收口。
 
+<TopicStudyPanel topic-id="spring-framework-5-3-mvc" />
+
 ## 源码入口
 
 - 前端控制器：`DispatcherServlet.doService(...)` / `doDispatch(...)`

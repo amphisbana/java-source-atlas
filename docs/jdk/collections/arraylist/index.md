@@ -4,6 +4,8 @@
 
 本专题以 OpenJDK 8 为主基线，并单独说明 JDK 17/21 在扩容辅助方法和局部代码组织上的变化。
 
+<TopicStudyPanel topic-id="openjdk8-java-util-arraylist" />
+
 ## 类型与核心字段
 
 ```text
@@ -96,4 +98,3 @@ minCapacity - elementData.length > 0
 | 非线程安全 | `ConcurrentModificationException` 一定能发现所有并发修改 |
 
 下一步阅读 [扩容、删除与视图](./mutation.md)，观察数组增长和元素搬移。
-

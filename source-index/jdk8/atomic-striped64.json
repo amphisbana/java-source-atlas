@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 AtomicInteger、LongAdder 与 Striped64 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "它先用单点 CAS 提供明确的原子更新，再在竞争升高时把写入分散到 Cell，体现了以空间换并发吞吐的取舍。",
+  "focusQuestion": "LongAdder 为什么能缓解热点竞争，却不能把 sum 当作并发时刻的精确快照？",
+  "readingGoal": "能解释 CAS 重试、base/cells 分流、线程 probe 和 Cell 扩容之间的状态机关系。",
+  "recommendedNextTopicId": "openjdk8-thread-locksupport",
+  "recommendedNextReason": "继续向下阅读线程启动、中断和 park/unpark，理解并发工具最终如何阻塞和唤醒线程。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.AtomicDebugLab",

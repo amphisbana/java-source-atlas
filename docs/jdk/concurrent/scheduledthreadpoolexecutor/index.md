@@ -4,6 +4,8 @@
 
 本文以 **OpenJDK 8u** 为源码基线。对应源码为 `java.util.concurrent.ScheduledThreadPoolExecutor`，路径是 `jdk/src/share/classes/java/util/concurrent/ScheduledThreadPoolExecutor.java`。
 
+<TopicStudyPanel topic-id="openjdk8-java-util-concurrent-scheduledthreadpoolexecutor" />
+
 ## 它与普通线程池的结构差异
 
 构造器最终固定传给父类一组特殊参数：

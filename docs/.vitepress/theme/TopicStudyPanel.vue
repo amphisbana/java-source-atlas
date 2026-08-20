@@ -17,8 +17,6 @@ import {
 
 interface TopicStudyPanelProps {
   topicId: string
-  designInsight: string
-  focusQuestion: string
 }
 
 type ProgressField = 'readMain' | 'ranLab'
@@ -30,6 +28,36 @@ const progress = ref<TopicProgress>({ readMain: false, ranLab: false, updatedAt:
  * 根据索引编号找到当前专题；索引缺失时保留空值，让文档正文仍可正常渲染。
  */
 const topic = computed<SourceTopic | undefined>(() => sourceTopics.find((item) => item.topicId === props.topicId))
+
+/**
+ * 读取索引中的设计亮点；旧专题尚未补齐时使用可理解的过渡文案。
+ */
+const designInsight = computed(() => topic.value?.designInsight ?? '从公开契约进入关键状态，再用源码不变量解释每个分支。')
+
+/**
+ * 读取索引中的重点问题，让每个专题都以一个可验证的问题收口。
+ */
+const focusQuestion = computed(() => topic.value?.focusQuestion ?? '这段实现解决了什么问题，又牺牲了什么？')
+
+/**
+ * 读取索引中的完成标准，提示读者从“看过”走向“能复述”。
+ */
+const readingGoal = computed(() => topic.value?.readingGoal ?? '能够沿入口、关键状态和边界分支复述一次完整执行路径。')
+
+/**
+ * 根据索引中的专题编号找到下一站，避免推荐关系退化为不可点击的自由文本。
+ */
+const recommendedNextTopic = computed(() => {
+  const nextTopicId = topic.value?.recommendedNextTopicId
+  return nextTopicId === undefined
+    ? undefined
+    : sourceTopics.find((item) => item.topicId === nextTopicId)
+})
+
+/**
+ * 读取下一站的推荐理由；未建立关系的旧专题仍保留明确的学习提示。
+ */
+const recommendedNextReason = computed(() => topic.value?.recommendedNextReason ?? '回到学习路线，选择一个前置或相邻专题继续。')
 
 /**
  * 只展示最值得先跟踪的两个入口，避免面板变成专题正文的重复目录。
@@ -111,6 +139,7 @@ function formatUpdatedAt(value: string): string {
       <span>这份源码的精妙之处</span>
       <strong>{{ designInsight }}</strong>
       <p>阅读时先回答：{{ focusQuestion }}</p>
+      <p>完成标准：{{ readingGoal }}</p>
     </div>
 
     <div class="topic-study-panel__grid">
@@ -174,6 +203,10 @@ function formatUpdatedAt(value: string): string {
           <span>我已运行并理解 Lab</span>
         </label>
         <small v-if="progress.updatedAt">{{ formatUpdatedAt(progress.updatedAt) }}</small>
+        <small v-if="recommendedNextTopic">
+          下一步：<a :href="withBase(topicHomeUrl(recommendedNextTopic))">{{ recommendedNextTopic.title }}</a>；{{ recommendedNextReason }}
+        </small>
+        <small v-else>下一步：{{ recommendedNextReason }}</small>
       </div>
       <div class="topic-study-panel__actions">
         <a class="topic-study-panel__button topic-study-panel__button--primary" :href="withBase(topicLabUrl(topic))">

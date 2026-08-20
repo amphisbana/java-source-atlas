@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 ByteBuffer 与 Selector 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "ByteBuffer 用 position、limit、capacity 三个游标表达读写窗口，Selector 再把多个通道的就绪事件汇聚成一次可消费的键集合。",
+  "focusQuestion": "为什么 flip 不是把数据复制到新数组，而只是重新定义 position、limit 和读写方向？",
+  "readingGoal": "能画出 write/flip/read/compact 的状态变化，并解释 Selector 注册、select 和 SelectionKey 就绪位。",
+  "recommendedNextTopicId": "openjdk8-classloader-serviceloader",
+  "recommendedNextReason": "从底层 I/O 状态切换到运行时类型发现，继续阅读 JDK 如何延迟解析和装配实现。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.nio.NioBufferSelectorDebugLab",

@@ -11,6 +11,8 @@
 
 ForkJoinPool 不是“换一种线程池就自动更快”。只有任务可拆分、子任务足够独立、粒度合适且阻塞较少时，工作窃取才容易发挥优势。
 
+<TopicStudyPanel topic-id="openjdk8-java-util-concurrent-forkjoinpool" />
+
 ## 四个核心角色
 
 | 角色 | 职责 | 源码观察点 |

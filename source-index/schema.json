@@ -10,6 +10,11 @@
     "title": { "type": "string", "minLength": 1 },
     "primaryVersion": { "type": "string", "minLength": 1 },
     "sourceRef": { "type": "string", "minLength": 1 },
+    "designInsight": { "type": "string", "minLength": 1 },
+    "focusQuestion": { "type": "string", "minLength": 1 },
+    "readingGoal": { "type": "string", "minLength": 1 },
+    "recommendedNextTopicId": { "type": "string", "minLength": 1 },
+    "recommendedNextReason": { "type": "string", "minLength": 1 },
     "compatibleVersions": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 },

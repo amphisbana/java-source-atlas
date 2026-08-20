@@ -6,6 +6,8 @@ ClassLoader 解决“某个二进制名由谁找到、定义并形成 JVM 类型
 
 [打开 JDK 8 / 17 / 21 版本对比 →](/jdk/version-comparison/)，可并排核对模块感知加载入口、命名类加载器、Provider Stream、ModuleLayer 与平台类加载器变化。
 
+<TopicStudyPanel topic-id="openjdk8-classloader-serviceloader" />
+
 ## 源码入口
 
 | 类型 | OpenJDK 8u 源文件 | 本专题关注入口 |

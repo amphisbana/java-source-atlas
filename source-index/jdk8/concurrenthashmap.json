@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 ConcurrentHashMap 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "它没有用一把大锁换取简单，而是让 CAS、桶首同步、特殊节点和协作扩容各自承担清晰职责。",
+  "focusQuestion": "同一时刻读、写、扩容都可能发生时，为什么每条路径都能找到自己的安全边界？",
+  "readingGoal": "能分场景说明空桶、普通桶、树桶和迁移桶分别由谁同步，并指出 get 与 put 的关键分流。",
+  "recommendedNextTopicId": "openjdk8-java-util-concurrent-copyonwritearraylist",
+  "recommendedNextReason": "从共享并发容器转向写时复制快照，比较不同读写负载下的一致性与成本。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentHashMapDebugLab",

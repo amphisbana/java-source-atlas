@@ -4,6 +4,8 @@
 
 本专题以 OpenJDK 8u 为主基线。JDK 17/21 延续“CAS 发布节点、CAS 清空 item、允许 head/tail 滞后”的核心协议，但原子访问工具、批量删除和内部清理策略已有调整；私有字段和循环分支不能当作跨版本 API。
 
+<TopicStudyPanel topic-id="openjdk8-java-util-concurrent-concurrentlinkedqueue" />
+
 ## 源码入口
 
 | 类型 | OpenJDK 8u 源文件 | 本专题关注入口 |

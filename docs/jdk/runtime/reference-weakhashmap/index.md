@@ -8,6 +8,8 @@
 2. GC 何时清除 `Reference.referent`，并把引用对象送入 `ReferenceQueue`；
 3. 容器或清理线程何时消费队列，真正解除 value、native handle 等资源。
 
+<TopicStudyPanel topic-id="openjdk8-reference-weakhashmap" />
+
 ## 源码地图
 
 | 类型 | 固定源码 | 本专题关注点 |
@@ -117,4 +119,3 @@ GC 只负责到“清除 referent、安排入队”附近。如何处理队列�
 4. `null` key 为什么不会像普通 key 一样自动消失？
 5. PhantomReference 的 `get()` 永远为 null，清理线程靠什么知道要释放哪个资源？
 6. 为什么自动测试不能把“调用一次 `System.gc()` 后必须清除”当公开契约？
-

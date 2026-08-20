@@ -12,6 +12,8 @@
 
 本站以 OpenJDK `jdk8u412-b08` 为实现基线。动画中的 `_owner / _recursions / _EntryList / _WaitSet` 用来读懂这份 HotSpot 源码；Java 程序正确性只应依赖前两层保证。
 
+<TopicStudyPanel topic-id="openjdk8-synchronized-objectmonitor" />
+
 ## 先分清三种“没有继续执行”
 
 | 线程状态 | 正在等待什么 | 是否持有目标 monitor | 如何恢复 |

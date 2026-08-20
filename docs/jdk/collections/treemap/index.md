@@ -14,6 +14,8 @@
 3. 阅读 [导航查询与范围视图](./navigation-view.md)。
 4. 最后按 [断点实验手册](./debug-lab.md) 进入本机 JDK 源码。
 
+<TopicStudyPanel topic-id="openjdk8-java-util-treemap" />
+
 ## 类型关系与核心字段
 
 ```text

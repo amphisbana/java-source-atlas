@@ -4,6 +4,8 @@
 
 本专题以 OpenJDK 8u 为主基线。阅读前建议先掌握 [HashMap 的数据结构](../hashmap/data-structure.md) 和 [`putVal` 主流程](../hashmap/put.md)，因为 `LinkedHashMap` 没有重写整套哈希算法，而是通过 `HashMap` 预留的节点工厂和回调 Hook 接入。
 
+<TopicStudyPanel topic-id="openjdk8-java-util-linkedhashmap" />
+
 ## 先建立正确的结构模型
 
 同一个映射节点同时位于两套结构中：

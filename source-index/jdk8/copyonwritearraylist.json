@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 CopyOnWriteArrayList 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "它用写时复制和 volatile 发布把读路径变成快照读取，让读线程不加锁，但把写成本集中到复制整份数组。",
+  "focusQuestion": "为什么旧迭代器不会抛 ConcurrentModificationException，却可能永远看不到新写入的元素？",
+  "readingGoal": "能解释 get 的快照、add 的复制发布和迭代器视图，并判断读多写少场景是否值得付出空间成本。",
+  "recommendedNextTopicId": "openjdk8-java-util-concurrent-blockingqueue",
+  "recommendedNextReason": "从快照式共享容器转向有界任务通道，观察锁与条件等待如何形成背压。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.CopyOnWriteArrayListDebugLab",

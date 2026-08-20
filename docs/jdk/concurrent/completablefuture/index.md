@@ -6,6 +6,8 @@
 
 [打开 JDK 8 / 17 / 21 版本对比 →](/jdk/version-comparison/)，可逐项核对超时与失败工厂、异常组合、非阻塞结果读取以及内部原子访问方式。
 
+<TopicStudyPanel topic-id="openjdk8-java-util-concurrent-completablefuture" />
+
 ## 两个核心字段
 
 | 字段 | 未完成时 | 完成后 | 作用 |

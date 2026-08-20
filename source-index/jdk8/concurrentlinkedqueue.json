@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 ConcurrentLinkedQueue 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "它允许 head、tail 暂时滞后，用 CAS 发布 next、清空 item 和自链接恢复维护链表可达性，以较少同步换取并发吞吐。",
+  "focusQuestion": "tail 为什么可以落后，旧 head 指向自己又如何帮助遍历恢复？",
+  "readingGoal": "能标出 offer、poll 的线性化点，并解释逻辑删除、弱一致迭代和 size 近似统计。",
+  "recommendedNextTopicId": "openjdk8-java-util-concurrent-threadpoolexecutor",
+  "recommendedNextReason": "把无锁队列放回任务执行场景，观察线程池如何在入队、扩线程和拒绝之间做决策。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentLinkedQueueDebugLab",

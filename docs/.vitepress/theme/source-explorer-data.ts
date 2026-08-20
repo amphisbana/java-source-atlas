@@ -25,6 +25,11 @@ export interface SourceTopic {
   title: string
   primaryVersion: string
   compatibleVersions: string[]
+  designInsight?: string
+  focusQuestion?: string
+  readingGoal?: string
+  recommendedNextTopicId?: string
+  recommendedNextReason?: string
   platform: SourcePlatform
   platformLabel: string
   repository: string
@@ -53,6 +58,11 @@ interface RawSourceTopic {
   title: string
   primaryVersion: string
   sourceRef: string
+  designInsight?: string
+  focusQuestion?: string
+  readingGoal?: string
+  recommendedNextTopicId?: string
+  recommendedNextReason?: string
   compatibleVersions?: string[]
   source: SourceLocation & { repository: string }
   relatedSources?: SourceLocation[]
@@ -120,6 +130,11 @@ function normalizeTopic(modulePath: string, rawTopic: RawSourceTopic): SourceTop
     title: rawTopic.title,
     primaryVersion: rawTopic.primaryVersion,
     compatibleVersions: rawTopic.compatibleVersions ?? [],
+    designInsight: rawTopic.designInsight,
+    focusQuestion: rawTopic.focusQuestion,
+    readingGoal: rawTopic.readingGoal,
+    recommendedNextTopicId: rawTopic.recommendedNextTopicId,
+    recommendedNextReason: rawTopic.recommendedNextReason,
     platform: platformMetadata.platform,
     platformLabel: platformMetadata.platformLabel,
     repository: repository.replace(/\/$/, ''),

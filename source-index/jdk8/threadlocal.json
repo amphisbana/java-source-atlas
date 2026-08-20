@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 ThreadLocal 与 ThreadLocalMap 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "它把数据所有权放在线程而不是 ThreadLocal 对象上，用弱 key、开放寻址和惰性清理换取线程隔离与低查找开销。",
+  "focusQuestion": "ThreadLocalMap 的 key 已被回收后，value 为什么仍可能在线程池中长期存活？",
+  "readingGoal": "能沿 get、set、replaceStaleEntry 和 expungeStaleEntry 解释碰撞探测、过期清理与 finally remove 的关系。",
+  "recommendedNextTopicId": "openjdk8-java-util-concurrent-concurrenthashmap",
+  "recommendedNextReason": "把线程私有的数据结构与并发共享容器对照起来，理解无锁读取、桶锁和协作扩容。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLocalDebugLab",

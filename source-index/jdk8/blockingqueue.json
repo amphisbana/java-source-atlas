@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 BlockingQueue、ArrayBlockingQueue、LinkedBlockingQueue 与 SynchronousQueue 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "它把满与空这两个边界条件抽象成生产者、消费者可以等待或限时等待的协议，并让不同队列用不同锁粒度实现同一契约。",
+  "focusQuestion": "LinkedBlockingQueue 为什么需要原子 count，put 和 take 又怎样跨两把锁完成必要通知？",
+  "readingGoal": "能比较 ArrayBlockingQueue、LinkedBlockingQueue 和 SynchronousQueue 的容量、锁和交接语义。",
+  "recommendedNextTopicId": "openjdk8-java-util-concurrent-concurrentlinkedqueue",
+  "recommendedNextReason": "从可阻塞的条件协作转向无锁队列，区分线程安全与等待语义。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.BlockingQueueDebugLab",

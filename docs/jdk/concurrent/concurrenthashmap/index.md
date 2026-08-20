@@ -6,8 +6,6 @@
 
 <TopicStudyPanel
   topic-id="openjdk8-java-util-concurrent-concurrenthashmap"
-  design-insight="它没有用一把大锁换取简单，而是让 CAS、桶首同步、特殊节点和协作扩容各自承担清晰职责。"
-  focus-question="同一时刻读、写、扩容都可能发生时，为什么每条路径都能找到自己的安全边界？"
 />
 
 ## 核心结构

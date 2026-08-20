@@ -4,6 +4,8 @@ Java Stream 不是保存元素的新集合，而是围绕一个数据源组装�
 
 本专题以 OpenJDK 8u 为主基线。JDK 17/21 延续 `AbstractPipeline + Sink + Spliterator + ForkJoinTask` 的核心架构，但公开 API、大小优化和部分内部任务实现已有变化；不要把 JDK 8 的私有类签名当成跨版本接口。
 
+<TopicStudyPanel topic-id="openjdk8-java-util-stream-spliterator" />
+
 ## 源码入口
 
 | 类型 | OpenJDK 8u 源文件 | 本专题关注入口 |

@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 ArrayList 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "它把逻辑 size 与物理容量分开，通过延迟分配、按需扩容和批量 arraycopy 把连续数组变成可变长列表。",
+  "focusQuestion": "为什么一次 add 不能只看 size，还要先判断 elementData 的容量和默认空数组？",
+  "readingGoal": "能沿 add、grow、remove 和迭代器复述数组扩容、元素搬移与 fail-fast 的边界。",
+  "recommendedNextTopicId": "openjdk8-java-util-hashmap",
+  "recommendedNextReason": "从连续数组进入哈希桶，继续观察容量与结构转换如何共同决定性能。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.collection.ArrayListDebugLab",

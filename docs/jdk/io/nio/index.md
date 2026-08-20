@@ -9,6 +9,8 @@ Java NIO 最容易被两个表象误导：`ByteBuffer` 看起来只是带游标�
 
 本专题以 **OpenJDK 8u** 为源码基线，讲清公开契约和 8u 的典型实现。JDK 17/21 仍保持 Buffer 四指标、SelectionKey 三个集合和非阻塞 Channel 的核心语义，但 `sun.nio.ch` 中的 provider、轮询器、唤醒管道、更新队列与内部字段都可能随平台和版本变化，不能把它们当成业务代码可依赖的 API。
 
+<TopicStudyPanel topic-id="openjdk8-bytebuffer-selector" />
+
 ## 源码入口
 
 | 层次 | OpenJDK 8u 源文件 | 本专题关注入口 |

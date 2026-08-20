@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 AQS 与 ReentrantLock 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "AQS 不定义具体业务锁，而是把 state、FIFO 等待队列、独占/共享模板和 park/unpark 拆成可复用的同步骨架。",
+  "focusQuestion": "Condition.signal 为什么不能直接让线程继续，而要先把节点转移到同步队列？",
+  "readingGoal": "能沿 acquire、addWaiter、acquireQueued 和 release 画出节点竞争、阻塞、唤醒与重新获取的路径。",
+  "recommendedNextTopicId": "openjdk8-reference-weakhashmap",
+  "recommendedNextReason": "从线程协作转入对象生命周期，区分 GC 清除、引用入队和容器清理三个时间点。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.lock.ReentrantLockDebugLab",

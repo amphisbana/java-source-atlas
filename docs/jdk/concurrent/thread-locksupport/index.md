@@ -4,6 +4,8 @@
 
 本专题以 OpenJDK 8u 为源码基线，并单独标注 JDK 17/21 的实现边界。`Thread.start()`、中断、六种 `Thread.State` 和一位 permit 是跨版本公开语义；`threadStatus`、`start0`、`parkBlocker` 字段名以及 Unsafe 调用方式属于私有实现，业务代码不能依赖。
 
+<TopicStudyPanel topic-id="openjdk8-thread-locksupport" />
+
 ## 源码入口
 
 | 类型 | OpenJDK 8u 源文件 | 本专题关注入口 |
@@ -122,4 +124,3 @@ permit 不是锁的所有权，也不是消息队列，更不是计数信号量�
 | 六种 `Thread.State` | 六个公开枚举值 | 六个公开枚举值 | 仍是六个公开枚举值，不新增“VIRTUAL”状态 |
 
 JDK 21 的虚拟线程改变的是调度与承载方式，不改变“一次 start”“中断是协作请求”“park 必须循环检查条件”等核心规则。虚拟线程在可卸载点 park 时通常不占住 carrier；在 native、外部函数或某些 monitor 场景被固定时，表现与成本会不同。不要把 JDK 8 的“一条 Thread 通常对应一条 OS 线程”直接套到虚拟线程上。
-

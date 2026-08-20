@@ -9,6 +9,8 @@
 
 完成代理创建主线后，进入 [Bean、早期引用与最终代理](/spring/deep-dive/bean-proxy-cycle)，核对循环依赖场景为什么必须复用同一个早期代理；再沿 [MVC 请求怎样进入事务代理](/spring/deep-dive/request-transaction) 观察代理的真实调用者。
 
+<TopicStudyPanel topic-id="spring-framework-5-3-aop" />
+
 ## 源码入口
 
 - 自动代理模板：`AbstractAutoProxyCreator`

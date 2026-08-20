@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 Stream 与 Spliterator 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "Stream 把数据遍历、操作融合、短路和并行拆分分成可组合阶段，让同一条声明式流水线延迟到终端操作才真正执行。",
+  "focusQuestion": "为什么中间操作可以只记录 Sink 链，直到终端操作才逐元素驱动整条流水线？",
+  "readingGoal": "能沿 pipeline、Sink、tryAdvance 和 trySplit 解释顺序执行、短路和并行分区的差异。",
+  "recommendedNextTopicId": "openjdk8-bytebuffer-selector",
+  "recommendedNextReason": "从内存中的数据流水线转入 NIO 的缓冲区状态和事件驱动读取。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.stream.StreamSpliteratorDebugLab",

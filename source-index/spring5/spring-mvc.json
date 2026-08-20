@@ -5,6 +5,11 @@
   "title": "Spring Framework 5.3 MVC 源码解析",
   "primaryVersion": "Spring Framework 5.3.39",
   "sourceRef": "v5.3.39",
+  "designInsight": "DispatcherServlet 用映射器、适配器、参数解析、返回值处理和异常解析组成策略链，把一次请求拆成可替换的协作阶段。",
+  "focusQuestion": "为什么找到 HandlerMethod 后还要经过 HandlerAdapter，而不是直接反射调用 Controller 方法？",
+  "readingGoal": "能沿 doDispatch、HandlerMapping、HandlerAdapter、参数/返回值处理和异常解析复述一条请求链。",
+  "recommendedNextTopicId": "spring-boot-2-7-autoconfiguration",
+  "recommendedNextReason": "继续阅读 Boot 自动装配如何准备 MVC 所需的上下文、处理器和默认基础设施。",
   "lab": {
     "module": "labs/spring-framework-lab",
     "mainClass": "io.github.javasourceatlas.spring.mvc.SpringMvcDebugLab",

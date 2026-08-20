@@ -4,6 +4,8 @@ Reflection 解决的是“运行时才知道要读哪个类型、调用哪个成
 
 本专题以 OpenJDK 8u 为主基线。JDK 8 的 `Method.invoke` 默认采用 native accessor 到生成字节码 accessor 的 inflation 策略，动态代理采用 `WeakCache + ProxyClassFactory + ProxyGenerator`。JDK 17 已加入模块边界但反射执行器仍保留旧架构；JDK 21 的核心反射默认改为 MethodHandle accessor，不能再用“第 16 次切换生成 accessor”解释现代 JDK 的主路径。
 
+<TopicStudyPanel topic-id="openjdk8-reflection-dynamic-proxy" />
+
 ## 源码入口
 
 | 类型 | OpenJDK 8u 源文件 | 本专题关注入口 |

@@ -317,6 +317,53 @@ function validateUniqueTopicId(document, indexFile, topicOwners, failures) {
 }
 
 /**
+ * 校验下一专题关系的字段是否成对出现，并收集待解析的目标编号。
+ * 目标是否存在要等全部索引登记完成后再判断，避免依赖文件扫描顺序。
+ *
+ * @param {unknown} document 当前索引文档
+ * @param {string} indexFile 当前索引文件
+ * @param {Array<{ topicId: string, indexFile: string, targetId: string }>} references 待解析关系
+ * @param {string[]} failures 错误收集器
+ */
+function collectRecommendedNextReference(document, indexFile, references, failures) {
+  if (document === null || typeof document !== 'object' || Array.isArray(document)) {
+    return
+  }
+
+  const targetId = document.recommendedNextTopicId
+  const reason = document.recommendedNextReason
+  const hasTarget = targetId !== undefined
+  const hasReason = reason !== undefined
+  const displayPath = relative(projectRoot, indexFile)
+
+  if (hasTarget !== hasReason) {
+    failures.push(`${displayPath} #/recommendedNextTopicId 与 #/recommendedNextReason 必须同时出现`)
+  }
+  if (hasTarget && typeof targetId === 'string' && targetId.trim() !== '') {
+    references.push({
+      topicId: typeof document.topicId === 'string' ? document.topicId : displayPath,
+      indexFile: displayPath,
+      targetId
+    })
+  }
+}
+
+/**
+ * 确认所有推荐目标都指向现有专题，防止页面出现失效的下一步链接。
+ *
+ * @param {Array<{ topicId: string, indexFile: string, targetId: string }>} references 待解析关系
+ * @param {Map<string, string>} topicOwners 已登记的专题编号与文件
+ * @param {string[]} failures 错误收集器
+ */
+function validateRecommendedNextTargets(references, topicOwners, failures) {
+  references.forEach(({ topicId, indexFile, targetId }) => {
+    if (!topicOwners.has(targetId)) {
+      failures.push(`${indexFile} #/recommendedNextTopicId: ${topicId} 指向不存在的专题 ${targetId}`)
+    }
+  })
+}
+
+/**
  * 校验入口和断点显式声明的源码类确实存在于专题源码清单中。
  * sourceClass 为 null 表示教学 Lab 方法，不参与远端源码定位。
  *
@@ -526,6 +573,7 @@ const indexFiles = (await collectJsonFiles(sourceIndexRoot))
   .filter((filePath) => filePath !== schemaPath && filePath !== baselinesPath)
 
 const topicOwners = new Map()
+const recommendedReferences = []
 
 if (indexFiles.length === 0) {
   failures.push('source-index: 至少需要一个专题索引')
@@ -536,6 +584,7 @@ for (const indexFile of indexFiles) {
   const errors = []
   validateValue(schema, document, '#', errors)
   validateUniqueTopicId(document, indexFile, topicOwners, failures)
+  collectRecommendedNextReference(document, indexFile, recommendedReferences, failures)
   validateSourceClassReferences(document, indexFile, failures)
   await validateLabMetadata(document, indexFile, failures)
   validateTopicBaseline(document, indexFile, repositoryRefs, failures)
@@ -545,6 +594,8 @@ for (const indexFile of indexFiles) {
     failures.push(...errors.map((error) => `${displayPath} ${error}`))
   }
 }
+
+validateRecommendedNextTargets(recommendedReferences, topicOwners, failures)
 
 const markdownFileCount = await validateMarkdownSourceLinks(repositoryRefs, failures)
 

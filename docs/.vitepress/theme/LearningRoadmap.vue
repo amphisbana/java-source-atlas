@@ -49,6 +49,8 @@ interface RoadmapStop extends RoadmapStopDefinition {
   entry: SourceEntryPoint
   breakpoint: SourceBreakpoint
   sourceUrl: string
+  nextTopic?: SourceTopic
+  nextReason?: string
 }
 
 interface RoadmapPhase extends Omit<RoadmapPhaseDefinition, 'stops'> {
@@ -411,51 +413,112 @@ const ROADMAP_PHASES: RoadmapPhaseDefinition[] = [
 ]
 
 /**
- * 将路线定义与源码索引合并，并在构建期检查重复、缺失和未覆盖专题。
+ * 从专题索引的推荐关系计算一条无重复路线，并检查根节点、断链和循环。
  *
- * 路线必须覆盖当前全部专题；新增索引却忘记安排学习顺序时，让文档构建立刻失败。
+ * 推荐关系是路线的单一事实来源；学习阶段只负责提供阶段说明和先修解释。
+ */
+function resolveRecommendedTopicOrder(topicById: Map<string, SourceTopic>): string[] {
+  const incomingTopicIds = new Set<string>()
+  const nextTopicById = new Map<string, string>()
+
+  for (const topic of topicById.values()) {
+    const nextTopicId = topic.recommendedNextTopicId
+    if (nextTopicId === undefined) {
+      continue
+    }
+    if (!topicById.has(nextTopicId)) {
+      throw new Error(`专题推荐目标不存在: ${topic.topicId} -> ${nextTopicId}`)
+    }
+    if (incomingTopicIds.has(nextTopicId)) {
+      throw new Error(`专题推荐目标有多个前驱: ${nextTopicId}`)
+    }
+    incomingTopicIds.add(nextTopicId)
+    nextTopicById.set(topic.topicId, nextTopicId)
+  }
+
+  const roots = [...topicById.values()].filter((topic) => !incomingTopicIds.has(topic.topicId))
+  if (roots.length !== 1) {
+    throw new Error(`学习路线必须只有一个根专题，当前找到 ${roots.length} 个`)
+  }
+
+  const orderedTopicIds: string[] = []
+  const visitedTopicIds = new Set<string>()
+  let currentTopicId: string | undefined = roots[0].topicId
+  while (currentTopicId !== undefined) {
+    if (visitedTopicIds.has(currentTopicId)) {
+      throw new Error(`专题推荐关系存在循环: ${currentTopicId}`)
+    }
+    visitedTopicIds.add(currentTopicId)
+    orderedTopicIds.push(currentTopicId)
+    currentTopicId = nextTopicById.get(currentTopicId)
+  }
+
+  if (orderedTopicIds.length !== topicById.size) {
+    const disconnectedTopicIds = [...topicById.keys()].filter((topicId) => !visitedTopicIds.has(topicId))
+    throw new Error(`专题推荐关系存在断开的专题: ${disconnectedTopicIds.join(', ')}`)
+  }
+  return orderedTopicIds
+}
+
+/**
+ * 将阶段说明与源码索引合并，并使用推荐关系决定专题顺序。
+ *
+ * 阶段必须覆盖当前全部专题；新增索引却未接入推荐链时，让文档构建立刻失败。
  */
 function resolveRoadmapPhases(): RoadmapPhase[] {
   const topicById = new Map(sourceTopics.map((topic) => [topic.topicId, topic]))
+  const orderedTopicIds = resolveRecommendedTopicOrder(topicById)
+  const routeOrder = new Map(orderedTopicIds.map((topicId, index) => [topicId, index]))
   const seenTopicIds = new Set<string>()
-  let order = 0
 
   const phases = ROADMAP_PHASES.map((phase): RoadmapPhase => ({
     ...phase,
-    stops: phase.stops.map((definition): RoadmapStop => {
-      if (seenTopicIds.has(definition.topicId)) {
-        throw new Error(`学习路线包含重复专题: ${definition.topicId}`)
-      }
+    stops: [...phase.stops]
+      .sort((left, right) => (routeOrder.get(left.topicId) ?? Number.MAX_SAFE_INTEGER)
+        - (routeOrder.get(right.topicId) ?? Number.MAX_SAFE_INTEGER))
+      .map((definition): RoadmapStop => {
+        if (seenTopicIds.has(definition.topicId)) {
+          throw new Error(`学习路线包含重复专题: ${definition.topicId}`)
+        }
 
-      const topic = topicById.get(definition.topicId)
-      if (topic === undefined) {
-        throw new Error(`学习路线找不到源码索引: ${definition.topicId}`)
-      }
-      const entry = topic.entryPoints[0]
-      const breakpoint = topic.breakpoints[0]
-      if (entry === undefined || breakpoint === undefined) {
-        throw new Error(`学习路线专题缺少源码入口或实验断点: ${definition.topicId}`)
-      }
+        const topic = topicById.get(definition.topicId)
+        if (topic === undefined) {
+          throw new Error(`学习路线找不到源码索引: ${definition.topicId}`)
+        }
+        const entry = topic.entryPoints[0]
+        const breakpoint = topic.breakpoints[0]
+        if (entry === undefined || breakpoint === undefined) {
+          throw new Error(`学习路线专题缺少源码入口或实验断点: ${definition.topicId}`)
+        }
 
-      const entrySource = findSourceForMethod(topic, entry.method, entry.sourceClass) ?? topic.source
-      seenTopicIds.add(definition.topicId)
-      order += 1
-      return {
-        ...definition,
-        order,
-        phaseId: phase.id,
-        phaseTitle: phase.title,
-        topic,
-        entry,
-        breakpoint,
-        sourceUrl: githubSourceUrl(topic, entrySource)
-      }
-    })
+        const entrySource = findSourceForMethod(topic, entry.method, entry.sourceClass) ?? topic.source
+        seenTopicIds.add(definition.topicId)
+        const nextTopic = topic.recommendedNextTopicId === undefined
+          ? undefined
+          : topicById.get(topic.recommendedNextTopicId)
+        return {
+          ...definition,
+          order: (routeOrder.get(definition.topicId) ?? 0) + 1,
+          phaseId: phase.id,
+          phaseTitle: phase.title,
+          topic,
+          entry,
+          breakpoint,
+          sourceUrl: githubSourceUrl(topic, entrySource),
+          nextTopic,
+          nextReason: topic.recommendedNextReason
+        }
+      })
   }))
 
   const uncoveredTopics = sourceTopics.filter((topic) => !seenTopicIds.has(topic.topicId))
   if (uncoveredTopics.length > 0) {
     throw new Error(`学习路线尚未覆盖专题: ${uncoveredTopics.map((topic) => topic.topicId).join(', ')}`)
+  }
+
+  const flattenedTopicIds = phases.flatMap((phase) => phase.stops.map((stop) => stop.topicId))
+  if (flattenedTopicIds.join('\u0000') !== orderedTopicIds.join('\u0000')) {
+    throw new Error('学习阶段顺序与专题推荐关系不一致')
   }
   return phases
 }
@@ -770,6 +833,7 @@ onMounted(() => {
       <li><strong>执行</strong><span>接着看任务怎样完成</span></li>
       <li><strong>运行时</strong><span>理解框架依赖的能力</span></li>
       <li><strong>容器</strong><span>最后进入 Spring 调用链</span></li>
+      <li><strong>导航</strong><span>下一站由专题索引自动生成</span></li>
     </ol>
 
     <nav v-if="viewMode === 'all'" class="roadmap-phase-nav" aria-label="学习阶段">
@@ -850,6 +914,15 @@ onMounted(() => {
               <div class="roadmap-stop__context">
                 <p><strong>先修关系</strong>{{ stop.prerequisite }}</p>
                 <p><strong>为什么现在学</strong>{{ stop.whyNow }}</p>
+                <p v-if="stop.nextTopic" class="roadmap-stop__next">
+                  <strong>下一站</strong>
+                  <a :href="withBase(topicHomeUrl(stop.nextTopic))">{{ stop.nextTopic.title }}</a>
+                  <span>；{{ stop.nextReason }}</span>
+                </p>
+                <p v-else class="roadmap-stop__next roadmap-stop__next--terminal">
+                  <strong>路线终点</strong>
+                  <span>这是当前推荐路线的最后一个专题，完成后可回到源码索引自由深挖。</span>
+                </p>
               </div>
 
               <details class="roadmap-stop__details" :open="viewMode === 'next'">
@@ -1074,7 +1147,7 @@ onMounted(() => {
 
 .roadmap-logic {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   margin: 0 0 24px;
   padding: 0;
   border-block: 1px solid var(--roadmap-line);
@@ -1358,6 +1431,27 @@ onMounted(() => {
   color: var(--vp-c-text-2);
   font-size: 0.8rem;
   line-height: 1.65;
+}
+
+.roadmap-stop__next {
+  padding: 9px 11px;
+  border-left: 3px solid var(--phase-accent);
+  background: color-mix(in srgb, var(--phase-accent) 7%, transparent);
+}
+
+.roadmap-stop__next a {
+  color: var(--phase-accent);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.roadmap-stop__next a:hover {
+  text-decoration: underline;
+}
+
+.roadmap-stop__next--terminal {
+  border-left-color: #15803d;
+  background: color-mix(in srgb, #15803d 7%, transparent);
 }
 
 .roadmap-stop__context strong,

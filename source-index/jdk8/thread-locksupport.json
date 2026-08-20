@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 Thread 与 LockSupport 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "Thread 负责执行者的生命周期，LockSupport 只维护每个线程的一位 permit，让阻塞与唤醒可以解耦并允许信号提前到达。",
+  "focusQuestion": "unpark 为什么可以早于 park，连续两次 unpark 又为什么不能让后续两个 park 都直接返回？",
+  "readingGoal": "能画出 Thread 状态主线，并用条件循环区分 park 返回、中断、超时和真正获得许可。",
+  "recommendedNextTopicId": "openjdk8-reentrantlock-aqs",
+  "recommendedNextReason": "观察 AQS 如何把 state、等待队列和 park/unpark 组合成可复用同步模板。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLockSupportDebugLab",

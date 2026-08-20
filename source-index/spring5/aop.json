@@ -5,6 +5,11 @@
   "title": "Spring Framework 5.3 AOP 源码解析",
   "primaryVersion": "Spring Framework 5.3.39",
   "sourceRef": "v5.3.39",
+  "designInsight": "Spring AOP 把代理选择、Advisor 匹配、拦截器链和递归 proceed 分成独立扩展点，让横切逻辑叠加在对象调用边界而不是业务方法内部。",
+  "focusQuestion": "为什么 `this.inner()` 会绕过通知，而 exposeProxy 又会引入 ThreadLocal 和调用约束？",
+  "readingGoal": "能沿自动代理创建、JDK/CGLIB 选择、Advisor 链组装和 ReflectiveMethodInvocation.proceed 复述一次调用。",
+  "recommendedNextTopicId": "spring-framework-5-3-transaction",
+  "recommendedNextReason": "观察声明式事务如何作为一个具体 Advisor 进入同一条代理拦截链。",
   "lab": {
     "module": "labs/spring-framework-lab",
     "mainClass": "io.github.javasourceatlas.spring.aop.SpringAopDebugLab",

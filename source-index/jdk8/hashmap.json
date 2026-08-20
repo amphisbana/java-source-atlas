@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 HashMap 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "它把容量、哈希扰动、冲突结构和扩容迁移压缩进一套可演进的桶协议。",
+  "focusQuestion": "为什么扩容时不重新计算完整 hash，也能把节点稳定地拆到两个新桶？",
+  "readingGoal": "能沿 hash、putVal、resize 和 treeifyBin 复述一次从写入到结构转换的完整路径。",
+  "recommendedNextTopicId": "openjdk8-java-util-linkedhashmap",
+  "recommendedNextReason": "观察 HashMap 如何通过节点工厂和回调 Hook 叠加出顺序语义。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.collection.HashMapDebugLab",

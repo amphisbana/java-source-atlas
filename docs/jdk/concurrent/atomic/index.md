@@ -4,6 +4,8 @@
 
 本专题以 OpenJDK 8u 为主基线。JDK 17/21 延续了分段累加模型，但底层原子访问、`longAccumulate` 参数以及 `sumThenReset` 的局部实现已有变化；这些差异会单独标明，不能拿 JDK 8 的私有签名直接给较新 JDK 下断点。
 
+<TopicStudyPanel topic-id="openjdk8-java-util-concurrent-atomic-striped64" />
+
 ## 源码入口
 
 | 类型 | OpenJDK 8u 源文件 | 本专题关注入口 |

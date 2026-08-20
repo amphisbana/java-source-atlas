@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 ThreadPoolExecutor 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "它把任务接收、资源扩张、排队背压和生命周期收口拆成可组合策略，却用一个 ctl 保持关键状态的原子快照。",
+  "focusQuestion": "为什么一次 execute 必须在入队后再次检查线程池状态？",
+  "readingGoal": "能给定线程池参数和任务序列，逐个判断创建线程、入队、扩容、拒绝和关闭收口。",
+  "recommendedNextTopicId": "openjdk8-java-util-concurrent-futuretask",
+  "recommendedNextReason": "理解线程池中的一个任务如何发布结果并唤醒等待者。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ThreadPoolExecutorDebugLab",

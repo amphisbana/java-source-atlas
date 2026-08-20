@@ -5,6 +5,11 @@
   "title": "OpenJDK 8 ForkJoinPool 与 ForkJoinTask 源码解析",
   "primaryVersion": "OpenJDK 8u",
   "sourceRef": "jdk8u412-b08",
+  "designInsight": "它让工作线程优先处理自己的任务，再从其他队列窃取工作，并用 join 帮助执行避免等待线程与任务互相阻塞。",
+  "focusQuestion": "为什么工作窃取要从对方队列的另一端取任务，join 时又为什么需要帮助执行？",
+  "readingGoal": "能沿 fork、push、scan、poll、doJoin 和 work stealing 解释分治任务的拆分、执行和汇总。",
+  "recommendedNextTopicId": "openjdk8-java-util-stream-spliterator",
+  "recommendedNextReason": "继续阅读 Stream 如何借助 Spliterator 拆分数据，把分治执行模型连接到函数式流水线。",
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ForkJoinPoolDebugLab",
