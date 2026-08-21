@@ -15,6 +15,7 @@ const requiredFiles = [
   'CHANGELOG.md',
   'docs/roadmap/index.md',
   'docs/guide/feedback.md',
+  'docs/guide/contribution-walkthrough.md',
   'docs/guide/topic-template.md',
   'docs/guide/lab-authoring.md'
 ]
@@ -73,6 +74,20 @@ if (await fileExists('.github/pull_request_template.md')) {
   for (const command of ['mvn --batch-mode test', 'npm run verify:docs', 'git diff --check']) {
     if (!pullRequestTemplate.includes(command)) {
       failures.push(`Pull Request 模板缺少验证命令：${command}`)
+    }
+  }
+}
+if (await fileExists('docs/guide/contribution-walkthrough.md')) {
+  const walkthrough = await readProjectFile('docs/guide/contribution-walkthrough.md')
+  for (const requiredText of [
+    'shouldKeepMappingsAfterResize',
+    '"evidenceId": "resize-boundary"',
+    'mvn --batch-mode test',
+    'npm run verify:docs',
+    './gradlew test buildPlugin --offline --no-daemon'
+  ]) {
+    if (!walkthrough.includes(requiredText)) {
+      failures.push(`完整贡献示例缺少闭环内容：${requiredText}`)
     }
   }
 }

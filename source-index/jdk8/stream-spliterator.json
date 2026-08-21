@@ -13,7 +13,11 @@
   "versionComparison": {
     "id": "stream-spliterator",
     "summary": "惰性流水线、Sink 融合和并行拆分主架构跨 JDK 8/17/21 保持稳定，count 快路径、takeWhile 取消、切片尺寸、未知尺寸拆分、forEachOrdered 依赖与 mapMulti 持续演进。",
-    "supportedVersions": ["8", "17", "21"],
+    "supportedVersions": [
+      "8",
+      "17",
+      "21"
+    ],
     "migrationHint": "先判断流水线是否保留精确尺寸与遇见顺序，再分析元素是否真正遍历、子 Spliterator 能否报告 SIZED，以及当前版本应观察 completionMap 还是 next/VarHandle。"
   },
   "lab": {
@@ -21,7 +25,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.stream.StreamSpliteratorDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/stream/StreamSpliteratorDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.util.stream.AbstractPipeline",
@@ -247,89 +254,208 @@
       "purpose": "沿父任务链标记遇见顺序上更晚的右侧兄弟分区取消"
     }
   ],
-  "evidence": [{
-    "claim": "Stream 中间操作只组装流水线，终止操作到来前不会遍历数据，并且流只能消费一次。",
-    "entryPoint": "AbstractPipeline(AbstractPipeline,int)",
-    "document": "/jdk/functional/stream/pipeline-sink#一个-stage-保存什么",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.stream.StreamSpliteratorBehaviorTest",
-    "testMethod": "shouldEvaluateLazilyAndRejectSecondConsumption"
-  }],
+  "evidence": [
+    {
+      "id": "lazy-single-use-main",
+      "kind": "main",
+      "claim": "Stream 中间操作只组装流水线，终止操作才触发遍历，完成后同一流不能再次消费。",
+      "entryPoint": "AbstractPipeline.evaluate(TerminalOp)",
+      "document": "/jdk/functional/stream/pipeline-sink#evaluate-如何启动终止操作",
+      "labMethod": "observeLazyPipelineAndSingleUse",
+      "testClass": "io.github.javasourceatlas.jdk.stream.StreamSpliteratorBehaviorTest",
+      "testMethod": "shouldEvaluateLazilyAndRejectSecondConsumption",
+      "expectedOutcome": "终止操作前无元素处理记录，第一次收集得到结果，第二次消费抛 IllegalStateException。"
+    },
+    {
+      "id": "short-circuit-boundary",
+      "kind": "boundary",
+      "claim": "limit 满足后会通过 cancellationRequested 停止继续推进 Sink，不必消费全部源元素。",
+      "entryPoint": "AbstractPipeline.copyIntoWithCancel(Sink,Spliterator)",
+      "document": "/jdk/functional/stream/short-circuit#copyinto-的两条遍历路径",
+      "labMethod": "observeFilterMapLimitPipeline",
+      "testClass": "io.github.javasourceatlas.jdk.stream.StreamSpliteratorBehaviorTest",
+      "testMethod": "shouldFuseSinkStagesAndStopAtLimit",
+      "expectedOutcome": "limit 收集到首个符合条件的元素后停止遍历，后续源元素没有继续进入 filter。"
+    },
+    {
+      "id": "ordered-parallel-concurrency",
+      "kind": "concurrency",
+      "claim": "并行 forEachOrdered 用完成依赖保留 encounter order，而不是依赖工作线程的执行先后。",
+      "entryPoint": "ForEachOps.ForEachOrderedTask.onCompletion(CountedCompleter)",
+      "document": "/jdk/functional/stream/parallel-spliterator#foreach-与-foreachordered-的边界",
+      "labMethod": "observeParallelForEachOrdered",
+      "testClass": "io.github.javasourceatlas.jdk.stream.StreamSpliteratorBehaviorTest",
+      "testMethod": "shouldKeepForEachOrderedContractAcrossInternalRewrite",
+      "expectedOutcome": "多个工作线程并行处理后，最终输出顺序仍与有序数据源一致且无丢失重复。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "ReferencePipeline.count()",
       "scenario": "运行 peek().count()，观察 JDK 8 逐元素求和与新版尺寸快路径的分叉",
-      "variables": ["流水线 combinedFlags", "source Spliterator characteristics", "peekCalls"]
+      "variables": [
+        "流水线 combinedFlags",
+        "source Spliterator characteristics",
+        "peekCalls"
+      ]
     },
     {
       "method": "AbstractPipeline(AbstractPipeline,int)",
       "scenario": "组装 filter、map 和 limit，确认构建阶段尚未推进 source",
-      "variables": ["previousStage", "nextStage", "depth", "sourceOrOpFlags", "combinedFlags", "linkedOrConsumed"]
+      "variables": [
+        "previousStage",
+        "nextStage",
+        "depth",
+        "sourceOrOpFlags",
+        "combinedFlags",
+        "linkedOrConsumed"
+      ],
+      "evidenceId": "lazy-single-use-main"
     },
     {
       "method": "AbstractPipeline.wrapSink(Sink)",
       "scenario": "collect 启动后观察 terminal Sink 被 limit、map、filter 反向包装",
-      "variables": ["sink", "p", "p.depth", "p.previousStage", "p.previousStage.combinedFlags"]
+      "variables": [
+        "sink",
+        "p",
+        "p.depth",
+        "p.previousStage",
+        "p.previousStage.combinedFlags"
+      ]
     },
     {
       "method": "ReferencePipeline.forEachWithCancel(Spliterator,Sink)",
       "scenario": "filter、map、limit(1) 在接收第二个源元素后停止推进",
-      "variables": ["spliterator", "sink", "sink.cancellationRequested()"]
+      "variables": [
+        "spliterator",
+        "sink",
+        "sink.cancellationRequested()"
+      ],
+      "evidenceId": "short-circuit-boundary"
     },
     {
       "method": "SliceOps.flags(long)",
       "scenario": "组装 skip(1).limit(2)，比较 JDK 8 NOT_SIZED 与新版 SIZE_ADJUSTING",
-      "variables": ["limit", "opFlags", "combinedFlags", "exactOutputSizeIfKnown"]
+      "variables": [
+        "limit",
+        "opFlags",
+        "combinedFlags",
+        "exactOutputSizeIfKnown"
+      ]
     },
     {
       "method": "Spliterators.IteratorSpliterator.trySplit()",
       "scenario": "拆分 spliteratorUnknownSize，观察批次数组、SIZED 特征和 estimateSize",
-      "variables": ["est", "batch", "n", "j", "characteristics", "返回分区"]
+      "variables": [
+        "est",
+        "batch",
+        "n",
+        "j",
+        "characteristics",
+        "返回分区"
+      ]
     },
     {
       "method": "ArrayList.ArrayListSpliterator.getFence()",
       "scenario": "创建 Spliterator 后先追加元素，再以 estimateSize 触发延迟绑定",
-      "variables": ["fence", "index", "expectedModCount", "list.size", "list.modCount"]
+      "variables": [
+        "fence",
+        "index",
+        "expectedModCount",
+        "list.size",
+        "list.modCount"
+      ]
     },
     {
       "method": "ArrayList.ArrayListSpliterator.trySplit()",
       "scenario": "把八元素 ArrayList 的索引范围拆为前缀与剩余后缀",
-      "variables": ["lo", "hi", "mid", "index", "fence", "expectedModCount"]
+      "variables": [
+        "lo",
+        "hi",
+        "mid",
+        "index",
+        "fence",
+        "expectedModCount"
+      ]
     },
     {
       "method": "ArrayList.ArrayListSpliterator.forEachRemaining(Consumer)",
       "scenario": "fence 绑定后结构性修改，观察 action 与末尾 modCount 检查",
-      "variables": ["i", "hi", "mc", "expectedModCount", "list.modCount", "elementData"]
+      "variables": [
+        "i",
+        "hi",
+        "mc",
+        "expectedModCount",
+        "list.modCount",
+        "elementData"
+      ]
     },
     {
       "method": "AbstractTask.compute()",
       "scenario": "并行归约从根 Spliterator 构建二叉任务树并形成叶节点",
-      "variables": ["rs", "ls", "sizeEstimate", "sizeThreshold", "forkRight", "task", "taskToFork", "task.getPendingCount()"]
+      "variables": [
+        "rs",
+        "ls",
+        "sizeEstimate",
+        "sizeThreshold",
+        "forkRight",
+        "task",
+        "taskToFork",
+        "task.getPendingCount()"
+      ]
     },
     {
       "method": "ReduceOps.ReduceTask.onCompletion(CountedCompleter)",
       "scenario": "多个叶结果完成后观察左结果与右结果的有序 combine",
-      "variables": ["leftChild", "rightChild", "leftChild.getLocalResult()", "rightChild.getLocalResult()", "caller"]
+      "variables": [
+        "leftChild",
+        "rightChild",
+        "leftChild.getLocalResult()",
+        "rightChild.getLocalResult()",
+        "caller"
+      ]
     },
     {
       "method": "ForEachOps.ForEachOrderedTask.compute()",
       "scenario": "并行 forEachOrdered 拆分左右叶，并建立前驱完成依赖",
-      "variables": ["leftPredecessor", "completionMap 或 next", "pending count", "spliterator"]
+      "variables": [
+        "leftPredecessor",
+        "completionMap 或 next",
+        "pending count",
+        "spliterator"
+      ]
     },
     {
       "method": "ForEachOps.ForEachOrderedTask.onCompletion(CountedCompleter)",
       "scenario": "前驱完成后按遇见顺序倾倒 Node，并释放后继任务",
-      "variables": ["caller", "node", "action", "completionMap 或 NEXT", "后继任务"]
+      "variables": [
+        "caller",
+        "node",
+        "action",
+        "completionMap 或 NEXT",
+        "后继任务"
+      ],
+      "evidenceId": "ordered-parallel-concurrency"
     },
     {
       "method": "AbstractShortCircuitTask.shortCircuit(R)",
       "scenario": "并行 match 或 find 叶任务发现有效结果并尝试发布",
-      "variables": ["result", "sharedResult", "sharedResult.get()"]
+      "variables": [
+        "result",
+        "sharedResult",
+        "sharedResult.get()"
+      ]
     },
     {
       "method": "AbstractShortCircuitTask.cancelLaterNodes()",
       "scenario": "有序 findFirst 找到候选后取消遇见顺序更晚的分区",
-      "variables": ["node", "parent", "parent.leftChild", "rightSibling", "rightSibling.canceled"]
+      "variables": [
+        "node",
+        "parent",
+        "parent.leftChild",
+        "rightSibling",
+        "rightSibling.canceled"
+      ]
     }
   ]
 }

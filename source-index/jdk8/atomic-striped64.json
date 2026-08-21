@@ -15,7 +15,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.AtomicDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/AtomicDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.util.concurrent.atomic.AtomicInteger",
@@ -87,44 +90,107 @@
       "purpose": "观察碰撞线程如何改变 probe 并选择新槽位"
     }
   ],
-  "evidence": [{
-    "claim": "compareAndSet 只会在当前值等于期望值时提交更新，失配时保持原值。",
-    "entryPoint": "AtomicInteger.compareAndSet(int,int)",
-    "document": "/jdk/concurrent/atomic/atomic-integer#compareandset-的判定边界",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.concurrent.AtomicBehaviorTest",
-    "testMethod": "shouldSucceedAndFailCompareAndSetByExpectedValue"
-  }],
+  "evidence": [
+    {
+      "id": "cas-main",
+      "kind": "main",
+      "claim": "compareAndSet 只在当前值等于期望值时原子更新，失败时不覆盖现值。",
+      "entryPoint": "AtomicInteger.compareAndSet(int,int)",
+      "document": "/jdk/concurrent/atomic/atomic-integer#compareandset-的判定边界",
+      "labMethod": "observeCompareAndSet",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.AtomicBehaviorTest",
+      "testMethod": "shouldSucceedAndFailCompareAndSetByExpectedValue",
+      "expectedOutcome": "第一次 CAS 成功并写入新值，使用过期期望值的第二次 CAS 失败且数值不变。"
+    },
+    {
+      "id": "lost-update-concurrency",
+      "kind": "concurrency",
+      "claim": "volatile 读写不能把复合自增变成原子操作，AtomicInteger 的原子 RMW 可以避免稳定复现的丢失更新。",
+      "entryPoint": "AtomicInteger.getAndAdd(int)",
+      "document": "/jdk/concurrent/atomic/atomic-integer#getandadd-为什么能避免丢失更新",
+      "labMethod": "observeAtomicCounterContrast",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.AtomicBehaviorTest",
+      "testMethod": "shouldContrastStableLostUpdateWithAtomicIncrement",
+      "expectedOutcome": "受控竞争下普通计数器少一次更新，而 AtomicInteger 精确得到全部线程的增量。"
+    },
+    {
+      "id": "update-retry-boundary",
+      "kind": "boundary",
+      "claim": "updateAndGet 在竞争失败后会重新读取并再次调用更新函数，因此函数必须无副作用。",
+      "entryPoint": "AtomicInteger.updateAndGet(IntUnaryOperator)",
+      "document": "/jdk/concurrent/atomic/atomic-integer#函数更新为什么要求无副作用",
+      "labMethod": "observeUpdateFunctionRetry",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.AtomicBehaviorTest",
+      "testMethod": "shouldRetryUpdateFunctionAfterCompetingUpdate",
+      "expectedOutcome": "竞争线程插入更新后，更新函数至少执行两次，最终值基于最新状态计算。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "AtomicInteger.compareAndSet(int,int)",
       "scenario": "分别触发期望值匹配和失配",
-      "variables": ["expect", "update", "value", "return value"]
+      "variables": [
+        "expect",
+        "update",
+        "value",
+        "return value"
+      ],
+      "evidenceId": "cas-main"
     },
     {
       "method": "AtomicInteger.updateAndGet(IntUnaryOperator)",
       "scenario": "受控竞争使第一次 CAS 失败并重新计算",
-      "variables": ["prev", "next", "value", "updateFunction"]
+      "variables": [
+        "prev",
+        "next",
+        "value",
+        "updateFunction"
+      ],
+      "evidenceId": "update-retry-boundary"
     },
     {
       "method": "LongAdder.add(long)",
       "scenario": "比较 base CAS、Cell CAS 和进入慢路径",
-      "variables": ["x", "as", "b", "a", "uncontended"]
+      "variables": [
+        "x",
+        "as",
+        "b",
+        "a",
+        "uncontended"
+      ]
     },
     {
       "method": "Striped64.longAccumulate(long,LongBinaryOperator,boolean)",
       "scenario": "观察 cells 初始化、空槽安装、连续碰撞和扩容",
-      "variables": ["x", "h", "as", "n", "a", "wasUncontended", "collide", "cellsBusy"]
+      "variables": [
+        "x",
+        "h",
+        "as",
+        "n",
+        "a",
+        "wasUncontended",
+        "collide",
+        "cellsBusy"
+      ]
     },
     {
       "method": "Striped64.advanceProbe(int)",
       "scenario": "目标 Cell CAS 失败后更换槽位",
-      "variables": ["probe", "cells.length", "probe & (cells.length - 1)"]
+      "variables": [
+        "probe",
+        "cells.length",
+        "probe & (cells.length - 1)"
+      ]
     },
     {
       "method": "LongAdder.sumThenReset()",
       "scenario": "在静默期逐项汇总并清零 base 和 Cell",
-      "variables": ["sum", "base", "as", "a.value"]
+      "variables": [
+        "sum",
+        "base",
+        "as",
+        "a.value"
+      ]
     }
   ]
 }

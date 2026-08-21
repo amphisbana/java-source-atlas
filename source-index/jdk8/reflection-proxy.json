@@ -15,7 +15,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.runtime.ReflectionProxyDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/runtime/ReflectionProxyDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.lang.reflect.Method",
@@ -121,64 +124,153 @@
       "purpose": "可靠确认 Class 是否由 JDK Proxy 机制生成，而非只判断是否继承 Proxy"
     }
   ],
-  "evidence": [{
-    "claim": "getDeclaredMethod 只查声明类，而公开成员查找会沿继承关系扩大范围。",
-    "entryPoint": "Class.getDeclaredMethod(String,Class<?>...)",
-    "document": "/jdk/runtime/reflection-proxy/reflection-invoke#getmethod-与-getdeclaredmethod-先解决查找范围",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.runtime.ReflectionProxyBehaviorTest",
-    "testMethod": "shouldSeparatePublicMemberSearchFromDeclaredMemberSearch"
-  }],
+  "evidence": [
+    {
+      "id": "member-lookup-main",
+      "kind": "main",
+      "claim": "getMethod 搜索公开继承成员，getDeclaredMethod 只搜索当前类声明成员，两者解决不同查找范围。",
+      "entryPoint": "Class.getDeclaredMethod(String,Class<?>...)",
+      "document": "/jdk/runtime/reflection-proxy/reflection-invoke#getmethod-与-getdeclaredmethod-先解决查找范围",
+      "labMethod": "observeMetadataAndInvoke",
+      "testClass": "io.github.javasourceatlas.jdk.runtime.ReflectionProxyBehaviorTest",
+      "testMethod": "shouldSeparatePublicMemberSearchFromDeclaredMemberSearch",
+      "expectedOutcome": "公开继承方法可由 getMethod 找到，当前类私有方法只能由 getDeclaredMethod 找到。"
+    },
+    {
+      "id": "invoke-wrapper-failure",
+      "kind": "failure",
+      "claim": "Method.invoke 会把目标方法抛出的真实异常包装在 InvocationTargetException 中。",
+      "entryPoint": "Method.invoke(Object,Object...)",
+      "document": "/jdk/runtime/reflection-proxy/reflection-invoke#method-invoke-的准确主线",
+      "labMethod": "observeTargetException",
+      "testClass": "io.github.javasourceatlas.jdk.runtime.ReflectionProxyBehaviorTest",
+      "testMethod": "shouldWrapTargetFailureInInvocationTargetException",
+      "expectedOutcome": "反射调用失败时外层类型为 InvocationTargetException，getCause 保留原始 IOException。"
+    },
+    {
+      "id": "proxy-contract-boundary",
+      "kind": "boundary",
+      "claim": "生成的代理方法会校验 InvocationHandler 返回值与声明的返回类型，并约束未声明受检异常。",
+      "entryPoint": "InvocationHandler.invoke(Object,Method,Object[])",
+      "document": "/jdk/runtime/reflection-proxy/dynamic-proxy#handler-的三个入参分别代表什么",
+      "labMethod": "observeCheckedExceptionBoundary",
+      "testClass": "io.github.javasourceatlas.jdk.runtime.ReflectionProxyBehaviorTest",
+      "testMethod": "shouldEnforceProxyCheckedExceptionContract",
+      "expectedOutcome": "声明内异常按原类型传播，未声明受检异常被包装为 UndeclaredThrowableException。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "Class.privateGetDeclaredMethods(boolean)",
       "scenario": "首次和再次查询 GreetingTarget 的声明方法，比较 ReflectionData 缓存路径",
-      "variables": ["publicOnly", "rd", "res", "rd.declaredPublicMethods", "rd.declaredMethods"]
+      "variables": [
+        "publicOnly",
+        "rd",
+        "res",
+        "rd.declaredPublicMethods",
+        "rd.declaredMethods"
+      ],
+      "evidenceId": "member-lookup-main"
     },
     {
       "method": "Method.invoke(Object,Object[])",
       "scenario": "调用 welcome(String,long)，观察访问检查和 Integer 到 long 的拆箱拓宽",
-      "variables": ["override", "clazz", "obj", "args", "methodAccessor"]
+      "variables": [
+        "override",
+        "clazz",
+        "obj",
+        "args",
+        "methodAccessor"
+      ],
+      "evidenceId": "invoke-wrapper-failure"
     },
     {
       "method": "Method.acquireMethodAccessor()",
       "scenario": "同一成员的 Method 副本首次调用和后续调用，观察 root accessor 共享",
-      "variables": ["root", "root.methodAccessor", "methodAccessor", "tmp"]
+      "variables": [
+        "root",
+        "root.methodAccessor",
+        "methodAccessor",
+        "tmp"
+      ]
     },
     {
       "method": "NativeMethodAccessorImpl.invoke(Object,Object[])",
       "scenario": "JDK 8 对同一 Method 连续调用至少 17 次，观察默认 inflation 切换",
-      "variables": ["numInvocations", "ReflectionFactory.inflationThreshold()", "parent", "method"]
+      "variables": [
+        "numInvocations",
+        "ReflectionFactory.inflationThreshold()",
+        "parent",
+        "method"
+      ]
     },
     {
       "method": "Proxy.newProxyInstance(ClassLoader,Class<?>[],InvocationHandler)",
       "scenario": "使用同序和逆序接口列表创建三个实例，区分 Class 缓存与实例构造",
-      "variables": ["loader", "interfaces", "intfs", "h", "cl", "cons"]
+      "variables": [
+        "loader",
+        "interfaces",
+        "intfs",
+        "h",
+        "cl",
+        "cons"
+      ],
+      "evidenceId": "proxy-contract-boundary"
     },
     {
       "method": "WeakCache.get(Object,Object)",
       "scenario": "第二次使用相同 loader 与接口顺序创建代理，确认缓存命中",
-      "variables": ["cacheKey", "subKey", "supplier", "valueMap"]
+      "variables": [
+        "cacheKey",
+        "subKey",
+        "supplier",
+        "valueMap"
+      ]
     },
     {
       "method": "Proxy.ProxyClassFactory.apply(ClassLoader,Class<?>[])",
       "scenario": "首次生成 GreetingService 代理，观察 loader 可见性与 proxyPkg 选择",
-      "variables": ["loader", "interfaces", "interfaceSet", "proxyPkg", "accessFlags", "proxyName"]
+      "variables": [
+        "loader",
+        "interfaces",
+        "interfaceSet",
+        "proxyPkg",
+        "accessFlags",
+        "proxyName"
+      ]
     },
     {
       "method": "ProxyGenerator.addProxyMethod(Method,Class<?>)",
       "scenario": "FirstView 与 SecondView 提供重复 identity 签名，观察最前接口决定代表 Method",
-      "variables": ["m", "fromClass", "sig", "sigmethods", "exceptionTypes"]
+      "variables": [
+        "m",
+        "fromClass",
+        "sig",
+        "sigmethods",
+        "exceptionTypes"
+      ]
     },
     {
       "method": "ProxyGenerator.ProxyMethod.generateMethod()",
       "scenario": "生成带 String 和 long 参数的代理方法，观察装箱、返回强转与异常表",
-      "variables": ["parameterTypes", "returnType", "exceptionTypes", "catchList", "minfo"]
+      "variables": [
+        "parameterTypes",
+        "returnType",
+        "exceptionTypes",
+        "catchList",
+        "minfo"
+      ]
     },
     {
       "method": "ReflectionProxyDebugLab.ForwardingInvocationHandler.invoke(Object,Method,Object[])",
       "scenario": "分别调用接口方法、default 方法、toString、equals 和真实目标失败方法",
-      "variables": ["proxy", "method", "method.getDeclaringClass()", "args", "exception.getCause()"]
+      "variables": [
+        "proxy",
+        "method",
+        "method.getDeclaringClass()",
+        "args",
+        "exception.getCause()"
+      ]
     }
   ]
 }

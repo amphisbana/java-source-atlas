@@ -15,7 +15,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.collection.ArrayListDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/collection/ArrayListDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.util.ArrayList",
@@ -53,29 +56,71 @@
       "purpose": "创建共享父列表数据的范围视图"
     }
   ],
-  "evidence": [{
-    "claim": "ArrayList 扩容只改变底层数组容量，不改变已有元素的逻辑顺序。",
-    "entryPoint": "add(E)",
-    "document": "/jdk/collections/arraylist/#add-e-调用链",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.collection.ArrayListBehaviorTest",
-    "testMethod": "shouldKeepOrderAfterGrowth"
-  }],
+  "evidence": [
+    {
+      "id": "growth-main",
+      "kind": "main",
+      "claim": "ArrayList 扩容后保持元素顺序，新增元素落在原有元素之后。",
+      "entryPoint": "add(E)",
+      "document": "/jdk/collections/arraylist/#add-e-调用链",
+      "labMethod": "observeGrowth",
+      "testClass": "io.github.javasourceatlas.jdk.collection.ArrayListBehaviorTest",
+      "testMethod": "shouldKeepOrderAfterGrowth",
+      "expectedOutcome": "连续写入触发扩容后，列表大小、顺序和每个下标对应的值全部保持正确。"
+    },
+    {
+      "id": "middle-mutation-boundary",
+      "kind": "boundary",
+      "claim": "中间位置的插入与删除依赖数组搬移，但不会破坏剩余元素的相对顺序。",
+      "entryPoint": "remove(int)",
+      "document": "/jdk/collections/arraylist/mutation#删除为什么要清空尾部",
+      "labMethod": "observeMiddleMutation",
+      "testClass": "io.github.javasourceatlas.jdk.collection.ArrayListBehaviorTest",
+      "testMethod": "shouldShiftElementsForMiddleMutation",
+      "expectedOutcome": "中间插入后后缀整体右移，中间删除后后缀整体左移，最终顺序与预期一致。"
+    },
+    {
+      "id": "iterator-fail-fast",
+      "kind": "failure",
+      "claim": "迭代器创建后的结构性修改会通过 modCount 检查快速失败。",
+      "entryPoint": "Itr.next()",
+      "document": "/jdk/collections/arraylist/iterator-version#fail-fast-如何发生",
+      "labMethod": "observeFailFast",
+      "testClass": "io.github.javasourceatlas.jdk.collection.ArrayListBehaviorTest",
+      "testMethod": "shouldFailFastAfterStructuralModification",
+      "expectedOutcome": "列表结构变化后继续调用旧迭代器 next，稳定抛出 ConcurrentModificationException。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "grow(int)",
       "scenario": "观察首次分配与后续扩容",
-      "variables": ["minCapacity", "oldCapacity", "newCapacity", "elementData"]
+      "variables": [
+        "minCapacity",
+        "oldCapacity",
+        "newCapacity",
+        "elementData"
+      ],
+      "evidenceId": "growth-main"
     },
     {
       "method": "add(int,E)",
       "scenario": "观察中间插入的数组搬移",
-      "variables": ["index", "size", "elementData"]
+      "variables": [
+        "index",
+        "size",
+        "elementData"
+      ],
+      "evidenceId": "middle-mutation-boundary"
     },
     {
       "method": "Itr.checkForComodification()",
       "scenario": "观察迭代器快速失败",
-      "variables": ["expectedModCount", "ArrayList.this.modCount"]
+      "variables": [
+        "expectedModCount",
+        "ArrayList.this.modCount"
+      ],
+      "evidenceId": "iterator-fail-fast"
     }
   ]
 }

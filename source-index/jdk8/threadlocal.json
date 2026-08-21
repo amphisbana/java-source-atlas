@@ -13,7 +13,11 @@
   "versionComparison": {
     "id": "thread-local",
     "summary": "弱 key、强 value、开放寻址和惰性清理仍是核心边界，JDK 21 额外暴露 carrier 与虚拟线程诊断路径。",
-    "supportedVersions": ["8", "17", "21"],
+    "supportedVersions": [
+      "8",
+      "17",
+      "21"
+    ],
     "migrationHint": "虚拟线程不会消除泄漏风险，线程池和上下文复用仍必须在 finally 中 remove。"
   },
   "lab": {
@@ -21,7 +25,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLocalDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/ThreadLocalDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.lang.ThreadLocal",
@@ -112,49 +119,119 @@
       "purpose": "在线程构造期间复制父线程可继承绑定并调用 childValue"
     }
   ],
-  "evidence": [{
-    "claim": "ThreadLocal 的值实际保存在各自线程的 ThreadLocalMap 中，不同线程读取互不覆盖。",
-    "entryPoint": "ThreadLocal.get()",
-    "document": "/jdk/concurrent/threadlocal/#get-的当前线程查找链",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLocalBehaviorTest",
-    "testMethod": "shouldIsolateValuesBetweenThreads"
-  }],
+  "evidence": [
+    {
+      "id": "thread-isolation-main",
+      "kind": "main",
+      "claim": "ThreadLocal 值存放在当前 Thread 的 ThreadLocalMap 中，同一实例在不同线程拥有独立绑定。",
+      "entryPoint": "ThreadLocal.get()",
+      "document": "/jdk/concurrent/threadlocal/#get-的当前线程查找链",
+      "labMethod": "observePerThreadValues",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLocalBehaviorTest",
+      "testMethod": "shouldIsolateValuesBetweenThreads",
+      "expectedOutcome": "主线程与工作线程分别读取自己的值，任一线程 set 都不会覆盖另一线程。"
+    },
+    {
+      "id": "pool-leak-failure",
+      "kind": "failure",
+      "claim": "线程池复用工作线程时，未 remove 的 ThreadLocal 绑定会泄漏到后续逻辑任务。",
+      "entryPoint": "ThreadLocal.set(T)",
+      "document": "/jdk/concurrent/threadlocal/threadlocalmap#set-如何线性探测",
+      "labMethod": "observeThreadPoolPollutionAndCleanup",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLocalBehaviorTest",
+      "testMethod": "shouldLeakBindingAcrossReusedWorkerWhenRemoveIsMissing",
+      "expectedOutcome": "同一单线程池的第二个任务在未 set 时仍读到前一任务遗留值。"
+    },
+    {
+      "id": "finally-remove-cleanup",
+      "kind": "cleanup",
+      "claim": "在 finally 中调用 remove 能确定性删除当前绑定，避免依赖弱 key 的机会式清理。",
+      "entryPoint": "ThreadLocal.remove()",
+      "document": "/jdk/concurrent/threadlocal/stale-cleanup#remove-为什么是确定性清理",
+      "labMethod": "observeThreadPoolPollutionAndCleanup",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLocalBehaviorTest",
+      "testMethod": "shouldPreventWorkerPollutionWithFinallyRemove",
+      "expectedOutcome": "首个任务退出前清理后，复用同一工作线程的下一任务读取到 null。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "ThreadLocal.get()",
       "scenario": "比较同一 ThreadLocal 在两个线程中的独立值",
-      "variables": ["t", "map", "e", "result"]
+      "variables": [
+        "t",
+        "map",
+        "e",
+        "result"
+      ],
+      "evidenceId": "thread-isolation-main"
     },
     {
       "method": "ThreadLocalMap.set(ThreadLocal,Object)",
       "scenario": "观察 home slot、线性探测、已有 key 和 stale 分支",
-      "variables": ["key.threadLocalHashCode", "i", "e", "k", "size", "threshold"]
+      "variables": [
+        "key.threadLocalHashCode",
+        "i",
+        "e",
+        "k",
+        "size",
+        "threshold"
+      ],
+      "evidenceId": "pool-leak-failure"
     },
     {
       "method": "ThreadLocalMap.replaceStaleEntry(ThreadLocal,Object,int)",
       "scenario": "set 在碰撞 run 中先遇到 stale，随后找到已有 key",
-      "variables": ["staleSlot", "slotToExpunge", "i", "e", "k"]
+      "variables": [
+        "staleSlot",
+        "slotToExpunge",
+        "i",
+        "e",
+        "k"
+      ]
     },
     {
       "method": "ThreadLocalMap.expungeStaleEntry(int)",
       "scenario": "get 或 remove 清 stale 后重新安置后续碰撞项",
-      "variables": ["staleSlot", "i", "e", "k", "h", "size"]
+      "variables": [
+        "staleSlot",
+        "i",
+        "e",
+        "k",
+        "h",
+        "size"
+      ],
+      "evidenceId": "finally-remove-cleanup"
     },
     {
       "method": "ThreadLocalMap.cleanSomeSlots(int,int)",
       "scenario": "插入新 Entry 后观察 n 右移和发现 stale 后扩大扫描",
-      "variables": ["i", "n", "e", "removed", "len"]
+      "variables": [
+        "i",
+        "n",
+        "e",
+        "removed",
+        "len"
+      ]
     },
     {
       "method": "ThreadLocalMap(ThreadLocalMap)",
       "scenario": "构造子 Thread 时复制 inheritableThreadLocals",
-      "variables": ["parentTable", "key", "value", "h", "size"]
+      "variables": [
+        "parentTable",
+        "key",
+        "value",
+        "h",
+        "size"
+      ]
     },
     {
       "method": "InheritableThreadLocal.childValue(T)",
       "scenario": "父线程构造 child 时生成子线程初始值",
-      "variables": ["parentValue", "Thread.currentThread()"]
+      "variables": [
+        "parentValue",
+        "Thread.currentThread()"
+      ]
     }
   ]
 }

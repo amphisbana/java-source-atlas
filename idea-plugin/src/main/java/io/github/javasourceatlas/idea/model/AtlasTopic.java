@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
@@ -143,6 +144,19 @@ public record AtlasTopic(
     public Stream<AtlasSource> allSources() {
         return Stream.concat(Stream.of(source), relatedSources.stream())
                 .filter(sourceItem -> sourceItem != null && sourceItem.className() != null);
+    }
+
+    /**
+     * 按专题内稳定编号查找一条可执行证据。
+     *
+     * @param evidenceId 证据编号
+     * @return 对应证据；编号为空或不存在时返回空
+     */
+    public Optional<AtlasEvidence> findEvidenceById(String evidenceId) {
+        if (evidenceId == null || evidenceId.isBlank()) {
+            return Optional.empty();
+        }
+        return evidence.stream().filter(item -> evidenceId.equals(item.id())).findFirst();
     }
 
     /**

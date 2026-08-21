@@ -102,44 +102,106 @@
       "purpose": "取得当前线程调用栈中显式暴露的代理，演示自调用补救及其边界"
     }
   ],
-  "evidence": [{
-    "claim": "目标实现接口且未强制类代理时，Spring AOP 可以为 Bean 创建 JDK 动态代理。",
-    "entryPoint": "AbstractAutoProxyCreator.postProcessAfterInitialization(Object,String)",
-    "document": "/spring/aop/proxy-creation",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.spring.aop.SpringAopBehaviorTest",
-    "testMethod": "shouldCreateJdkProxyForInterfaceBasedTarget"
-  }],
+  "evidence": [
+    {
+      "id": "jdk-proxy-main",
+      "kind": "main",
+      "claim": "目标实现接口且未强制类代理时，Spring AOP 为 Bean 创建 JDK 动态代理。",
+      "entryPoint": "DefaultAopProxyFactory.createAopProxy(AdvisedSupport)",
+      "document": "/spring/aop/proxy-creation",
+      "labMethod": "runAutoProxyExample",
+      "testClass": "io.github.javasourceatlas.spring.aop.SpringAopBehaviorTest",
+      "testMethod": "shouldCreateProxyThroughApplicationContext",
+      "expectedOutcome": "容器返回对象是 JDK Proxy，接口方法调用进入配置的 Advisor 链。"
+    },
+    {
+      "id": "cglib-boundary",
+      "kind": "boundary",
+      "claim": "启用 proxyTargetClass 后，Spring 选择 CGLIB 子类代理并保留目标类方法调用能力。",
+      "entryPoint": "DefaultAopProxyFactory.createAopProxy(AdvisedSupport)",
+      "document": "/spring/aop/proxy-creation",
+      "labMethod": "runCglibExample",
+      "testClass": "io.github.javasourceatlas.spring.aop.SpringAopBehaviorTest",
+      "testMethod": "shouldCreateCglibProxyWhenProxyTargetClassIsEnabled",
+      "expectedOutcome": "代理对象是目标类子类型而非 JDK Proxy，方法调用仍被 Advice 拦截。"
+    },
+    {
+      "id": "chain-unwind-failure",
+      "kind": "failure",
+      "claim": "目标方法抛异常时已进入的拦截器仍按调用栈逆序退出，异常继续向客户端传播。",
+      "entryPoint": "ReflectiveMethodInvocation.proceed()",
+      "document": "/spring/aop/interceptor-chain",
+      "labMethod": "main",
+      "testClass": "io.github.javasourceatlas.spring.aop.SpringAopBehaviorTest",
+      "testMethod": "shouldUnwindInterceptorChainWhenTargetThrows",
+      "expectedOutcome": "事件顺序表现为外层进入、内层进入、目标失败、内层退出、外层退出，原异常未被吞掉。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "AbstractAutoProxyCreator.wrapIfNecessary(...)",
       "scenario": "观察 atlasService 是否命中 Advisor 以及为何创建或跳过代理",
-      "variables": ["beanName", "cacheKey", "beanClass", "advisedBeans", "specificInterceptors"]
+      "variables": [
+        "beanName",
+        "cacheKey",
+        "beanClass",
+        "advisedBeans",
+        "specificInterceptors"
+      ],
+      "evidenceId": "jdk-proxy-main"
     },
     {
       "method": "AbstractAdvisorAutoProxyCreator.findEligibleAdvisors(...)",
       "scenario": "区分候选 Advisor、适用 Advisor 与最终排序结果",
-      "variables": ["candidateAdvisors", "eligibleAdvisors", "beanClass", "beanName"]
+      "variables": [
+        "candidateAdvisors",
+        "eligibleAdvisors",
+        "beanClass",
+        "beanName"
+      ]
     },
     {
       "method": "DefaultAopProxyFactory.createAopProxy(...)",
       "scenario": "对照 JDK 动态代理与 CGLIB 子类代理选择条件",
-      "variables": ["config", "targetClass", "proxyTargetClass", "proxiedInterfaces"]
+      "variables": [
+        "config",
+        "targetClass",
+        "proxyTargetClass",
+        "proxiedInterfaces"
+      ],
+      "evidenceId": "cglib-boundary"
     },
     {
       "method": "JdkDynamicAopProxy.invoke(...)",
       "scenario": "观察外部接口调用如何取得 target、方法链并创建 MethodInvocation",
-      "variables": ["method", "args", "target", "targetClass", "chain", "oldProxy"]
+      "variables": [
+        "method",
+        "args",
+        "target",
+        "targetClass",
+        "chain",
+        "oldProxy"
+      ]
     },
     {
       "method": "ReflectiveMethodInvocation.proceed()",
       "scenario": "观察两个具名拦截器进入、目标执行与调用栈逆序回卷",
-      "variables": ["currentInterceptorIndex", "interceptorsAndDynamicMethodMatchers", "method", "arguments"]
+      "variables": [
+        "currentInterceptorIndex",
+        "interceptorsAndDynamicMethodMatchers",
+        "method",
+        "arguments"
+      ],
+      "evidenceId": "chain-unwind-failure"
     },
     {
       "method": "AopContext.setCurrentProxy(...)",
       "scenario": "比较 this.inner 与 currentProxy.inner 的代理重入差异",
-      "variables": ["proxy", "old", "currentProxy"]
+      "variables": [
+        "proxy",
+        "old",
+        "currentProxy"
+      ]
     }
   ]
 }

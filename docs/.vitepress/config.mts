@@ -493,6 +493,7 @@ export default defineConfig({
           items: [
             { text: '如何阅读一个主题', link: '/guide/reading' },
             { text: '贡献源码解析', link: '/guide/contributing' },
+            { text: '完整贡献示例', link: '/guide/contribution-walkthrough' },
             { text: '新专题模板', link: '/guide/topic-template' },
             { text: 'Lab 编写规范', link: '/guide/lab-authoring' },
             { text: '反馈与问题定位', link: '/guide/feedback' }

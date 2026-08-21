@@ -13,7 +13,11 @@
   "versionComparison": {
     "id": "synchronized-monitor",
     "summary": "Java 层 monitorenter、wait、notify 契约保持稳定，但 HotSpot 的偏向锁、ObjectMonitor 竞争和轻量级路径持续重构。",
-    "supportedVersions": ["8", "17", "21"],
+    "supportedVersions": [
+      "8",
+      "17",
+      "21"
+    ],
     "migrationHint": "跨版本调试应以 monitor 语义为主线，重新确认 ObjectSynchronizer 和 ObjectMonitor 的私有字段与入口。"
   },
   "lab": {
@@ -21,7 +25,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.SynchronizedMonitorDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/SynchronizedMonitorDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.lang.Object",
@@ -95,45 +102,102 @@
       "sourceClass": "hotspot.runtime.ObjectMonitor"
     }
   ],
-  "evidence": [{
-    "claim": "同一线程可以重复进入同一个 monitor，退出次数与进入深度匹配后锁才真正释放。",
-    "entryPoint": "monitorenter / monitorexit",
-    "document": "/jdk/concurrent/synchronized-monitor/bytecode-reentrancy#同步代码块与同步方法不是同一种字节码形态",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.concurrent.SynchronizedMonitorBehaviorTest",
-    "testMethod": "shouldReenterSameMonitor"
-  }],
+  "evidence": [
+    {
+      "id": "reentrant-main",
+      "kind": "main",
+      "claim": "同一线程可以重复进入同一个 monitor，退出深度归零后才真正释放。",
+      "entryPoint": "monitorenter / monitorexit",
+      "document": "/jdk/concurrent/synchronized-monitor/bytecode-reentrancy#同步代码块与同步方法不是同一种字节码形态",
+      "labMethod": "observeReentrantEntry",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.SynchronizedMonitorBehaviorTest",
+      "testMethod": "shouldReenterSameMonitor",
+      "expectedOutcome": "两层 synchronized 均能进入，离开内层后仍持有 monitor，离开外层后竞争者才可获得。"
+    },
+    {
+      "id": "wait-reacquire-concurrency",
+      "kind": "concurrency",
+      "claim": "wait 会完整释放全部重入深度，通知后必须重新竞争并在返回前恢复原深度。",
+      "entryPoint": "Object.wait(long,int)",
+      "document": "/jdk/concurrent/synchronized-monitor/wait-notify#wait-完整释放-sleep-不释放",
+      "labMethod": "observeWaitReleaseAndReacquire",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.SynchronizedMonitorBehaviorTest",
+      "testMethod": "shouldReleaseAndRestoreFullReentrantDepthAroundWait",
+      "expectedOutcome": "等待期间竞争者成功进入；wait 返回后退出一层仍阻塞竞争者，证明重入深度已恢复。"
+    },
+    {
+      "id": "wait-interrupt-failure",
+      "kind": "failure",
+      "claim": "WAITING 线程被中断时 wait 抛 InterruptedException，并在抛出前清除中断标记。",
+      "entryPoint": "Object.wait(long,int)",
+      "document": "/jdk/concurrent/synchronized-monitor/wait-notify#wait-完整释放-sleep-不释放",
+      "labMethod": "observeWaitInterruption",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.SynchronizedMonitorBehaviorTest",
+      "testMethod": "shouldClearInterruptStatusWhenWaitThrows",
+      "expectedOutcome": "等待线程捕获 InterruptedException，catch 中 isInterrupted 为 false，线程可正常结束。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "SynchronizedMonitorDebugLab.observeBlockedAndWaiting()",
       "scenario": "同时稳定构造一个 WaitSet 等待者和一个入口 monitor 竞争者",
-      "variables": ["waiter.getState()", "contender.getState()", "waitCondition.open", "releaseOwner"]
+      "variables": [
+        "waiter.getState()",
+        "contender.getState()",
+        "waitCondition.open",
+        "releaseOwner"
+      ]
     },
     {
       "method": "SynchronizedMonitorDebugLab.observeWaitReleaseAndReacquire()",
       "scenario": "两层重入调用 wait，通知后退出内层但继续持有外层",
-      "variables": ["condition.open", "innerExited", "releaseOuter", "contender.getState()"]
+      "variables": [
+        "condition.open",
+        "innerExited",
+        "releaseOuter",
+        "contender.getState()"
+      ]
     },
     {
       "method": "SynchronizedMonitorDebugLab.observeNotifyDoesNotReleaseMonitor()",
       "scenario": "notifier 调用 notify 后停在同步块内，观察 waiter 仍不能继续",
-      "variables": ["notifyCalled", "releaseNotifier", "waiterResumed", "waiter.getState()"]
+      "variables": [
+        "notifyCalled",
+        "releaseNotifier",
+        "waiterResumed",
+        "waiter.getState()"
+      ]
     },
     {
       "method": "SynchronizedMonitorDebugLab.observeWaitInterruption()",
       "scenario": "中断 WAITING 线程并观察异常与 catch 中的中断标记",
-      "variables": ["exceptionCaught", "flagAfterCatch", "waiter.getState()"]
+      "variables": [
+        "exceptionCaught",
+        "flagAfterCatch",
+        "waiter.getState()"
+      ]
     },
     {
       "method": "ObjectMonitor::enter(Thread*)",
       "scenario": "在可调试 HotSpot 中比较首次获取、重入与竞争慢路径",
-      "variables": ["Self", "_owner", "_recursions", "_cxq", "_EntryList"],
+      "variables": [
+        "Self",
+        "_owner",
+        "_recursions",
+        "_cxq",
+        "_EntryList"
+      ],
       "sourceClass": "hotspot.runtime.ObjectMonitor"
     },
     {
       "method": "ObjectMonitor::wait(jlong,bool,Thread*)",
       "scenario": "在可调试 HotSpot 中观察保存重入深度、WaitSet 和重新进入",
-      "variables": ["save", "_recursions", "_WaitSet", "_owner"],
+      "variables": [
+        "save",
+        "_recursions",
+        "_WaitSet",
+        "_owner"
+      ],
       "sourceClass": "hotspot.runtime.ObjectMonitor"
     }
   ]

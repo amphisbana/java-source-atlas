@@ -162,64 +162,143 @@
       "purpose": "查找并调用局部或全局 @ExceptionHandler 方法"
     }
   ],
-  "evidence": [{
-    "claim": "Spring MVC 会先解析控制器方法参数，调用处理器后再选择返回值处理器写出响应。",
-    "entryPoint": "FrameworkServlet.processRequest(HttpServletRequest,HttpServletResponse)",
-    "document": "/spring/mvc/dispatch-chain",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.spring.mvc.SpringMvcBehaviorTest",
-    "testMethod": "shouldResolveArgumentsAndWriteResponse"
-  }],
+  "evidence": [
+    {
+      "id": "dispatch-main",
+      "kind": "main",
+      "claim": "DispatcherServlet 选择 Handler、解析参数、调用控制器并通过消息转换器写出响应。",
+      "entryPoint": "DispatcherServlet.doDispatch(HttpServletRequest,HttpServletResponse)",
+      "document": "/spring/mvc/dispatch-chain",
+      "labMethod": "runRequest",
+      "testClass": "io.github.javasourceatlas.spring.mvc.SpringMvcBehaviorTest",
+      "testMethod": "shouldResolveArgumentsAndWriteResponse",
+      "expectedOutcome": "GET 请求的路径变量与查询参数正确注入，响应状态、媒体类型和正文全部符合预期。"
+    },
+    {
+      "id": "method-condition-boundary",
+      "kind": "boundary",
+      "claim": "路径匹配但 HTTP method 条件不满足时不会进入控制器，而由 handleNoMatch 生成 405。",
+      "entryPoint": "RequestMappingInfoHandlerMapping.handleNoMatch(Set<RequestMappingInfo>,String,HttpServletRequest)",
+      "document": "/spring/mvc/dispatch-chain",
+      "labMethod": "runUnsupportedMethodRequest",
+      "testClass": "io.github.javasourceatlas.spring.mvc.SpringMvcBehaviorTest",
+      "testMethod": "shouldRejectUnsupportedHttpMethod",
+      "expectedOutcome": "POST 请求命中同一路径但返回 405，并在 Allow 响应头声明支持的方法。"
+    },
+    {
+      "id": "exception-resolver-failure",
+      "kind": "failure",
+      "claim": "控制器异常会回到 processHandlerException，并由匹配的 @ExceptionHandler 转换为业务响应。",
+      "entryPoint": "DispatcherServlet.processHandlerException(HttpServletRequest,HttpServletResponse,Object,Exception)",
+      "document": "/spring/mvc/argument-return-exception",
+      "labMethod": "runRequest",
+      "testClass": "io.github.javasourceatlas.spring.mvc.SpringMvcBehaviorTest",
+      "testMethod": "shouldResolveControllerException",
+      "expectedOutcome": "异常没有泄漏到 MockMvc 调用方，最终响应使用全局异常处理器定义的状态码和正文。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "DispatcherServlet.doDispatch(HttpServletRequest,HttpServletResponse)",
       "scenario": "分别执行正常、业务异常和 HTTP 方法不匹配请求",
-      "variables": ["processedRequest", "mappedHandler", "mv", "dispatchException"]
+      "variables": [
+        "processedRequest",
+        "mappedHandler",
+        "mv",
+        "dispatchException"
+      ],
+      "evidenceId": "dispatch-main"
     },
     {
       "method": "AbstractHandlerMethodMapping.lookupHandlerMethod(String,HttpServletRequest)",
       "scenario": "匹配 GET /orders/42 并观察最佳 RequestMappingInfo",
-      "variables": ["lookupPath", "directPathMatches", "matchingMappings", "bestMatch"]
+      "variables": [
+        "lookupPath",
+        "directPathMatches",
+        "matchingMappings",
+        "bestMatch"
+      ]
     },
     {
       "method": "RequestMappingInfoHandlerMapping.handleNoMatch(Set<RequestMappingInfo>,String,HttpServletRequest)",
       "scenario": "POST /orders/42 路径命中但 HTTP method 条件失败",
-      "variables": ["infos", "partialMatches", "methods"]
+      "variables": [
+        "infos",
+        "partialMatches",
+        "methods"
+      ],
+      "evidenceId": "method-condition-boundary"
     },
     {
       "method": "AbstractHandlerMapping.getHandlerExecutionChain(Object,HttpServletRequest)",
       "scenario": "观察 OrderController 与 TraceHandlerInterceptor 的组合",
-      "variables": ["handler", "chain", "adaptedInterceptors"]
+      "variables": [
+        "handler",
+        "chain",
+        "adaptedInterceptors"
+      ]
     },
     {
       "method": "RequestMappingHandlerAdapter.invokeHandlerMethod(HttpServletRequest,HttpServletResponse,HandlerMethod)",
       "scenario": "进入注解方法适配器并创建 ServletInvocableHandlerMethod",
-      "variables": ["handlerMethod", "invocableMethod", "mavContainer", "asyncManager"]
+      "variables": [
+        "handlerMethod",
+        "invocableMethod",
+        "mavContainer",
+        "asyncManager"
+      ]
     },
     {
       "method": "InvocableHandlerMethod.getMethodArgumentValues(NativeWebRequest,ModelAndViewContainer,Object...)",
       "scenario": "解析 orderId 路径变量与 detail 查询参数",
-      "variables": ["parameters", "providedArgs", "args", "parameter"]
+      "variables": [
+        "parameters",
+        "providedArgs",
+        "args",
+        "parameter"
+      ]
     },
     {
       "method": "RequestResponseBodyMethodProcessor.resolveArgument(MethodParameter,ModelAndViewContainer,NativeWebRequest,WebDataBinderFactory)",
       "scenario": "POST /orders/echo 通过 StringHttpMessageConverter 读取 text/plain 请求体",
-      "variables": ["parameter", "arg", "binder", "bindingResult"]
+      "variables": [
+        "parameter",
+        "arg",
+        "binder",
+        "bindingResult"
+      ]
     },
     {
       "method": "HandlerMethodReturnValueHandlerComposite.handleReturnValue(Object,MethodParameter,ModelAndViewContainer,NativeWebRequest)",
       "scenario": "正常请求返回 ResponseEntity<String>",
-      "variables": ["returnValue", "returnType", "mavContainer", "handler"]
+      "variables": [
+        "returnValue",
+        "returnType",
+        "mavContainer",
+        "handler"
+      ]
     },
     {
       "method": "AbstractMessageConverterMethodProcessor.writeWithMessageConverters(Object,MethodParameter,NativeWebRequest)",
       "scenario": "观察 ResponseEntity 或 @ResponseBody 的媒体类型与 converter 选择",
-      "variables": ["value", "targetType", "acceptableTypes", "producibleTypes", "selectedMediaType"]
+      "variables": [
+        "value",
+        "targetType",
+        "acceptableTypes",
+        "producibleTypes",
+        "selectedMediaType"
+      ]
     },
     {
       "method": "DispatcherServlet.processHandlerException(HttpServletRequest,HttpServletResponse,Object,Exception)",
       "scenario": "订单 0 抛异常后命中全局 @ExceptionHandler",
-      "variables": ["handler", "ex", "handlerExceptionResolvers", "exMv"]
+      "variables": [
+        "handler",
+        "ex",
+        "handlerExceptionResolvers",
+        "exMv"
+      ],
+      "evidenceId": "exception-resolver-failure"
     }
   ]
 }

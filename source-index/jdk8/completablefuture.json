@@ -13,7 +13,11 @@
   "versionComparison": {
     "id": "completable-future",
     "summary": "JDK 8 奠定 Completion 栈与 result 状态机，后续版本补充执行器定制、超时和非阻塞状态观察。",
-    "supportedVersions": ["8", "17", "21"],
+    "supportedVersions": [
+      "8",
+      "17",
+      "21"
+    ],
     "migrationHint": "区分修改当前 future 的超时方法、创建下游阶段的方法和 Future.State 观察 API。"
   },
   "lab": {
@@ -21,7 +25,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.CompletableFutureDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/CompletableFutureDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.util.concurrent.CompletableFuture",
@@ -74,34 +81,86 @@
       "purpose": "以 CancellationException 完成阶段并触发依赖"
     }
   ],
-  "evidence": [{
-    "claim": "CompletableFuture 的结果转换与异步阶段依赖已有完成状态和执行器，而不是为每一步固定创建线程。",
-    "entryPoint": "supplyAsync(Supplier)",
-    "document": "/jdk/concurrent/completablefuture/#supplyasync-不等于创建一个专属线程",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.concurrent.CompletableFutureBehaviorTest",
-    "testMethod": "shouldTransformAndComposeResult"
-  }],
+  "evidence": [
+    {
+      "id": "composition-main",
+      "kind": "main",
+      "claim": "thenApply 转换同一阶段结果，thenCompose 展平另一个 CompletionStage 而不产生嵌套 Future。",
+      "entryPoint": "thenApply(Function)",
+      "document": "/jdk/concurrent/completablefuture/completion-stack#uniapply-的触发条件",
+      "labMethod": "observeComposition",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.CompletableFutureBehaviorTest",
+      "testMethod": "shouldTransformAndComposeResult",
+      "expectedOutcome": "同步转换和异步组合依次生效，最终 join 得到展平后的业务结果。"
+    },
+    {
+      "id": "recovery-failure",
+      "kind": "failure",
+      "claim": "上游异常会跳过普通转换并沿完成栈传播，exceptionally 可以把失败恢复为正常结果。",
+      "entryPoint": "thenApply(Function)",
+      "document": "/jdk/concurrent/completablefuture/completion-stack#uniapply-的触发条件",
+      "labMethod": "observeExceptionRecovery",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.CompletableFutureBehaviorTest",
+      "testMethod": "shouldSkipNormalTransformAndRecoverException",
+      "expectedOutcome": "普通转换没有执行，恢复函数收到原始异常并提供可继续组合的替代值。"
+    },
+    {
+      "id": "completion-thread-concurrency",
+      "kind": "concurrency",
+      "claim": "非 async 回调通常由完成源 Future 的线程就地执行，而不是自动切换到公共线程池。",
+      "entryPoint": "postComplete()",
+      "document": "/jdk/concurrent/completablefuture/completion-stack#postcomplete-为什么不用递归到底",
+      "labMethod": "observeThreadBoundaries",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.CompletableFutureBehaviorTest",
+      "testMethod": "shouldRunNonAsyncActionOnCompletingThread",
+      "expectedOutcome": "完成线程名称与 thenRun 回调线程名称一致，证明回调沿 postComplete 同步推进。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "uniApplyStage(Executor,Function)",
       "scenario": "观察未完成与已完成源阶段的依赖注册路径",
-      "variables": ["e", "d", "c", "result", "stack"]
+      "variables": [
+        "e",
+        "d",
+        "c",
+        "result",
+        "stack"
+      ],
+      "evidenceId": "composition-main"
     },
     {
       "method": "UniApply.tryFire(int)",
       "scenario": "比较同步、异步和嵌套传播模式",
-      "variables": ["mode", "src", "dep", "executor", "fn"]
+      "variables": [
+        "mode",
+        "src",
+        "dep",
+        "executor",
+        "fn"
+      ],
+      "evidenceId": "recovery-failure"
     },
     {
       "method": "postComplete()",
       "scenario": "跟踪 Completion 出栈和下游继续传播",
-      "variables": ["f", "h", "t", "d"]
+      "variables": [
+        "f",
+        "h",
+        "t",
+        "d"
+      ],
+      "evidenceId": "completion-thread-concurrency"
     },
     {
       "method": "waitingGet(boolean)",
       "scenario": "观察 join/get 如何注册等待线程 Signaller",
-      "variables": ["interruptible", "q", "queued", "result"]
+      "variables": [
+        "interruptible",
+        "q",
+        "queued",
+        "result"
+      ]
     }
   ]
 }

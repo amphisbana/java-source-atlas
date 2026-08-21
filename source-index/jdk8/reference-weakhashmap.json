@@ -13,7 +13,11 @@
   "versionComparison": {
     "id": "reference-weakhashmap",
     "summary": "ReferenceQueue 通知与 WeakHashMap 弱 key/强 value 协议跨 JDK 8/17/21 保持稳定，GC 清除屏障、pending-list、refersTo、队列等待和类型层级持续演进。",
-    "supportedVersions": ["8", "17", "21"],
+    "supportedVersions": [
+      "8",
+      "17",
+      "21"
+    ],
     "migrationHint": "不要把 System.gc、isEnqueued 或一次 size 变化当完成信号；按版本定位 clear0、processPendingReferences、refersTo、ReferenceQueue 锁与 newWeakHashMap。"
   },
   "lab": {
@@ -21,7 +25,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.reference.ReferenceWeakHashMapDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/reference/ReferenceWeakHashMapDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.lang.ref.Reference",
@@ -116,47 +123,120 @@
       "purpose": "用 nextKey/currentKey 临时强引用保持迭代步骤中的 key"
     }
   ],
-  "evidence": [{
-    "claim": "Reference.clear 只清除 referent，入队是独立状态变化，二者不能混为一次操作。",
-    "entryPoint": "Reference.get()",
-    "document": "/jdk/runtime/reference-weakhashmap/reference-processing#四类引用的处理边界",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.reference.ReferenceWeakHashMapBehaviorTest",
-    "testMethod": "shouldSeparateClearFromEnqueue"
-  }],
+  "evidence": [
+    {
+      "id": "clear-enqueue-main",
+      "kind": "main",
+      "claim": "Reference.clear 只清空 referent，enqueue 才把引用对象放入 ReferenceQueue，两者是独立动作。",
+      "entryPoint": "Reference.clear()",
+      "document": "/jdk/runtime/reference-weakhashmap/reference-processing#clear-与-enqueue-不能混为一个动作",
+      "labMethod": "observeExplicitQueueProtocol",
+      "testClass": "io.github.javasourceatlas.jdk.reference.ReferenceWeakHashMapBehaviorTest",
+      "testMethod": "shouldSeparateClearFromEnqueue",
+      "expectedOutcome": "clear 后 get 返回 null 但 queue 为空；显式 enqueue 后 poll 才返回该引用。"
+    },
+    {
+      "id": "phantom-boundary",
+      "kind": "boundary",
+      "claim": "PhantomReference 的 get 永远返回 null，只能通过 ReferenceQueue 感知可回收阶段。",
+      "entryPoint": "PhantomReference.get()",
+      "document": "/jdk/runtime/reference-weakhashmap/reference-processing#phantomreference",
+      "labMethod": "observePhantomReference",
+      "testClass": "io.github.javasourceatlas.jdk.reference.ReferenceWeakHashMapBehaviorTest",
+      "testMethod": "shouldExposeNullFromPhantomReference",
+      "expectedOutcome": "创建前后和入队后 get 均为 null，引用对象可通过队列被取回。"
+    },
+    {
+      "id": "queue-wait-cleanup",
+      "kind": "cleanup",
+      "claim": "ReferenceQueue.remove 的等待与超时契约允许清理线程阻塞等待引用到达，并在超时后返回空。",
+      "entryPoint": "ReferenceQueue.poll/remove(long)",
+      "document": "/jdk/runtime/reference-weakhashmap/reference-processing#referencequeue-的三种消费方式",
+      "labMethod": "observeExplicitQueueProtocol",
+      "testClass": "io.github.javasourceatlas.jdk.reference.ReferenceWeakHashMapBehaviorTest",
+      "testMethod": "shouldKeepReferenceQueueWaitContractAcrossVersions",
+      "expectedOutcome": "空队列超时等待不会伪造引用，入队后 remove 能取到唯一目标引用。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "Reference.clear()/enqueue()",
       "scenario": "先 clear 再显式 enqueue，区分 referent 与队列状态",
-      "variables": ["referent", "queue", "next", "enqueue 返回值"]
+      "variables": [
+        "referent",
+        "queue",
+        "next",
+        "enqueue 返回值"
+      ]
     },
     {
       "method": "Reference.tryHandlePending(boolean)",
       "scenario": "JDK 8 GC 清弱 key 后观察 Reference Handler 入队",
-      "variables": ["pending", "r", "c", "r.discovered", "r.queue"]
+      "variables": [
+        "pending",
+        "r",
+        "c",
+        "r.discovered",
+        "r.queue"
+      ]
     },
     {
       "method": "ReferenceQueue.enqueue(Reference)",
       "scenario": "WeakReference 或 WeakHashMap.Entry 进入注册队列",
-      "variables": ["r", "r.queue", "head", "queueLength"]
+      "variables": [
+        "r",
+        "r.queue",
+        "head",
+        "queueLength"
+      ],
+      "evidenceId": "queue-wait-cleanup"
     },
     {
       "method": "WeakHashMap.expungeStaleEntries()",
       "sourceClass": "java.util.WeakHashMap",
       "scenario": "map.size 触发已入队 Entry 的桶级摘链",
-      "variables": ["x", "e", "i", "prev", "p", "size"]
+      "variables": [
+        "x",
+        "e",
+        "i",
+        "prev",
+        "p",
+        "size"
+      ]
     },
     {
       "method": "WeakHashMap.transfer(Entry[],Entry[])",
       "sourceClass": "java.util.WeakHashMap",
       "scenario": "resize 期间 key 被清除并导致 Entry 丢弃",
-      "variables": ["src", "dest", "e", "key", "size", "threshold"]
+      "variables": [
+        "src",
+        "dest",
+        "e",
+        "key",
+        "size",
+        "threshold"
+      ]
     },
     {
       "method": "WeakHashMap.HashIterator.hasNext()",
       "sourceClass": "java.util.WeakHashMap",
       "scenario": "迭代弱键时观察 nextKey 对当前 key 的临时强保活",
-      "variables": ["nextEntry", "nextKey", "currentKey", "expectedModCount"]
+      "variables": [
+        "nextEntry",
+        "nextKey",
+        "currentKey",
+        "expectedModCount"
+      ]
+    },
+    {
+      "method": "Reference.enqueue()",
+      "scenario": "在行为测试中显式入队 WeakReference，区分 referent 清空与队列发布",
+      "variables": [
+        "this.referent",
+        "this.queue",
+        "enqueue 返回值"
+      ],
+      "evidenceId": "clear-enqueue-main"
     }
   ]
 }

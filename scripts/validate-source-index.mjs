@@ -31,6 +31,7 @@ const validationKeywords = new Set([
   'properties',
   'items',
   'const',
+  'enum',
   'minLength',
   'minItems',
   'format',
@@ -218,6 +219,10 @@ function validateValue(schema, value, pointer, errors) {
 
   if (schema.const !== undefined && !jsonEquals(value, schema.const)) {
     errors.push(`${pointer}: 值必须等于 ${JSON.stringify(schema.const)}`)
+  }
+
+  if (Array.isArray(schema.enum) && !schema.enum.some((candidate) => jsonEquals(value, candidate))) {
+    errors.push(`${pointer}: 值必须是 ${schema.enum.map((candidate) => JSON.stringify(candidate)).join('、')} 之一`)
   }
 
   if (typeof value === 'string') {
@@ -525,16 +530,18 @@ function containsJunitTestMethod(source, methodName) {
  * @param {unknown} document 当前专题索引
  * @param {string} indexFile 当前索引文件
  * @param {string[]} failures 错误收集器
- * @returns {Promise<number>} 当前专题通过结构读取的证据条数
+ * @returns {Promise<{ evidenceCount: number, boundBreakpointCount: number }>} 当前专题证据与已绑定断点数量
  */
 async function validateEvidence(document, indexFile, failures) {
   if (document === null || typeof document !== 'object' || Array.isArray(document)) {
-    return 0
+    return { evidenceCount: 0, boundBreakpointCount: 0 }
   }
 
   const evidenceItems = Array.isArray(document.evidence) ? document.evidence : []
   const entryPoints = Array.isArray(document.entryPoints) ? document.entryPoints : []
   const displayPath = relative(projectRoot, indexFile)
+  const evidenceIds = new Set()
+  const evidenceKinds = new Set()
   let labSource
 
   if (typeof document.lab?.sourcePath === 'string') {
@@ -550,6 +557,15 @@ async function validateEvidence(document, indexFile, failures) {
       continue
     }
     const pointer = `${displayPath} #/evidence/${index}`
+    if (typeof evidence.id === 'string') {
+      if (evidenceIds.has(evidence.id)) {
+        failures.push(`${pointer}/id: ${evidence.id} 在当前专题中重复`)
+      }
+      evidenceIds.add(evidence.id)
+    }
+    if (typeof evidence.kind === 'string') {
+      evidenceKinds.add(evidence.kind)
+    }
     const entryExists = entryPoints.some((entryPoint) => (
       entryPoint?.method === evidence.entryPoint && entryPoint?.document === evidence.document
     ))
@@ -580,7 +596,31 @@ async function validateEvidence(document, indexFile, failures) {
     }
   }
 
-  return evidenceItems.length
+  if (evidenceItems.length >= 3 && !evidenceKinds.has('main')) {
+    failures.push(`${displayPath} #/evidence: 至少需要一条 main 主线证据`)
+  }
+  if (evidenceItems.length >= 3
+    && !['boundary', 'failure', 'cleanup'].some((kind) => evidenceKinds.has(kind))) {
+    failures.push(`${displayPath} #/evidence: 除主线外至少需要 boundary、failure 或 cleanup 证据之一`)
+  }
+
+  const breakpoints = Array.isArray(document.breakpoints) ? document.breakpoints : []
+  let boundBreakpointCount = 0
+  breakpoints.forEach((breakpoint, index) => {
+    if (breakpoint === null || typeof breakpoint !== 'object' || Array.isArray(breakpoint)) {
+      return
+    }
+    if (typeof breakpoint.evidenceId !== 'string') {
+      return
+    }
+    boundBreakpointCount += 1
+    if (!evidenceIds.has(breakpoint.evidenceId)) {
+      failures.push(
+        `${displayPath} #/breakpoints/${index}/evidenceId: ${breakpoint.evidenceId} 不属于当前专题证据`
+      )
+    }
+  })
+  return { evidenceCount: evidenceItems.length, boundBreakpointCount }
 }
 
 /**
@@ -736,6 +776,7 @@ const topicOwners = new Map()
 const comparisonOwners = new Map()
 const recommendedReferences = []
 let evidenceCount = 0
+let boundBreakpointCount = 0
 
 if (indexFiles.length === 0) {
   failures.push('source-index: 至少需要一个专题索引')
@@ -750,13 +791,21 @@ for (const indexFile of indexFiles) {
   collectRecommendedNextReference(document, indexFile, recommendedReferences, failures)
   validateSourceClassReferences(document, indexFile, failures)
   await validateLabMetadata(document, indexFile, failures)
-  evidenceCount += await validateEvidence(document, indexFile, failures)
+  const evidenceStats = await validateEvidence(document, indexFile, failures)
+  evidenceCount += evidenceStats.evidenceCount
+  boundBreakpointCount += evidenceStats.boundBreakpointCount
   validateTopicBaseline(document, indexFile, repositoryRefs, failures)
 
   if (errors.length > 0) {
     const displayPath = relative(projectRoot, indexFile)
     failures.push(...errors.map((error) => `${displayPath} ${error}`))
   }
+}
+
+// 2026-08-21：原校验要求每个专题至少绑定一个断点，会迫使只有 Lab 断点的专题建立不真实映射。
+// 当前改为检查仓库级覆盖；单个断点只有在对应 JUnit 场景确定经过该方法时才声明 evidenceId。
+if (boundBreakpointCount < indexFiles.length) {
+  failures.push(`source-index: 已绑定断点仅 ${boundBreakpointCount} 条，至少应达到专题数 ${indexFiles.length}`)
 }
 
 validateRecommendedNextTargets(recommendedReferences, topicOwners, failures)
@@ -770,6 +819,6 @@ if (failures.length > 0) {
   process.exitCode = 1
 } else {
   console.log(
-    `source-index 校验通过：${indexFiles.length} 个专题索引、${evidenceCount} 条可执行证据、${baselines.baselines.length} 个固定版本、${markdownFileCount} 篇 Markdown`
+    `source-index 校验通过：${indexFiles.length} 个专题索引、${evidenceCount} 条可执行证据、${boundBreakpointCount} 个场景断点绑定、${baselines.baselines.length} 个固定版本、${markdownFileCount} 篇 Markdown`
   )
 }

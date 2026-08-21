@@ -13,7 +13,11 @@
   "versionComparison": {
     "id": "thread-pool-executor",
     "summary": "ThreadPoolExecutor 的 ctl 编码、execute 三步复查、Worker 锁和五态关闭协议跨 JDK 8/17/21 基本稳定，但 finalization、显式 close、线程容器和部分边界约束持续演进。",
-    "supportedVersions": ["8", "17", "21"],
+    "supportedVersions": [
+      "8",
+      "17",
+      "21"
+    ],
     "migrationHint": "业务代码继续依赖 execute、shutdown 和拒绝策略的公开契约；JDK 19+ 可用 close，调试时按版本重新定位 finalize、decrementWorkerCount、runWorker 与 JDK 21 SharedThreadContainer。"
   },
   "lab": {
@@ -21,7 +25,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ThreadPoolExecutorDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/ThreadPoolExecutorDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.util.concurrent.ThreadPoolExecutor",
@@ -146,67 +153,146 @@
       "purpose": "把饱和或关闭后的任务交给 RejectedExecutionHandler"
     }
   ],
-  "evidence": [{
-    "claim": "工作线程与队列同时达到容量上限后，新任务会进入配置的拒绝策略。",
-    "entryPoint": "runStateOf(int)",
-    "document": "/jdk/concurrent/threadpoolexecutor/#生命周期状态",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.concurrent.ThreadPoolExecutorBehaviorTest",
-    "testMethod": "shouldRejectWhenWorkersAndQueueAreFull"
-  }],
+  "evidence": [
+    {
+      "id": "execute-reject-main",
+      "kind": "main",
+      "claim": "execute 按核心线程、队列、非核心线程三步决策；三处都无容量后进入拒绝策略。",
+      "entryPoint": "execute(Runnable)",
+      "document": "/jdk/concurrent/threadpoolexecutor/#execute-的三步决策",
+      "labMethod": "observeExecuteDecision",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ThreadPoolExecutorBehaviorTest",
+      "testMethod": "shouldRejectWhenWorkersAndQueueAreFull",
+      "expectedOutcome": "核心与最大线程数已满且队列已满时，新任务稳定触发 RejectedExecutionException。"
+    },
+    {
+      "id": "caller-runs-boundary",
+      "kind": "boundary",
+      "claim": "CallerRunsPolicy 在未关闭的饱和池中把被拒任务同步交给提交线程执行，形成反压。",
+      "entryPoint": "reject(Runnable)",
+      "document": "/jdk/concurrent/threadpoolexecutor/shutdown-reject#四种内置拒绝策略",
+      "labMethod": "observeCallerRuns",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ThreadPoolExecutorBehaviorTest",
+      "testMethod": "shouldRunRejectedTaskInCallerThread",
+      "expectedOutcome": "拒绝任务没有丢失，执行线程名称等于调用 execute 的线程名称。"
+    },
+    {
+      "id": "graceful-shutdown-cleanup",
+      "kind": "cleanup",
+      "claim": "shutdown 不接收新任务但会排空队列，并且不应中断正在执行的 Worker。",
+      "entryPoint": "shutdown()",
+      "document": "/jdk/concurrent/threadpoolexecutor/shutdown-reject#shutdown-是有序关闭",
+      "labMethod": "observeGracefulShutdown",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ThreadPoolExecutorBehaviorTest",
+      "testMethod": "shouldDrainQueueDuringGracefulShutdown",
+      "expectedOutcome": "已提交任务全部完成，shutdown 后新任务被拒绝，线程池最终进入 TERMINATED。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "execute(Runnable)",
       "scenario": "观察三步提交决策和 offer 后状态复查",
-      "variables": ["c", "recheck", "command", "workQueue"]
+      "variables": [
+        "c",
+        "recheck",
+        "command",
+        "workQueue"
+      ],
+      "evidenceId": "execute-reject-main"
     },
     {
       "method": "addWorker(Runnable,boolean)",
       "scenario": "观察 worker 数量预占、状态双检和启动回滚",
-      "variables": ["rs", "wc", "core", "workerAdded", "workerStarted"]
+      "variables": [
+        "rs",
+        "wc",
+        "core",
+        "workerAdded",
+        "workerStarted"
+      ]
     },
     {
       "method": "runWorker(Worker)",
       "scenario": "观察 Worker 锁、中断复查、模板钩子与异常退出",
-      "variables": ["task", "thrown", "completedAbruptly", "w.completedTasks"]
+      "variables": [
+        "task",
+        "thrown",
+        "completedAbruptly",
+        "w.completedTasks"
+      ]
     },
     {
       "method": "getTask()",
       "scenario": "观察核心超时和正常 Worker 回收",
-      "variables": ["c", "rs", "wc", "timed", "timedOut"]
+      "variables": [
+        "c",
+        "rs",
+        "wc",
+        "timed",
+        "timedOut"
+      ]
     },
     {
       "method": "processWorkerExit(Worker,boolean)",
       "scenario": "观察 execute 异常后的 Worker 替补",
-      "variables": ["completedAbruptly", "c", "min", "workQueue"]
+      "variables": [
+        "completedAbruptly",
+        "c",
+        "min",
+        "workQueue"
+      ]
     },
     {
       "method": "interruptIdleWorkers(boolean)",
       "scenario": "对比空闲 Worker 与持锁活跃 Worker 的中断结果",
-      "variables": ["onlyOne", "w", "t", "t.isInterrupted()"]
+      "variables": [
+        "onlyOne",
+        "w",
+        "t",
+        "t.isInterrupted()"
+      ],
+      "evidenceId": "graceful-shutdown-cleanup"
     },
     {
       "method": "afterExecute(Runnable,Throwable)",
       "scenario": "对比 execute 与 submit 任务失败时的 Throwable 参数",
-      "variables": ["r", "t", "r instanceof Future"]
+      "variables": [
+        "r",
+        "t",
+        "r instanceof Future"
+      ]
     },
     {
       "method": "tryTerminate()",
       "scenario": "观察 ctl 从关闭状态收口到 TERMINATED",
-      "variables": ["c", "workerCountOf(c)", "workQueue", "termination"]
+      "variables": [
+        "c",
+        "workerCountOf(c)",
+        "workQueue",
+        "termination"
+      ],
+      "evidenceId": "graceful-shutdown-cleanup"
     },
     {
       "method": "BlockingAfterOfferQueue.offer(Runnable)",
       "document": "/jdk/concurrent/threadpoolexecutor/debug-lab#实验四offer-后-shutdown-的复查回滚",
       "scenario": "在 Lab 中稳定暂停 offer 返回并插入 shutdown",
-      "variables": ["accepted", "offered", "continueOffer"],
+      "variables": [
+        "accepted",
+        "offered",
+        "continueOffer"
+      ],
       "sourceClass": null
     },
     {
       "method": "HookTrackingExecutor.afterExecute(Runnable,Throwable)",
       "document": "/jdk/concurrent/threadpoolexecutor/debug-lab#实验七三个生命周期钩子与-submit-异常",
       "scenario": "在 Lab 中解包 FutureTask 保存的业务异常",
-      "variables": ["runnable", "throwable", "futureFailure"],
+      "variables": [
+        "runnable",
+        "throwable",
+        "futureFailure"
+      ],
       "sourceClass": null
     }
   ]

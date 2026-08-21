@@ -13,7 +13,11 @@
   "versionComparison": {
     "id": "hashmap",
     "summary": "数组、链表、红黑树和 putVal → resize 主干保持稳定，变化集中在查询职责、集合视图和反序列化边界。",
-    "supportedVersions": ["8", "17", "21"],
+    "supportedVersions": [
+      "8",
+      "17",
+      "21"
+    ],
     "migrationHint": "跨版本断点先确认 getNode、readObject 和 newHashMap 的实际入口。"
   },
   "lab": {
@@ -21,7 +25,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.collection.HashMapDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/collection/HashMapDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.util.HashMap",
@@ -59,34 +66,90 @@
       "purpose": "按键或键值组合删除节点"
     }
   ],
-  "evidence": [{
-    "claim": "HashMap 为已有 key 写入新值时只替换 value，不增加映射数量。",
-    "entryPoint": "put(K,V)",
-    "document": "/jdk/collections/hashmap/put",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.collection.HashMapBehaviorTest",
-    "testMethod": "shouldReplaceValueWithoutIncreasingSize"
-  }],
+  "evidence": [
+    {
+      "id": "put-main",
+      "kind": "main",
+      "claim": "HashMap 为已有 key 写入新值时只替换 value，不增加映射数量。",
+      "entryPoint": "putVal(int,K,V,boolean,boolean)",
+      "document": "/jdk/collections/hashmap/put#putval-的五个阶段",
+      "labMethod": "observeBasicPutAndReplace",
+      "testClass": "io.github.javasourceatlas.jdk.collection.HashMapBehaviorTest",
+      "testMethod": "shouldReplaceValueWithoutIncreasingSize",
+      "expectedOutcome": "第二次 put 返回旧值，size 保持 1，get 返回替换后的新值。"
+    },
+    {
+      "id": "resize-boundary",
+      "kind": "boundary",
+      "claim": "HashMap 扩容迁移后所有旧映射仍可按原 key 读取，容量变化不改变 Map 契约。",
+      "entryPoint": "resize()",
+      "document": "/jdk/collections/hashmap/resize",
+      "labMethod": "observeResize",
+      "testClass": "io.github.javasourceatlas.jdk.collection.HashMapBehaviorTest",
+      "testMethod": "shouldKeepMappingsAfterResize",
+      "expectedOutcome": "从小容量连续写入 1000 个映射后 size 正确，逐个 key 都能读回对应 value。"
+    },
+    {
+      "id": "treeify-boundary",
+      "kind": "boundary",
+      "claim": "容量达到 64 后，同一桶中的足量碰撞节点会进入树化路径且仍以 equals 区分键。",
+      "entryPoint": "treeifyBin(Node[],int)",
+      "document": "/jdk/collections/hashmap/treeify#treeifybin-并不总是树化",
+      "labMethod": "observeTreeification",
+      "testClass": "io.github.javasourceatlas.jdk.collection.HashMapBehaviorTest",
+      "testMethod": "shouldKeepCollidingKeysDistinct",
+      "expectedOutcome": "20 个相同 hash、不同 equals 的键全部保留并能分别读取，treeifyBin 断点被稳定触发。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "hash(Object)",
       "scenario": "观察哈希扰动与 null 键",
-      "variables": ["key", "h"]
+      "variables": [
+        "key",
+        "h"
+      ],
+      "evidenceId": "put-main"
     },
     {
       "method": "putVal(int,K,V,boolean,boolean)",
       "scenario": "观察空桶、覆盖、链表和树分支",
-      "variables": ["tab", "n", "i", "p", "e", "binCount", "size", "threshold"]
+      "variables": [
+        "tab",
+        "n",
+        "i",
+        "p",
+        "e",
+        "binCount",
+        "size",
+        "threshold"
+      ],
+      "evidenceId": "put-main"
     },
     {
       "method": "resize()",
       "scenario": "观察首次分配与扩容拆链",
-      "variables": ["oldCap", "oldThr", "newCap", "newThr", "loHead", "hiHead"]
+      "variables": [
+        "oldCap",
+        "oldThr",
+        "newCap",
+        "newThr",
+        "loHead",
+        "hiHead"
+      ],
+      "evidenceId": "resize-boundary"
     },
     {
       "method": "treeifyBin(Node[],int)",
       "scenario": "观察扩容优先和树化条件",
-      "variables": ["tab", "n", "index", "hd", "tl"]
+      "variables": [
+        "tab",
+        "n",
+        "index",
+        "hd",
+        "tl"
+      ],
+      "evidenceId": "treeify-boundary"
     }
   ]
 }

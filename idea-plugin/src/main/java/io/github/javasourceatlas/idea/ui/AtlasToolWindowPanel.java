@@ -30,6 +30,7 @@ import io.github.javasourceatlas.idea.learning.AtlasLearningProgressState;
 import io.github.javasourceatlas.idea.model.AtlasBreakpoint;
 import io.github.javasourceatlas.idea.model.AtlasEditorContext;
 import io.github.javasourceatlas.idea.model.AtlasEntryPoint;
+import io.github.javasourceatlas.idea.model.AtlasEvidence;
 import io.github.javasourceatlas.idea.model.AtlasTopic;
 import io.github.javasourceatlas.idea.model.AtlasTopicRelation;
 import io.github.javasourceatlas.idea.model.AtlasVersionInfo;
@@ -109,6 +110,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     private final JButton addAllBreakpointsButton = new JButton("添加全部断点");
     private final JButton openLabButton = new JButton("打开 Lab");
     private final JButton debugLabButton = new JButton("Debug Lab");
+    private final JButton debugEvidenceButton = new JButton("Debug 当前场景");
     private final JButton viewBreakpointExplanationButton = new JButton("查看断点讲解");
     private final JButton favoriteTopicButton = new JButton("收藏当前专题");
     private final JButton clearRecentButton = new JButton("清空最近阅读");
@@ -260,6 +262,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         addAllBreakpointsButton.addActionListener(ignored -> addAllBreakpoints());
         openLabButton.addActionListener(ignored -> openLab());
         debugLabButton.addActionListener(ignored -> debugLab());
+        debugEvidenceButton.addActionListener(ignored -> debugCurrentEvidence());
         viewBreakpointExplanationButton.addActionListener(ignored -> viewBreakpointExplanation());
         favoriteTopicButton.addActionListener(ignored -> toggleFavoriteTopic());
         clearRecentButton.addActionListener(ignored -> clearRecentTopics());
@@ -279,6 +282,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         addAllBreakpointsButton.setToolTipText("添加当前专题的全部推荐断点");
         openLabButton.setToolTipText("打开当前专题的 Lab 主类");
         debugLabButton.setToolTipText("创建临时配置并 Debug 当前专题 Lab");
+        debugEvidenceButton.setToolTipText("选择已绑定证据的推荐断点后，Debug 对应 JUnit 测试方法");
         viewBreakpointExplanationButton.setToolTipText("打开与当前断点最匹配的源码入口讲解");
         favoriteTopicButton.setToolTipText("把当前专题加入或移出本地收藏");
         clearRecentButton.setToolTipText("清空本地最近阅读记录，不影响学习进度");
@@ -320,6 +324,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                 addAllBreakpointsButton,
                 openLabButton,
                 debugLabButton,
+                debugEvidenceButton,
                 viewBreakpointExplanationButton
         ));
         navigationTabs.addTab("学习路径", createLearningSection());
@@ -752,6 +757,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         AtlasTopic topic = topicList.getSelectedValue();
         AtlasEntryPoint entryPoint = entryPointList.getSelectedValue();
         AtlasBreakpoint breakpoint = breakpointList.getSelectedValue();
+        AtlasEvidence evidence = index.evidenceForBreakpoint(topic, breakpoint).orElse(null);
         openDocumentationButton.setEnabled(topic != null && entryPoint != null);
         openExternalDocumentationButton.setEnabled(topic != null && entryPoint != null);
         openVersionComparisonButton.setEnabled(topic != null && topic.versionComparison() != null);
@@ -766,12 +772,16 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         navigateSourceButton.setEnabled(false);
         openLabButton.setEnabled(false);
         debugLabButton.setEnabled(false);
+        debugEvidenceButton.setEnabled(false);
         if (topic != null && navigationTabs.getSelectedIndex() == 3) {
             actionHintLabel.setText("确认阅读与实验进度，再沿推荐关系进入下一专题");
         } else if (topic != null && navigationTabs.getSelectedIndex() == 2) {
+            // 2026-08-21：原逻辑统一提示启动整个 Debug Lab；现在优先提示断点绑定的单个 JUnit 证据场景。
             actionHintLabel.setText(breakpoint == null
                     ? "双击列表项添加单个断点；也可以一次添加全部断点并打开 Lab"
-                    : "当前断点已选中，双击即可添加，或启动 Debug Lab 观察变量变化");
+                    : evidence == null
+                    ? "当前断点可双击添加；该断点暂未绑定独立测试场景"
+                    : "当前断点已绑定行为测试，可直接 Debug 当前场景观察变量变化");
         } else if (topic != null && navigationTabs.getSelectedIndex() == 1) {
             actionHintLabel.setText(entryPoint == null
                     ? "选择一个源码入口开始阅读"
@@ -786,8 +796,12 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                 : "正在检查项目类路径…");
         openLabButton.setToolTipText(topic == null ? "选择专题后可打开实验" : "正在检查 Lab 主类…");
         debugLabButton.setToolTipText(topic == null ? "选择专题后可调试实验" : "正在检查 Lab 主类…");
+        debugEvidenceButton.setToolTipText(evidence == null
+                ? "当前断点没有绑定可执行证据，请选择带“可调试场景”标记的断点"
+                : "正在检查测试方法 " + evidence.testClass() + "#" + evidence.testMethod());
         if (topic == null) {
             viewBreakpointExplanationButton.setEnabled(false);
+            debugEvidenceButton.setEnabled(false);
             favoriteTopicButton.setEnabled(false);
             clearRecentButton.setEnabled(!learningProgress.recentTopicIds().isEmpty());
             return;
@@ -806,6 +820,19 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
             openLabButton.setToolTipText(labHint);
             debugLabButton.setToolTipText(labHint);
         });
+        if (evidence != null) {
+            AtlasLabLauncher.checkEvidenceAvailability(project, this, evidence, available -> {
+                if (!topic.equals(topicList.getSelectedValue())
+                        || !breakpoint.equals(breakpointList.getSelectedValue())) {
+                    return;
+                }
+                debugEvidenceButton.setEnabled(available);
+                debugEvidenceButton.setToolTipText(available
+                        ? evidence.testClass() + "#" + evidence.testMethod()
+                        + "；预期：" + evidence.expectedOutcome()
+                        : "当前项目未导入测试 " + evidence.testClass() + "#" + evidence.testMethod());
+            });
+        }
         if (entryPoint != null) {
             AtlasSourceNavigator.checkAvailability(project, this, topic, entryPoint, available -> {
                 if (!topic.equals(topicList.getSelectedValue())
@@ -1122,6 +1149,30 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     }
 
     /**
+     * 为当前推荐断点绑定的单个 JUnit 证据创建临时 Debug 配置。
+     */
+    private void debugCurrentEvidence() {
+        AtlasTopic topic = topicList.getSelectedValue();
+        AtlasBreakpoint breakpoint = breakpointList.getSelectedValue();
+        AtlasEvidence evidence = index.evidenceForBreakpoint(topic, breakpoint).orElse(null);
+        if (evidence == null) {
+            return;
+        }
+        debugEvidenceButton.setEnabled(false);
+        AtlasLabLauncher.debugEvidenceAsync(project, this, evidence, started -> {
+            updateActionState();
+            if (!started) {
+                Messages.showInfoMessage(
+                        project,
+                        "当前项目中未找到证据测试 " + evidence.testClass() + "#" + evidence.testMethod()
+                                + "。请用 IDEA 打开完整 java-source-atlas 仓库并导入对应 labs 模块。",
+                        "Java Source Atlas"
+                );
+            }
+        });
+    }
+
+    /**
      * 提示用户需要把索引声明的 labs 模块导入当前 IDEA 项目。
      *
      * @param topic 当前专题
@@ -1394,11 +1445,13 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
             String variables = value.variables().isEmpty()
                     ? "暂无额外变量"
                     : String.join("、", value.variables());
+            String evidenceHint = value.evidenceId() == null ? "" : " · 可调试场景";
             methodLabel.setText(value.method());
             scenarioLabel.setText("观察场景：" + StringUtil.shortenTextWithEllipsis(scenario, 118, 0));
-            variablesLabel.setText("观察变量：" + StringUtil.shortenTextWithEllipsis(variables, 118, 0));
+            variablesLabel.setText("观察变量：" + StringUtil.shortenTextWithEllipsis(variables, 118, 0)
+                    + evidenceHint);
             setToolTipText(value.method() + " · 观察场景：" + scenario
-                    + " · 观察变量：" + variables + " · 双击添加当前断点");
+                    + " · 观察变量：" + variables + evidenceHint + " · 双击添加当前断点");
             applySelectionState(list, selected);
             return this;
         }

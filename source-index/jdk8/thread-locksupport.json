@@ -15,7 +15,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLockSupportDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/ThreadLockSupportDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.lang.Thread",
@@ -123,65 +126,132 @@
       "sourceClass": "java.util.concurrent.FutureTask"
     }
   ],
-  "evidence": [{
-    "claim": "直接调用 run 仍在当前线程执行，只有 start 才创建并调度新线程。",
-    "entryPoint": "start()",
-    "document": "/jdk/concurrent/thread-locksupport/#start-与-run-不是同一种调用",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLockSupportBehaviorTest",
-    "testMethod": "shouldSeparateDirectRunFromStart"
-  }],
+  "evidence": [
+    {
+      "id": "start-run-main",
+      "kind": "main",
+      "claim": "直接调用 run 只是普通方法调用，start 才创建新执行线程且一个 Thread 只能启动一次。",
+      "entryPoint": "start()",
+      "document": "/jdk/concurrent/thread-locksupport/#start-与-run-不是同一种调用",
+      "labMethod": "observeRunAndStart",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLockSupportBehaviorTest",
+      "testMethod": "shouldSeparateDirectRunFromStart",
+      "expectedOutcome": "run 在调用线程执行，start 在新线程执行，终止后再次 start 抛 IllegalThreadStateException。"
+    },
+    {
+      "id": "permit-concurrency",
+      "kind": "concurrency",
+      "claim": "LockSupport permit 只有一位，先 unpark 可让下一次 park 立即返回，但多次 unpark 不会累积。",
+      "entryPoint": "park(Object)",
+      "document": "/jdk/concurrent/thread-locksupport/park-unpark#blocker-是诊断信息-不是条件",
+      "labMethod": "observeOneBitPermit",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLockSupportBehaviorTest",
+      "testMethod": "shouldKeepOnlyOnePermit",
+      "expectedOutcome": "第一次 park 消耗预发许可立即返回，第二次 park 真实等待直到新的 unpark 到达。"
+    },
+    {
+      "id": "interrupt-park-failure",
+      "kind": "failure",
+      "claim": "中断会让 park 返回但不清除中断状态，调用方必须自行解释并处理该标记。",
+      "entryPoint": "interrupt()",
+      "document": "/jdk/concurrent/thread-locksupport/interrupt#interrupt-的主路径",
+      "labMethod": "observeInterruptAndBlocker",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ThreadLockSupportBehaviorTest",
+      "testMethod": "shouldReturnFromParkAndPreserveInterruptStatus",
+      "expectedOutcome": "park 因 interrupt 返回后 isInterrupted 仍为 true，blocker 在停放期间可诊断、返回后清空。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "start()",
       "scenario": "对比直接 run、首次 start 和终止后二次 start",
-      "variables": ["threadStatus", "group", "started", "target"]
+      "variables": [
+        "threadStatus",
+        "group",
+        "started",
+        "target"
+      ],
+      "evidenceId": "start-run-main"
     },
     {
       "method": "run()",
       "scenario": "分别从 main 直接调用与 VM 启动的新线程进入 run",
-      "variables": ["this", "target", "Thread.currentThread()"]
+      "variables": [
+        "this",
+        "target",
+        "Thread.currentThread()"
+      ]
     },
     {
       "method": "interrupt()",
       "scenario": "中断停在 LockSupport.park 的线程并观察 blocker 与标记",
-      "variables": ["this", "blocker", "interruptLock"]
+      "variables": [
+        "this",
+        "blocker",
+        "interruptLock"
+      ],
+      "evidenceId": "interrupt-park-failure"
     },
     {
       "method": "join(long)",
       "scenario": "观察 isAlive 条件、wait 循环和目标终止后的返回",
-      "variables": ["millis", "base", "now", "isAlive()"]
+      "variables": [
+        "millis",
+        "base",
+        "now",
+        "isAlive()"
+      ]
     },
     {
       "method": "park(Object)",
       "scenario": "比较预发 permit 的立即返回与 permit 为空时的 WAITING",
-      "variables": ["blocker", "t", "parkBlocker"],
-      "sourceClass": "java.util.concurrent.locks.LockSupport"
+      "variables": [
+        "blocker",
+        "t",
+        "parkBlocker"
+      ],
+      "sourceClass": "java.util.concurrent.locks.LockSupport",
+      "evidenceId": "permit-concurrency"
     },
     {
       "method": "unpark(Thread)",
       "scenario": "在线程尚未 park 时连续调用两次，验证 permit 不累计",
-      "variables": ["thread"],
+      "variables": [
+        "thread"
+      ],
       "sourceClass": "java.util.concurrent.locks.LockSupport"
     },
     {
       "method": "getBlocker(Thread)",
       "scenario": "目标线程 WAITING 时读取 blocker，park 返回后再次观察 null",
-      "variables": ["t", "parkBlocker"],
+      "variables": [
+        "t",
+        "parkBlocker"
+      ],
       "sourceClass": "java.util.concurrent.locks.LockSupport"
     },
     {
       "method": "parkNanos(Object,long)",
       "scenario": "按剩余时间循环处理伪唤醒直到 deadline 到达",
-      "variables": ["blocker", "nanos", "t"],
+      "variables": [
+        "blocker",
+        "nanos",
+        "t"
+      ],
       "sourceClass": "java.util.concurrent.locks.LockSupport"
     },
     {
       "method": "observeOneBitPermit()",
       "document": "/jdk/concurrent/thread-locksupport/debug-lab#实验三unpark-before-park-与一位-permit",
       "scenario": "在 Lab 中用有界闩锁稳定复现预发许可和第二次真实等待",
-      "variables": ["enterParks", "releaseSecondPark", "firstParkReturned", "spuriousReturns"],
-      "sourceClass": null
+      "variables": [
+        "enterParks",
+        "releaseSecondPark",
+        "firstParkReturned",
+        "spuriousReturns"
+      ],
+      "sourceClass": null,
+      "evidenceId": "permit-concurrency"
     }
   ]
 }

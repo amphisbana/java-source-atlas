@@ -9,8 +9,15 @@ import java.util.List;
  * @param scenario    断点对应的实验场景
  * @param variables   建议观察的变量
  * @param sourceClass 方法所属源码类；为空时表示教学 Lab 或专题主类
+ * @param evidenceId  可直接调试的证据编号；为空时只提供源码断点
  */
-public record AtlasBreakpoint(String method, String scenario, List<String> variables, String sourceClass) {
+public record AtlasBreakpoint(
+        String method,
+        String scenario,
+        List<String> variables,
+        String sourceClass,
+        String evidenceId
+) {
 
     /**
      * 把断点信息压缩为工具窗口中的单行摘要。

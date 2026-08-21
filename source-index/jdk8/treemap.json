@@ -15,7 +15,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.collection.TreeMapDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/collection/TreeMapDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.util.TreeMap",
@@ -78,54 +81,132 @@
       "purpose": "对后备 TreeMap 的读写实施包含或排他的范围约束"
     }
   ],
-  "evidence": [{
-    "claim": "TreeMap 按比较结果定位键，相同比较结果替换值且不会新增节点。",
-    "entryPoint": "put(K,V)",
-    "document": "/jdk/collections/treemap/#put-的查找、覆盖与接入",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.collection.TreeMapBehaviorTest",
-    "testMethod": "shouldOrderNaturallyAndReplaceExistingValue"
-  }],
+  "evidence": [
+    {
+      "id": "ordering-main",
+      "kind": "main",
+      "claim": "TreeMap 用 compare 结果同时决定查找方向与键身份，覆盖已有键不会改变大小。",
+      "entryPoint": "put(K,V)",
+      "document": "/jdk/collections/treemap/#put-的查找、覆盖与接入",
+      "labMethod": "observeOrderingAndReplacement",
+      "testClass": "io.github.javasourceatlas.jdk.collection.TreeMapBehaviorTest",
+      "testMethod": "shouldOrderNaturallyAndReplaceExistingValue",
+      "expectedOutcome": "键按自然顺序迭代，重复键返回旧值、更新新值且 size 不增加。"
+    },
+    {
+      "id": "navigation-boundary",
+      "kind": "boundary",
+      "claim": "ceiling/floor 与 higher/lower 分别表达包含边界和严格边界，搜索中会保留最近候选。",
+      "entryPoint": "getCeilingEntry(K)",
+      "document": "/jdk/collections/treemap/navigation-view#getceilingentry-如何保留候选答案",
+      "labMethod": "observeNavigation",
+      "testClass": "io.github.javasourceatlas.jdk.collection.TreeMapBehaviorTest",
+      "testMethod": "shouldNavigateStrictAndInclusiveBoundaries",
+      "expectedOutcome": "存在键和间隙键的四种导航结果都精确符合包含或排除边界的定义。"
+    },
+    {
+      "id": "deletion-cleanup",
+      "kind": "cleanup",
+      "claim": "删除节点后 fixAfterDeletion 通过旋转与染色恢复红黑树不变量，同时保持剩余映射。",
+      "entryPoint": "deleteEntry(Entry)",
+      "document": "/jdk/collections/treemap/put-balance#删除先把问题压缩到至多一个孩子",
+      "labMethod": "observeDeletionRepairBranches",
+      "testClass": "io.github.javasourceatlas.jdk.collection.TreeMapBehaviorTest",
+      "testMethod": "shouldPreserveMappingsAcrossDeletionRepairScenarios",
+      "expectedOutcome": "多组固定删除序列执行后剩余键仍有序、值未丢失且所有查询结果正确。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "put(K,V)",
       "scenario": "对比自然顺序、显式比较器与覆盖已有键",
-      "variables": ["t", "parent", "cmp", "cpr", "size", "modCount"]
+      "variables": [
+        "t",
+        "parent",
+        "cmp",
+        "cpr",
+        "size",
+        "modCount"
+      ],
+      "evidenceId": "ordering-main"
     },
     {
       "method": "fixAfterInsertion(Entry)",
       "scenario": "递增插入 1 到 8，观察插入 8 的两轮修复",
-      "variables": ["x", "parentOf(x)", "parentOf(parentOf(x))", "y", "root"]
+      "variables": [
+        "x",
+        "parentOf(x)",
+        "parentOf(parentOf(x))",
+        "y",
+        "root"
+      ]
     },
     {
       "method": "rotateLeft(Entry)",
       "scenario": "观察右右直线分支的根和父链接更新",
-      "variables": ["p", "r", "r.left", "p.parent", "root"]
+      "variables": [
+        "p",
+        "r",
+        "r.left",
+        "p.parent",
+        "root"
+      ]
     },
     {
       "method": "deleteEntry(Entry)",
       "scenario": "删除同时拥有左右孩子的键 4",
-      "variables": ["p", "s", "replacement", "size", "modCount"]
+      "variables": [
+        "p",
+        "s",
+        "replacement",
+        "size",
+        "modCount"
+      ],
+      "evidenceId": "deletion-cleanup"
     },
     {
       "method": "fixAfterDeletion(Entry)",
       "scenario": "使用三组固定序列覆盖兄弟红、全黑上推、近侄红和远侄红分支",
-      "variables": ["x", "sib", "parentOf(x)", "leftOf(sib)", "rightOf(sib)"]
+      "variables": [
+        "x",
+        "sib",
+        "parentOf(x)",
+        "leftOf(sib)",
+        "rightOf(sib)"
+      ]
     },
     {
       "method": "rotateRight(Entry)",
       "scenario": "序列 3,2,4,5,7,1,6 删除 4，观察近侄红怎样转换为远侄红",
-      "variables": ["p", "l", "l.right", "p.parent", "root"]
+      "variables": [
+        "p",
+        "l",
+        "l.right",
+        "p.parent",
+        "root"
+      ]
     },
     {
       "method": "getCeilingEntry(K)",
       "scenario": "在 10、20、30、40 中查询不存在的键 25",
-      "variables": ["p", "cmp", "parent", "ch"]
+      "variables": [
+        "p",
+        "cmp",
+        "parent",
+        "ch"
+      ],
+      "evidenceId": "navigation-boundary"
     },
     {
       "method": "NavigableSubMap.inRange(Object)",
       "scenario": "向区间 [20,40) 内外分别写入键",
-      "variables": ["key", "lo", "hi", "loInclusive", "hiInclusive"]
+      "variables": [
+        "key",
+        "lo",
+        "hi",
+        "loInclusive",
+        "hiInclusive"
+      ]
     }
   ]
 }

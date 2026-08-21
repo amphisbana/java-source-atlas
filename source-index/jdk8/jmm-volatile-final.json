@@ -15,7 +15,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.JmmVolatileDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/JmmVolatileDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.lang.Thread",
@@ -75,39 +78,97 @@
       "sourceClass": "sun.misc.Unsafe"
     }
   ],
-  "evidence": [{
-    "claim": "线程启动前的写入通过 start happens-before 规则对新线程可见，join 再把完成结果发布给等待线程。",
-    "entryPoint": "Thread.start()",
-    "document": "/jdk/concurrent/jmm/happens-before#start-与-join-是两条方向相反的边",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.concurrent.JmmVolatileBehaviorTest",
-    "testMethod": "shouldPublishThroughStartAndJoin"
-  }],
+  "evidence": [
+    {
+      "id": "volatile-publication-main",
+      "kind": "main",
+      "claim": "先写普通 payload 再写 volatile 标志，可以把 payload 发布给观察到标志的读取线程。",
+      "entryPoint": "Thread.start()",
+      "document": "/jdk/concurrent/jmm/happens-before#start-与-join-是两条方向相反的边",
+      "labMethod": "observeVolatilePublication",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.JmmVolatileBehaviorTest",
+      "testMethod": "shouldPublishPlainPayloadThroughVolatileFlag",
+      "expectedOutcome": "读取线程看到 ready=true 后同时看到发布线程此前写入的完整 payload。"
+    },
+    {
+      "id": "volatile-lost-update-concurrency",
+      "kind": "concurrency",
+      "claim": "volatile 只能保证单次读写可见，两个线程的 read-modify-write 仍会覆盖彼此结果。",
+      "entryPoint": "AtomicInteger.compareAndSet(int,int)",
+      "document": "/jdk/concurrent/jmm/volatile-final#volatile-的精确能力",
+      "labMethod": "observeControlledLostUpdate",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.JmmVolatileBehaviorTest",
+      "testMethod": "shouldShowVolatileIncrementIsNotAtomic",
+      "expectedOutcome": "受控时序让两个线程读取同一个旧值并依次写回，最终计数少一次；CAS 对照值正确。"
+    },
+    {
+      "id": "final-publication-boundary",
+      "kind": "boundary",
+      "claim": "构造完成的 final 字段经安全发布后可以作为不可变快照读取。",
+      "entryPoint": "Thread.start()",
+      "document": "/jdk/concurrent/jmm/happens-before#start-与-join-是两条方向相反的边",
+      "labMethod": "observeFinalSnapshot",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.JmmVolatileBehaviorTest",
+      "testMethod": "shouldReadFinalStateAfterSafePublication",
+      "expectedOutcome": "读取线程观察到对象后，所有 final 字段均为构造器写入值且保持一致。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "JmmVolatileDebugLab.observeVolatilePublication()",
       "scenario": "先写普通 payload，再写 volatile ready，读取方观察到 ready 后读取 payload",
-      "variables": ["state.payload", "state.ready", "observedPayload"]
+      "variables": [
+        "state.payload",
+        "state.ready",
+        "observedPayload"
+      ]
     },
     {
       "method": "JmmVolatileDebugLab.observeControlledLostUpdate()",
       "scenario": "两个线程在写回前读取相同 volatile 旧值，稳定复现丢失更新",
-      "variables": ["counter.value", "snapshotsRead", "writeBack", "snapshot"]
+      "variables": [
+        "counter.value",
+        "snapshotsRead",
+        "writeBack",
+        "snapshot"
+      ]
     },
     {
       "method": "JmmVolatileDebugLab.observeStartAndJoinBoundaries()",
       "scenario": "在 start 前写配置，在线程内写结果，并在 join 返回后读取",
-      "variables": ["configuration", "result", "worker.getState()"]
+      "variables": [
+        "configuration",
+        "result",
+        "worker.getState()"
+      ]
     },
     {
       "method": "JmmVolatileDebugLab.observeFinalSnapshot()",
       "scenario": "构造不可变对象后通过 Thread.start 安全发布",
-      "variables": ["snapshot.name", "snapshot.value", "observed"]
+      "variables": [
+        "snapshot.name",
+        "snapshot.value",
+        "observed"
+      ]
     },
     {
       "method": "JmmVolatileDebugLab.observeVarHandleAvailability()",
       "scenario": "分别在 Java 8 与 Java 17 运行同一 Lab，观察 VarHandle API 可用性",
-      "variables": ["java.specification.version", "available"]
+      "variables": [
+        "java.specification.version",
+        "available"
+      ]
+    },
+    {
+      "method": "Thread.start()",
+      "scenario": "运行 volatile 发布测试，观察工作线程建立 start happens-before 边界",
+      "variables": [
+        "this",
+        "threadStatus",
+        "state.ready",
+        "state.payload"
+      ],
+      "evidenceId": "volatile-publication-main"
     }
   ]
 }

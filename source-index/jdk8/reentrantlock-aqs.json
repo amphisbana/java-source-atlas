@@ -13,7 +13,11 @@
   "versionComparison": {
     "id": "aqs-reentrantlock",
     "summary": "AQS 的 state 与队列协议保持核心职责，但 JDK 17/21 重做节点状态、条件转移和统一获取循环；ReentrantLock 也抽出更明确的快速获取入口。",
-    "supportedVersions": ["8", "17", "21"],
+    "supportedVersions": [
+      "8",
+      "17",
+      "21"
+    ],
     "migrationHint": "跨版本断点应先确认 Node 状态模型和 acquire 入口；不要把 waitStatus、ConditionNode 或 cleanQueue 的私有字段当作稳定 API。"
   },
   "lab": {
@@ -21,7 +25,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.lock.ReentrantLockDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/lock/ReentrantLockDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.util.concurrent.locks.AbstractQueuedSynchronizer",
@@ -128,63 +135,134 @@
       "purpose": "把条件节点转入同步队列"
     }
   ],
-  "evidence": [{
-    "claim": "ReentrantLock 由持有线程重复获取时累加持有次数，逐次 unlock 才能完全释放。",
-    "entryPoint": "ReentrantLock.lock()",
-    "document": "/jdk/concurrent/locks/#非公平锁路径",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.lock.ReentrantLockBehaviorTest",
-    "testMethod": "shouldTrackReentrantHoldCount"
-  }],
+  "evidence": [
+    {
+      "id": "reentrant-main",
+      "kind": "main",
+      "claim": "ReentrantLock 由 owner 与 state 共同记录重入深度，只有相同次数的 unlock 才完全释放。",
+      "entryPoint": "ReentrantLock.lock()",
+      "document": "/jdk/concurrent/locks/#非公平锁路径",
+      "labMethod": "observeReentrancy",
+      "testClass": "io.github.javasourceatlas.jdk.lock.ReentrantLockBehaviorTest",
+      "testMethod": "shouldTrackReentrantHoldCount",
+      "expectedOutcome": "连续两次 lock 后 holdCount 为 2，逐次 unlock 降为 1 和 0。"
+    },
+    {
+      "id": "unlock-owner-failure",
+      "kind": "failure",
+      "claim": "非持有线程不能释放独占锁，tryRelease 会拒绝越权修改同步状态。",
+      "entryPoint": "release(int)",
+      "document": "/jdk/concurrent/locks/aqs#release-流程",
+      "labMethod": "observeReentrancy",
+      "testClass": "io.github.javasourceatlas.jdk.lock.ReentrantLockBehaviorTest",
+      "testMethod": "shouldRejectUnlockByNonOwner",
+      "expectedOutcome": "非 owner 调用 unlock 稳定抛出 IllegalMonitorStateException，原持有者仍然拥有锁。"
+    },
+    {
+      "id": "condition-reacquire-concurrency",
+      "kind": "concurrency",
+      "claim": "Condition.await 会完整释放两层重入，signal 后重新排队并在返回前恢复原重入深度。",
+      "entryPoint": "ConditionObject.await()",
+      "document": "/jdk/concurrent/locks/condition#await-的完整流程",
+      "labMethod": "observeConditionSignal",
+      "testClass": "io.github.javasourceatlas.jdk.lock.ReentrantLockBehaviorTest",
+      "testMethod": "shouldRestoreTwoReentrantHoldsAfterSignal",
+      "expectedOutcome": "等待期间其他线程能获得锁，await 返回时等待线程的 holdCount 恢复为 2。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "NonfairSync.lock()",
       "sourceClass": "java.util.concurrent.locks.ReentrantLock",
       "scenario": "观察非公平快速 CAS",
-      "variables": ["state", "exclusiveOwnerThread"]
+      "variables": [
+        "state",
+        "exclusiveOwnerThread"
+      ],
+      "evidenceId": "reentrant-main"
     },
     {
       "method": "FairSync.tryAcquire(int)",
       "sourceClass": "java.util.concurrent.locks.ReentrantLock",
       "scenario": "让 first 和 second 真实入队，观察公平锁的队列前驱判断",
-      "variables": ["c", "current", "hasQueuedPredecessors()"]
+      "variables": [
+        "c",
+        "current",
+        "hasQueuedPredecessors()"
+      ]
     },
     {
       "method": "acquireQueued(Node,int)",
       "scenario": "观察前驱检查、park 和唤醒重试",
-      "variables": ["node", "p", "head", "failed", "interrupted"]
+      "variables": [
+        "node",
+        "p",
+        "head",
+        "failed",
+        "interrupted"
+      ],
+      "evidenceId": "condition-reacquire-concurrency"
     },
     {
       "method": "ConditionObject.await()",
       "scenario": "观察条件等待和重入状态恢复",
-      "variables": ["node", "savedState", "interruptMode", "firstWaiter"]
+      "variables": [
+        "node",
+        "savedState",
+        "interruptMode",
+        "firstWaiter"
+      ],
+      "evidenceId": "condition-reacquire-concurrency"
     },
     {
       "method": "doAcquireShared(int)",
       "scenario": "观察 CountDownLatch 或 Semaphore 等待者以 SHARED 节点排队",
-      "variables": ["node", "p", "r", "interrupted"]
+      "variables": [
+        "node",
+        "p",
+        "r",
+        "interrupted"
+      ]
     },
     {
       "method": "setHeadAndPropagate(Node,int)",
       "scenario": "观察共享节点成功后推进 head 并决定是否继续传播",
-      "variables": ["node", "propagate", "h", "s"]
+      "variables": [
+        "node",
+        "propagate",
+        "h",
+        "s"
+      ]
     },
     {
       "method": "doReleaseShared()",
       "scenario": "观察 SIGNAL 清零、PROPAGATE 设置与 head 改变后的循环",
-      "variables": ["h", "ws", "head", "tail"]
+      "variables": [
+        "h",
+        "ws",
+        "head",
+        "tail"
+      ]
     },
     {
       "method": "Sync.tryReleaseShared(int)",
       "sourceClass": "java.util.concurrent.CountDownLatch",
       "scenario": "观察第一次 countDown 返回 false、第二次归零返回 true",
-      "variables": ["c", "nextc", "state"]
+      "variables": [
+        "c",
+        "nextc",
+        "state"
+      ]
     },
     {
       "method": "Sync.nonfairTryAcquireShared(int)",
       "sourceClass": "java.util.concurrent.Semaphore",
       "scenario": "一次 release 两个许可后观察等待者依次扣减许可",
-      "variables": ["available", "remaining", "acquires"]
+      "variables": [
+        "available",
+        "remaining",
+        "acquires"
+      ]
     }
   ]
 }

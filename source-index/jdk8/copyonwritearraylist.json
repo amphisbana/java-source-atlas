@@ -15,7 +15,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.CopyOnWriteArrayListDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/CopyOnWriteArrayListDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.util.concurrent.CopyOnWriteArrayList",
@@ -59,39 +62,87 @@
       "purpose": "创建使用 expectedArray 校验父列表版本的视图"
     }
   ],
-  "evidence": [{
-    "claim": "CopyOnWriteArrayList 迭代器持有创建时的数组快照，后续写入不会改变这次遍历。",
-    "entryPoint": "get(int)",
-    "document": "/jdk/concurrent/copyonwritearraylist/#get-的最短调用链",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.concurrent.CopyOnWriteArrayListBehaviorTest",
-    "testMethod": "shouldKeepIteratorSnapshotAfterWrite"
-  }],
+  "evidence": [
+    {
+      "id": "snapshot-main",
+      "kind": "main",
+      "claim": "CopyOnWriteArrayList 迭代器持有创建瞬间的数组快照，后续写入不会改变本轮遍历。",
+      "entryPoint": "iterator()",
+      "document": "/jdk/concurrent/copyonwritearraylist/iterator-view#cowiterator-保存的是数组引用",
+      "labMethod": "observeIteratorSnapshot",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.CopyOnWriteArrayListBehaviorTest",
+      "testMethod": "shouldKeepIteratorSnapshotAfterWrite",
+      "expectedOutcome": "旧迭代器只返回创建前元素，新列表读取能看到写入后的新快照。"
+    },
+    {
+      "id": "iterator-mutation-failure",
+      "kind": "failure",
+      "claim": "快照迭代器不支持 remove、set 或 add，因为它不能把修改安全合并回当前数组。",
+      "entryPoint": "iterator()",
+      "document": "/jdk/concurrent/copyonwritearraylist/iterator-view#cowiterator-保存的是数组引用",
+      "labMethod": "observeUnsupportedIteratorMutation",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.CopyOnWriteArrayListBehaviorTest",
+      "testMethod": "shouldRejectIteratorMutation",
+      "expectedOutcome": "从迭代器发起修改稳定抛出 UnsupportedOperationException，底层列表保持不变。"
+    },
+    {
+      "id": "add-if-absent-concurrency",
+      "kind": "concurrency",
+      "claim": "addIfAbsent 在锁内基于最新数组二次确认，避免两个并发线程重复插入同一个值。",
+      "entryPoint": "addIfAbsent(E)",
+      "document": "/jdk/concurrent/copyonwritearraylist/write-snapshot#addifabsent-为什么要检查两次",
+      "labMethod": "observeConcurrentAddIfAbsent",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.CopyOnWriteArrayListBehaviorTest",
+      "testMethod": "shouldKeepSingleValueAfterConcurrentAddIfAbsent",
+      "expectedOutcome": "两个线程同时添加相同元素后列表中只出现一次，只有一个调用报告成功。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "add(E)",
       "scenario": "比较旧数组、写线程副本和发布后的当前数组",
-      "variables": ["elements", "len", "newElements", "array"]
+      "variables": [
+        "elements",
+        "len",
+        "newElements",
+        "array"
+      ]
     },
     {
       "method": "setArray(Object[])",
       "scenario": "观察新数组引用通过 volatile 字段一次发布",
-      "variables": ["array", "a"]
+      "variables": [
+        "array",
+        "a"
+      ]
     },
     {
       "method": "addIfAbsent(E,Object[])",
       "scenario": "观察等待写锁后 snapshot 与 current 不同的复查分支",
-      "variables": ["snapshot", "current", "common", "len"]
+      "variables": [
+        "snapshot",
+        "current",
+        "common",
+        "len"
+      ],
+      "evidenceId": "add-if-absent-concurrency"
     },
     {
       "method": "COWIterator.next()",
       "scenario": "父列表写入后继续遍历旧数组",
-      "variables": ["snapshot", "cursor"]
+      "variables": [
+        "snapshot",
+        "cursor"
+      ],
+      "evidenceId": "snapshot-main"
     },
     {
       "method": "COWSubList.checkForComodification()",
       "scenario": "父列表绕过视图发布新数组",
-      "variables": ["expectedArray", "l.array"]
+      "variables": [
+        "expectedArray",
+        "l.array"
+      ]
     }
   ]
 }

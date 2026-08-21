@@ -15,7 +15,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ScheduledThreadPoolExecutorDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/ScheduledThreadPoolExecutorDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.util.concurrent.ScheduledThreadPoolExecutor",
@@ -97,49 +100,113 @@
       "purpose": "按延迟与周期关闭策略筛选、取消队列任务并尝试终止"
     }
   ],
-  "evidence": [{
-    "claim": "普通 execute 命令也会被包装成零延迟 ScheduledFutureTask，统一进入延迟队列。",
-    "entryPoint": "schedule(Runnable,long,TimeUnit)",
-    "document": "/jdk/concurrent/scheduledthreadpoolexecutor/#schedule-的完整调用链",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.concurrent.ScheduledThreadPoolExecutorBehaviorTest",
-    "testMethod": "shouldWrapExecuteCommandAsZeroDelayScheduledFuture"
-  }],
+  "evidence": [
+    {
+      "id": "zero-delay-main",
+      "kind": "main",
+      "claim": "execute 也会被包装成零延迟 ScheduledFutureTask，再进入同一延迟队列。",
+      "entryPoint": "schedule(Runnable,long,TimeUnit)",
+      "document": "/jdk/concurrent/scheduledthreadpoolexecutor/#schedule-的完整调用链",
+      "labMethod": "observeZeroDelayWrapping",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ScheduledThreadPoolExecutorBehaviorTest",
+      "testMethod": "shouldWrapExecuteCommandAsZeroDelayScheduledFuture",
+      "expectedOutcome": "execute 提交的命令以 ScheduledFuture 形态运行，延迟为零且最终进入完成态。"
+    },
+    {
+      "id": "fixed-rate-boundary",
+      "kind": "boundary",
+      "claim": "固定频率任务不会并发重叠；执行超时时下一轮在前一轮结束后尽快继续。",
+      "entryPoint": "scheduleAtFixedRate(Runnable,long,long,TimeUnit)",
+      "document": "/jdk/concurrent/scheduledthreadpoolexecutor/#周期任务为什么要保存-outertask",
+      "labMethod": "observeFixedRateWithoutOverlap",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ScheduledThreadPoolExecutorBehaviorTest",
+      "testMethod": "shouldNotOverlapFixedRateExecutions",
+      "expectedOutcome": "最大并发执行数始终为 1，即使单次执行时间超过 period。"
+    },
+    {
+      "id": "periodic-failure",
+      "kind": "failure",
+      "claim": "周期任务一次执行抛异常后不会再次 reExecutePeriodic，Future 进入异常完成态。",
+      "entryPoint": "ScheduledFutureTask.run()",
+      "document": "/jdk/concurrent/scheduledthreadpoolexecutor/periodic-cancel#run-的三条分支",
+      "labMethod": "observePeriodicException",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ScheduledThreadPoolExecutorBehaviorTest",
+      "testMethod": "shouldStopPeriodicExecutionAfterException",
+      "expectedOutcome": "任务只执行一次，后续周期停止，get 通过 ExecutionException 暴露原始失败。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "schedule(Runnable,long,TimeUnit)",
       "scenario": "观察单次和 execute 零延迟任务的包装过程",
-      "variables": ["command", "delay", "unit", "t"]
+      "variables": [
+        "command",
+        "delay",
+        "unit",
+        "t"
+      ],
+      "evidenceId": "zero-delay-main"
     },
     {
       "method": "ScheduledFutureTask.run()",
       "scenario": "分别触发单次、周期正常、周期异常和关闭取消分支",
-      "variables": ["periodic", "period", "time", "outerTask", "FutureTask.state"]
+      "variables": [
+        "periodic",
+        "period",
+        "time",
+        "outerTask",
+        "FutureTask.state"
+      ],
+      "evidenceId": "periodic-failure"
     },
     {
       "method": "ScheduledFutureTask.setNextRunTime()",
       "scenario": "比较固定频率和固定延迟的下一触发时刻",
-      "variables": ["time", "period", "now()"]
+      "variables": [
+        "time",
+        "period",
+        "now()"
+      ],
+      "evidenceId": "fixed-rate-boundary"
     },
     {
       "method": "DelayedWorkQueue.offer(Runnable)",
       "scenario": "插入比当前堆首更早的任务并使旧 leader 失效",
-      "variables": ["i", "queue[0]", "leader", "e.heapIndex"]
+      "variables": [
+        "i",
+        "queue[0]",
+        "leader",
+        "e.heapIndex"
+      ]
     },
     {
       "method": "DelayedWorkQueue.take()",
       "scenario": "两个空闲 worker 分别进入 leader 定时等待和 follower 无限等待",
-      "variables": ["first", "delay", "leader", "thisThread"]
+      "variables": [
+        "first",
+        "delay",
+        "leader",
+        "thisThread"
+      ]
     },
     {
       "method": "ScheduledFutureTask.cancel(boolean)",
       "scenario": "对比 removeOnCancel 开关前后的远期任务清理",
-      "variables": ["cancelled", "removeOnCancel", "heapIndex"]
+      "variables": [
+        "cancelled",
+        "removeOnCancel",
+        "heapIndex"
+      ]
     },
     {
       "method": "onShutdown()",
       "scenario": "在队列同时包含单次和周期任务时执行 shutdown",
-      "variables": ["keepDelayed", "keepPeriodic", "q", "t.isPeriodic()"]
+      "variables": [
+        "keepDelayed",
+        "keepPeriodic",
+        "q",
+        "t.isPeriodic()"
+      ]
     }
   ]
 }

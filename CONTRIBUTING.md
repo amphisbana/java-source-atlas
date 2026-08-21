@@ -14,6 +14,7 @@
 6. 至少一个自动化测试，验证对外可观察行为。
 7. 版本差异和不适用范围。
 8. 第三方源码地址及许可证说明。
+9. 至少三条结构化 evidence，包含主线和边界、失败或清理证据；仅把确定会经过目标方法的 JUnit 场景绑定到断点。
 
 ## 代码规范
 
@@ -37,6 +38,7 @@ npm run verify:community
 - 想增加一个源码专题：使用 [新专题建议](https://github.com/amphisbana/java-source-atlas/issues/new?template=topic_request.yml)。
 - 还在比较阅读方向、版本差异或实验设计：使用 GitHub Discussions。
 - 开始实现专题：复用 [新专题模板](docs/guide/topic-template.md)，并同步索引、Lab、测试与导航。
+- 第一次贡献完整专题：按 [HashMap 端到端贡献示例](docs/guide/contribution-walkthrough.md)依次完成版本固定、evidence 和断点绑定。
 - 新增或修改 Lab：先阅读 [Lab 编写规范](docs/guide/lab-authoring.md)，确保有触发条件、推荐断点和自动化断言。
 
 提交 Pull Request 时请使用仓库模板，并确认没有提交密码、Token、IDE 配置、构建产物或 `agent.md`。

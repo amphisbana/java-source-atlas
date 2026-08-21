@@ -15,7 +15,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.collection.LinkedHashMapDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/collection/LinkedHashMapDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.util.LinkedHashMap",
@@ -79,44 +82,115 @@
       "purpose": "沿 after 遍历并执行快速失败检查"
     }
   ],
-  "evidence": [{
-    "claim": "插入顺序模式下替换已有键的值不会把节点移动到双向链表末尾。",
-    "entryPoint": "LinkedHashMap(int,float,boolean)",
-    "document": "/jdk/collections/linkedhashmap/access-order",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.collection.LinkedHashMapBehaviorTest",
-    "testMethod": "shouldKeepInsertionOrderWhenReplacingValue"
-  }],
+  "evidence": [
+    {
+      "id": "insertion-order-main",
+      "kind": "main",
+      "claim": "插入顺序模式用双向链表记录首次接入顺序，覆盖已有 key 不会新增或移动节点。",
+      "entryPoint": "LinkedHashMap(int,float,boolean)",
+      "document": "/jdk/collections/linkedhashmap/access-order",
+      "labMethod": "observeInsertionOrder",
+      "testClass": "io.github.javasourceatlas.jdk.collection.LinkedHashMapBehaviorTest",
+      "testMethod": "shouldKeepInsertionOrderWhenReplacingValue",
+      "expectedOutcome": "覆盖中间 key 后迭代顺序不变、size 不变且 value 已更新。"
+    },
+    {
+      "id": "access-order-boundary",
+      "kind": "boundary",
+      "claim": "访问顺序模式只有命中的条目读取才会移动到链表尾部，未命中和集合视图读取不改变顺序。",
+      "entryPoint": "afterNodeAccess(Node)",
+      "document": "/jdk/collections/linkedhashmap/access-order",
+      "labMethod": "observeAccessOrder",
+      "testClass": "io.github.javasourceatlas.jdk.collection.LinkedHashMapBehaviorTest",
+      "testMethod": "shouldNotReorderForMissOrCollectionViewRead",
+      "expectedOutcome": "get 命中会把条目移到尾部；get 缺失键和 entrySet 遍历保持现有顺序。"
+    },
+    {
+      "id": "lru-cleanup",
+      "kind": "cleanup",
+      "claim": "afterNodeInsertion 在新映射接入后调用 removeEldestEntry，可把最久未使用条目驱逐。",
+      "entryPoint": "afterNodeInsertion(boolean)",
+      "document": "/jdk/collections/linkedhashmap/lru",
+      "labMethod": "observeLruEviction",
+      "testClass": "io.github.javasourceatlas.jdk.collection.LinkedHashMapBehaviorTest",
+      "testMethod": "shouldEvictLeastRecentlyUsedEntry",
+      "expectedOutcome": "超过容量时恰好删除链表头部的最久未使用键，最近访问的键继续保留。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "linkNodeLast(Entry)",
       "scenario": "观察首个节点和后续节点如何成为 tail",
-      "variables": ["p", "last", "head", "tail"]
+      "variables": [
+        "p",
+        "last",
+        "head",
+        "tail"
+      ],
+      "evidenceId": "insertion-order-main"
     },
     {
       "method": "afterNodeAccess(Node)",
       "scenario": "观察 get 命中非尾节点后的摘除与尾插",
-      "variables": ["e", "p", "b", "a", "last", "head", "tail", "modCount"]
+      "variables": [
+        "e",
+        "p",
+        "b",
+        "a",
+        "last",
+        "head",
+        "tail",
+        "modCount"
+      ],
+      "evidenceId": "access-order-boundary"
     },
     {
       "method": "afterNodeInsertion(boolean)",
       "scenario": "观察新增映射后的 LRU 策略判断",
-      "variables": ["evict", "first", "head", "tail", "size"]
+      "variables": [
+        "evict",
+        "first",
+        "head",
+        "tail",
+        "size"
+      ],
+      "evidenceId": "lru-cleanup"
     },
     {
       "method": "afterNodeRemoval(Node)",
       "scenario": "观察主动删除或 LRU 淘汰后的双链修复",
-      "variables": ["e", "p", "b", "a", "head", "tail", "size", "modCount"]
+      "variables": [
+        "e",
+        "p",
+        "b",
+        "a",
+        "head",
+        "tail",
+        "size",
+        "modCount"
+      ]
     },
     {
       "method": "transferLinks(Entry,Entry)",
       "scenario": "观察树化或退化时替代节点继承原顺序位置",
-      "variables": ["src", "dst", "b", "a", "head", "tail"]
+      "variables": [
+        "src",
+        "dst",
+        "b",
+        "a",
+        "head",
+        "tail"
+      ]
     },
     {
       "method": "LinkedHashIterator.nextNode()",
       "scenario": "观察访问顺序变化导致旧迭代器快速失败",
-      "variables": ["next", "current", "expectedModCount", "modCount"]
+      "variables": [
+        "next",
+        "current",
+        "expectedModCount",
+        "modCount"
+      ]
     }
   ]
 }

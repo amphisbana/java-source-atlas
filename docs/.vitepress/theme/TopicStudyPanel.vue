@@ -7,6 +7,8 @@ import {
   sourceTopics,
   topicHomeUrl,
   topicLabUrl,
+  type SourceEvidence,
+  type SourceEvidenceKind,
   type SourceTopic
 } from './source-explorer-data'
 import {
@@ -73,6 +75,31 @@ const featuredBreakpoints = computed(() => topic.value?.breakpoints.slice(0, 2) 
  * 读取当前专题经过仓库校验的行为证据，保持结论、入口、Lab 与测试方法同屏可追溯。
  */
 const evidenceItems = computed(() => topic.value?.evidence ?? [])
+
+const evidenceKindLabels: Record<SourceEvidenceKind, string> = {
+  main: '主线',
+  boundary: '边界',
+  failure: '失败路径',
+  cleanup: '清理',
+  concurrency: '并发',
+  version: '版本'
+}
+
+/**
+ * 把稳定的证据类型转换为面向读者的中文标签。
+ */
+function evidenceKindLabel(kind: SourceEvidenceKind): string {
+  return evidenceKindLabels[kind]
+}
+
+/**
+ * 找出当前证据绑定的推荐断点，提示读者可在 IDEA 插件中直接调试同一测试场景。
+ */
+function linkedBreakpoints(evidence: SourceEvidence): string[] {
+  return topic.value?.breakpoints
+    .filter((breakpoint) => breakpoint.evidenceId === evidence.id)
+    .map((breakpoint) => breakpoint.method) ?? []
+}
 
 /**
  * 将测试完整类名缩短为类名，完整定位仍由 title 提供。
@@ -201,17 +228,34 @@ function formatUpdatedAt(value: string): string {
       <div class="topic-study-panel__section-title">可执行证据链</div>
       <div
         v-for="evidence in evidenceItems"
-        :key="`${evidence.testClass}-${evidence.testMethod}`"
+        :key="evidence.id"
         class="topic-study-panel__evidence-row"
       >
-        <strong>{{ evidence.claim }}</strong>
-        <span class="topic-study-panel__evidence-links">
+        <div class="topic-study-panel__evidence-main">
+          <div class="topic-study-panel__evidence-heading">
+            <span :class="`topic-study-panel__evidence-kind topic-study-panel__evidence-kind--${evidence.kind}`">
+              {{ evidenceKindLabel(evidence.kind) }}
+            </span>
+            <strong>{{ evidence.claim }}</strong>
+          </div>
+          <p class="topic-study-panel__expected">
+            <span>预期结果</span>
+            {{ evidence.expectedOutcome }}
+          </p>
+        </div>
+        <div class="topic-study-panel__evidence-detail">
+          <span class="topic-study-panel__evidence-links">
           <a :href="documentUrl(evidence.document)">{{ evidence.entryPoint }} 讲解</a>
           <a :href="withBase(topicLabUrl(topic))">Lab#{{ evidence.labMethod }}</a>
           <code :title="`${evidence.testClass}#${evidence.testMethod}`">
             {{ testLabel(evidence.testClass, evidence.testMethod) }}
           </code>
-        </span>
+          </span>
+          <p v-if="linkedBreakpoints(evidence).length" class="topic-study-panel__debug-link">
+            <span>IDEA 可调试</span>
+            <code>{{ linkedBreakpoints(evidence).join('、') }}</code>
+          </p>
+        </div>
       </div>
     </div>
 

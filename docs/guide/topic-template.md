@@ -51,6 +51,12 @@
 
 <说明预期输出、测试断言和如何确认断点命中了目标分支。>
 
+## 可执行证据
+
+| 证据编号 | 类型 | 结论 | Lab 方法 | JUnit 方法 | 预期结果 | 绑定断点 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `<evidence-id>` | `main / boundary / failure / cleanup / concurrency / version` | <可验证结论> | `<labMethod>` | `<testClass>#<testMethod>` | <运行后的明确判定> | `<breakpoint method>` |
+
 ## 版本差异与边界
 
 - <公开契约>
@@ -68,9 +74,10 @@
 新增专题不能只增加一篇 Markdown，还应同步检查：
 
 - `source-index/` 中的唯一专题数据，包括入口、断点、Lab、证据链和下一站。
+- 每个专题至少三条 evidence，包含主线和至少一种边界、失败或清理证据；可稳定触发的断点用 `evidenceId` 绑定对应 JUnit 场景。
 - `labs/` 中的最小案例与 JUnit 行为测试。
 - `docs/.vitepress/config.mts` 中的导航和侧边栏。
 - 学习路线、源码索引与必要的版本对比数据。
 - 上游固定源码地址、许可证和适用版本说明。
 
-提交前运行 `mvn --batch-mode test` 和 `npm run verify:docs`。Lab 的并发稳定性、断点设计与断言标准见 [Lab 编写规范](/guide/lab-authoring)。
+第一次新增专题建议对照 [HashMap 完整贡献示例](/guide/contribution-walkthrough)。提交前运行 `mvn --batch-mode test` 和 `npm run verify:docs`。Lab 的并发稳定性、断点设计与断言标准见 [Lab 编写规范](/guide/lab-authoring)。

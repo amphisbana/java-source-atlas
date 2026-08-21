@@ -7,6 +7,7 @@ import io.github.javasourceatlas.idea.model.AtlasTopic;
 import io.github.javasourceatlas.idea.model.AtlasTopicRelation;
 import io.github.javasourceatlas.idea.model.AtlasBreakpoint;
 import io.github.javasourceatlas.idea.model.AtlasEntryPoint;
+import io.github.javasourceatlas.idea.model.AtlasEvidence;
 import io.github.javasourceatlas.idea.match.AtlasMethodMatcher;
 
 import java.io.IOException;
@@ -159,6 +160,20 @@ public final class AtlasIndexService {
                 .filter(entryPoint -> methodName.equals(entryPoint.simpleMethodName()))
                 .filter(entryPoint -> sourceClass.equals(entryPoint.effectiveSourceClass(topic)))
                 .findFirst();
+    }
+
+    /**
+     * 解析推荐断点绑定的可执行证据，未绑定或索引失配时保持禁用状态。
+     *
+     * @param topic      当前专题
+     * @param breakpoint 当前推荐断点
+     * @return 可直接创建 JUnit Debug 配置的证据
+     */
+    public Optional<AtlasEvidence> evidenceForBreakpoint(AtlasTopic topic, AtlasBreakpoint breakpoint) {
+        if (topic == null || breakpoint == null) {
+            return Optional.empty();
+        }
+        return topic.findEvidenceById(breakpoint.evidenceId());
     }
 
     /**

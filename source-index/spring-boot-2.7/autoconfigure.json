@@ -102,49 +102,113 @@
       "purpose": "依据当前 BeanDefinition 可见范围决定默认 Bean 是否回退"
     }
   ],
-  "evidence": [{
-    "claim": "自动配置条件不满足时目标 Bean 不会创建，属性开启后才进入配置绑定与装配。",
-    "entryPoint": "SpringApplication.run(String...)",
-    "document": "/spring/boot-autoconfigure/springapplication-run",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.spring.boot.autoconfigure.AtlasFeatureAutoConfigurationTest",
-    "testMethod": "shouldStayDisabledWhenPropertyIsMissing"
-  }],
+  "evidence": [
+    {
+      "id": "binding-main",
+      "kind": "main",
+      "claim": "条件匹配后 ConfigurationPropertiesBindingPostProcessor 在初始化前把 Environment 属性绑定到配置对象。",
+      "entryPoint": "ConfigurationPropertiesBindingPostProcessor.postProcessBeforeInitialization(Object,String)",
+      "document": "/spring/boot-autoconfigure/condition-binding",
+      "labMethod": "main",
+      "testClass": "io.github.javasourceatlas.spring.boot.autoconfigure.AtlasFeatureAutoConfigurationTest",
+      "testMethod": "shouldBindPropertiesAndCreateDefaultService",
+      "expectedOutcome": "属性值覆盖字段默认值，自动配置创建的默认服务使用绑定后的配置工作。"
+    },
+    {
+      "id": "missing-property-boundary",
+      "kind": "boundary",
+      "claim": "关键属性缺失时条件评估为不匹配，自动配置类不会创建目标 Bean。",
+      "entryPoint": "SpringBootCondition.matches(ConditionContext,AnnotatedTypeMetadata)",
+      "document": "/spring/boot-autoconfigure/condition-binding",
+      "labMethod": "main",
+      "testClass": "io.github.javasourceatlas.spring.boot.autoconfigure.AtlasFeatureAutoConfigurationTest",
+      "testMethod": "shouldStayDisabledWhenPropertyIsMissing",
+      "expectedOutcome": "上下文可以启动，但 AtlasFeatureProperties 和默认服务均不存在，条件报告记录不匹配原因。"
+    },
+    {
+      "id": "backoff-boundary",
+      "kind": "boundary",
+      "claim": "用户已提供同类型 Bean 时 OnBeanCondition 让默认 Bean 回退，避免覆盖用户选择。",
+      "entryPoint": "OnBeanCondition.getMatchOutcome(ConditionContext,AnnotatedTypeMetadata)",
+      "document": "/spring/boot-autoconfigure/condition-binding",
+      "labMethod": "main",
+      "testClass": "io.github.javasourceatlas.spring.boot.autoconfigure.AtlasFeatureAutoConfigurationTest",
+      "testMethod": "shouldBackOffWhenUserProvidesService",
+      "expectedOutcome": "容器中只保留用户服务，自动配置默认实现没有重复创建。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "SpringApplication.run(String...)",
       "scenario": "观察 Boot 应用从参数到 ready 的完整生命周期",
-      "variables": ["args", "bootstrapContext", "environment", "context", "timeTakenToStartup"]
+      "variables": [
+        "args",
+        "bootstrapContext",
+        "environment",
+        "context",
+        "timeTakenToStartup"
+      ]
     },
     {
       "method": "SpringApplication.prepareEnvironment(...)",
       "scenario": "核对条件与 Binder 实际读取的属性源和最终值",
-      "variables": ["environment", "propertySources", "applicationArguments", "activeProfiles"]
+      "variables": [
+        "environment",
+        "propertySources",
+        "applicationArguments",
+        "activeProfiles"
+      ]
     },
     {
       "method": "AutoConfigurationImportSelector.getAutoConfigurationEntry(...)",
       "scenario": "观察候选列表经过去重、显式排除和快速过滤后的变化",
-      "variables": ["configurations", "exclusions", "annotationMetadata"]
+      "variables": [
+        "configurations",
+        "exclusions",
+        "annotationMetadata"
+      ]
     },
     {
       "method": "AutoConfigurationImportSelector.ConfigurationClassFilter.filter(...)",
       "scenario": "观察导入过滤器利用元数据批量排除候选",
-      "variables": ["candidates", "match", "skipped", "result"]
+      "variables": [
+        "candidates",
+        "match",
+        "skipped",
+        "result"
+      ]
     },
     {
       "method": "SpringBootCondition.matches(...)",
       "scenario": "区分类级与方法级条件，并核对报告中的匹配原因",
-      "variables": ["classOrMethodName", "metadata", "outcome", "context"]
+      "variables": [
+        "classOrMethodName",
+        "metadata",
+        "outcome",
+        "context"
+      ],
+      "evidenceId": "missing-property-boundary"
     },
     {
       "method": "ConfigurationPropertiesBindingPostProcessor.postProcessBeforeInitialization(...)",
       "scenario": "观察 AtlasFeatureProperties 从字段默认值变为 Environment 绑定值",
-      "variables": ["bean", "beanName", "binder"]
+      "variables": [
+        "bean",
+        "beanName",
+        "binder"
+      ],
+      "evidenceId": "binding-main"
     },
     {
       "method": "OnBeanCondition.getMatchOutcome(...)",
       "scenario": "比较默认服务创建与用户服务存在时的回退路径",
-      "variables": ["metadata", "beanFactory", "matchResult", "outcome"]
+      "variables": [
+        "metadata",
+        "beanFactory",
+        "matchResult",
+        "outcome"
+      ],
+      "evidenceId": "backoff-boundary"
     }
   ]
 }

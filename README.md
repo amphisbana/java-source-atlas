@@ -226,7 +226,7 @@ java-source-atlas/
 
 详细规范见 [贡献指南](CONTRIBUTING.md)。
 
-新增 Lab 请同时阅读 [Lab 编写规范](docs/guide/lab-authoring.md)；提交前可使用仓库中的 Issue、Discussion 和 Pull Request 模板，让源码入口、断点、测试与版本边界保持完整。
+第一次贡献可以直接照着 [HashMap 端到端贡献示例](docs/guide/contribution-walkthrough.md)完成问题、固定源码、Lab、JUnit、evidence、断点绑定和 PR。新增 Lab 请同时阅读 [Lab 编写规范](docs/guide/lab-authoring.md)；提交前可使用仓库中的 Issue、Discussion 和 Pull Request 模板，让源码入口、断点、测试与版本边界保持完整。
 
 ## 版本基线与许可证
 

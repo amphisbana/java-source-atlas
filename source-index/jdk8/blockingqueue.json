@@ -15,7 +15,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.BlockingQueueDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/BlockingQueueDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.util.concurrent.BlockingQueue",
@@ -112,44 +115,115 @@
       "purpose": "清理公平队列的取消节点并处理暂时不能移除的尾节点"
     }
   ],
-  "evidence": [{
-    "claim": "有界阻塞队列已满时 put 会等待，take 释放容量后生产者才能继续。",
-    "entryPoint": "BlockingQueue.put(E)",
-    "document": "/jdk/concurrent/blockingqueue/#四组方法如何选择",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.concurrent.BlockingQueueBehaviorTest",
-    "testMethod": "shouldResumeArrayQueuePutAfterTakeCreatesCapacity"
-  }],
+  "evidence": [
+    {
+      "id": "array-put-main",
+      "kind": "main",
+      "claim": "有界 ArrayBlockingQueue 满时 put 会等待，take 释放容量后生产者才能继续。",
+      "entryPoint": "ArrayBlockingQueue.put(E)",
+      "document": "/jdk/concurrent/blockingqueue/array-linked#arrayblockingqueue-put-的等待路径",
+      "labMethod": "observeArrayQueuePutWait",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.BlockingQueueBehaviorTest",
+      "testMethod": "shouldResumeArrayQueuePutAfterTakeCreatesCapacity",
+      "expectedOutcome": "生产者先进入 WAITING，消费者取走一个元素后 put 完成且队列仍满足容量约束。"
+    },
+    {
+      "id": "method-family-boundary",
+      "kind": "boundary",
+      "claim": "BlockingQueue 的异常、特殊值、阻塞和超时四组 API 在满队列与空队列边界具有不同结果。",
+      "entryPoint": "BlockingQueue.put(E)",
+      "document": "/jdk/concurrent/blockingqueue/#四组方法如何选择",
+      "labMethod": "observeMethodFamilies",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.BlockingQueueBehaviorTest",
+      "testMethod": "shouldExposeExceptionAndSpecialValueFamilies",
+      "expectedOutcome": "add/remove 抛异常，offer/poll 返回特殊值，边界行为与接口契约一致。"
+    },
+    {
+      "id": "synchronous-handoff-concurrency",
+      "kind": "concurrency",
+      "claim": "SynchronousQueue 不存储元素，put 必须与另一个线程的 take 直接配对。",
+      "entryPoint": "SynchronousQueue.Transferer.transfer(E,boolean,long)",
+      "document": "/jdk/concurrent/blockingqueue/synchronousqueue#所有操作汇入-transfer",
+      "labMethod": "observeSynchronousHandoff",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.BlockingQueueBehaviorTest",
+      "testMethod": "shouldHandoffInFairAndNonfairModes",
+      "expectedOutcome": "公平与非公平模式都只在消费者到达后完成交接，队列容量始终为零。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "ArrayBlockingQueue.put(E)",
       "scenario": "容量一队列已满时让生产者执行 put",
-      "variables": ["e", "count", "items.length", "putIndex", "lock"]
+      "variables": [
+        "e",
+        "count",
+        "items.length",
+        "putIndex",
+        "lock"
+      ],
+      "evidenceId": "array-put-main"
     },
     {
       "method": "ArrayBlockingQueue.dequeue()",
       "scenario": "消费者 take 后触发 notFull.signal",
-      "variables": ["takeIndex", "putIndex", "count", "notFull"]
+      "variables": [
+        "takeIndex",
+        "putIndex",
+        "count",
+        "notFull"
+      ],
+      "evidenceId": "array-put-main"
     },
     {
       "method": "LinkedBlockingQueue.put(E)",
       "scenario": "空队列首次入队以及满队列生产者等待",
-      "variables": ["c", "count", "capacity", "putLock", "notFull"]
+      "variables": [
+        "c",
+        "count",
+        "capacity",
+        "putLock",
+        "notFull"
+      ]
     },
     {
       "method": "LinkedBlockingQueue.take()",
       "scenario": "满队列移除一个元素并跨锁通知生产者",
-      "variables": ["x", "c", "count", "takeLock", "notEmpty"]
+      "variables": [
+        "x",
+        "c",
+        "count",
+        "takeLock",
+        "notEmpty"
+      ]
     },
     {
       "method": "SynchronousQueue.TransferStack.transfer(E,boolean,long)",
       "scenario": "非公平队列中让定时消费者与生产者直接交接",
-      "variables": ["e", "timed", "nanos", "mode", "h", "s", "s.match"]
+      "variables": [
+        "e",
+        "timed",
+        "nanos",
+        "mode",
+        "h",
+        "s",
+        "s.match"
+      ],
+      "evidenceId": "synchronous-handoff-concurrency"
     },
     {
       "method": "SynchronousQueue.TransferQueue.transfer(E,boolean,long)",
       "scenario": "公平队列中让定时消费者与生产者直接交接",
-      "variables": ["e", "timed", "nanos", "isData", "h", "t", "m", "m.item"]
+      "variables": [
+        "e",
+        "timed",
+        "nanos",
+        "isData",
+        "h",
+        "t",
+        "m",
+        "m.item"
+      ],
+      "evidenceId": "synchronous-handoff-concurrency"
     }
   ]
 }

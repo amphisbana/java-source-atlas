@@ -31,7 +31,11 @@ class AtlasIndexServiceTest {
 
             assertEquals(29, topics.size());
             assertTrue(topics.stream().allMatch(topic -> topic.lab() != null));
-            assertTrue(topics.stream().allMatch(topic -> !topic.evidence().isEmpty()));
+            assertTrue(topics.stream().allMatch(topic -> topic.evidence().size() >= 3));
+            assertTrue(topics.stream().flatMap(topic -> topic.evidence().stream())
+                    .allMatch(evidence -> evidence.id() != null
+                            && evidence.kind() != null
+                            && evidence.expectedOutcome() != null));
 
             // 2026-08-20：版本对比数据由 source-index 生成，必须确认插件资源没有丢失或错配。
             Set<String> comparisonIds = topics.stream()
@@ -65,6 +69,7 @@ class AtlasIndexServiceTest {
                     hashMap.lab().mainClass()
             );
             assertEquals("shouldReplaceValueWithoutIncreasingSize", hashMap.evidence().getFirst().testMethod());
+            assertEquals("put-main", hashMap.evidence().getFirst().id());
             assertEquals("openjdk8-java-util-linkedhashmap", hashMap.recommendedNextTopicId());
 
             AtlasTopic springIoc = findTopic(topics, "spring-framework-5-3-ioc");
@@ -128,9 +133,10 @@ class AtlasIndexServiceTest {
                 .orElseThrow();
 
         assertTrue(index.explanationForBreakpoint(topic, breakpoint).isPresent());
+        assertEquals("put-main", index.evidenceForBreakpoint(topic, breakpoint).orElseThrow().id());
         assertFalse(index.explanationForBreakpoint(
                 topic,
-                new AtlasBreakpoint("missingMethod()", "无对应讲解", List.of(), null)
+                new AtlasBreakpoint("missingMethod()", "无对应讲解", List.of(), null, null)
         ).isPresent());
     }
 

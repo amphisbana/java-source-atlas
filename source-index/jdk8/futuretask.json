@@ -13,7 +13,11 @@
   "versionComparison": {
     "id": "future-task",
     "summary": "FutureTask 的七状态、runner 执行权和 WaitNode 完成协议保持稳定；JDK 17 用 VarHandle 和更稳健的定时等待替代 Unsafe 路径，JDK 21 再增加非阻塞状态、结果和异常查询。",
-    "supportedVersions": ["8", "17", "21"],
+    "supportedVersions": [
+      "8",
+      "17",
+      "21"
+    ],
     "migrationHint": "跨版本调试先区分私有 int state 与 JDK 21 Future.State；Java 8/17 代码不能直接调用 resultNow、exceptionNow 和 state。"
   },
   "lab": {
@@ -21,7 +25,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.FutureTaskDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/FutureTaskDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.util.concurrent.FutureTask",
@@ -102,54 +109,127 @@
       "purpose": "运行 Callable 但不发布正常结果，为周期任务保留 NEW 状态"
     }
   ],
-  "evidence": [{
-    "claim": "FutureTask.run 通过 runner CAS 保证同一个任务的 Callable 最多被执行一次。",
-    "entryPoint": "run()",
-    "document": "/jdk/concurrent/futuretask/state-machine#run-如何只让一个线程执行-callable",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.concurrent.FutureTaskBehaviorTest",
-    "testMethod": "shouldRunCallableOnlyOnce"
-  }],
+  "evidence": [
+    {
+      "id": "single-run-main",
+      "kind": "main",
+      "claim": "FutureTask 用 runner CAS 和 NEW 状态检查保证 Callable 最多执行一次。",
+      "entryPoint": "run()",
+      "document": "/jdk/concurrent/futuretask/state-machine#run-如何只让一个线程执行-callable",
+      "labMethod": "observeSingleExecution",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.FutureTaskBehaviorTest",
+      "testMethod": "shouldRunCallableOnlyOnce",
+      "expectedOutcome": "两个线程竞争调用 run 后 Callable 计数仍为一，get 返回唯一结果。"
+    },
+    {
+      "id": "exception-terminal-failure",
+      "kind": "failure",
+      "claim": "Callable 抛出的异常经 setException 发布为 EXCEPTIONAL 终态，get 用 ExecutionException 暴露原因。",
+      "entryPoint": "setException(Throwable)",
+      "document": "/jdk/concurrent/futuretask/state-machine#set-和-setexception-的两阶段发布",
+      "labMethod": "observeExceptionalCompletion",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.FutureTaskBehaviorTest",
+      "testMethod": "shouldReportExceptionalCompletion",
+      "expectedOutcome": "任务进入完成态，get 抛 ExecutionException 且 cause 是原始业务异常。"
+    },
+    {
+      "id": "interrupted-waiter-cleanup",
+      "kind": "cleanup",
+      "claim": "等待 get 的线程被中断后会从 Treiber waiter 栈中移除，而任务本身仍保持 NEW。",
+      "entryPoint": "removeWaiter(WaitNode)",
+      "document": "/jdk/concurrent/futuretask/waiters-cancel#removewaiter-如何清理退出节点",
+      "labMethod": "observeInterruptedWaiter",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.FutureTaskBehaviorTest",
+      "testMethod": "shouldRemoveInterruptedGetWaiterWithoutCompletingTask",
+      "expectedOutcome": "等待线程收到 InterruptedException，任务未完成且随后仍可正常运行并返回结果。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "run()",
       "scenario": "两个线程同时调用 run，观察一次执行权和取消二次检查",
-      "variables": ["state", "runner", "c", "ran", "result"]
+      "variables": [
+        "state",
+        "runner",
+        "c",
+        "ran",
+        "result"
+      ],
+      "evidenceId": "single-run-main"
     },
     {
       "method": "set(V)",
       "scenario": "跟踪正常结果的两阶段发布",
-      "variables": ["state", "outcome", "v", "waiters"]
+      "variables": [
+        "state",
+        "outcome",
+        "v",
+        "waiters"
+      ]
     },
     {
       "method": "setException(Throwable)",
       "scenario": "让 Callable 抛异常并观察异常结果发布",
-      "variables": ["state", "outcome", "t"]
+      "variables": [
+        "state",
+        "outcome",
+        "t"
+      ],
+      "evidenceId": "exception-terminal-failure"
     },
     {
       "method": "awaitDone(boolean,long)",
       "scenario": "两个 get 等待者分别创建节点并 park",
-      "variables": ["timed", "nanos", "q", "queued", "state", "waiters"]
+      "variables": [
+        "timed",
+        "nanos",
+        "q",
+        "queued",
+        "state",
+        "waiters"
+      ]
     },
     {
       "method": "finishCompletion()",
       "scenario": "正常完成或取消后摘除整栈并逐个唤醒等待者",
-      "variables": ["q", "q.thread", "q.next", "waiters"]
+      "variables": [
+        "q",
+        "q.thread",
+        "q.next",
+        "waiters"
+      ]
     },
     {
       "method": "removeWaiter(WaitNode)",
       "scenario": "定时 get 超时后清理失效节点",
-      "variables": ["node", "pred", "q", "s", "waiters"]
+      "variables": [
+        "node",
+        "pred",
+        "q",
+        "s",
+        "waiters"
+      ],
+      "evidenceId": "interrupted-waiter-cleanup"
     },
     {
       "method": "cancel(boolean)",
       "scenario": "比较 cancel false 与 cancel true 对运行中任务的影响",
-      "variables": ["mayInterruptIfRunning", "state", "runner", "t"]
+      "variables": [
+        "mayInterruptIfRunning",
+        "state",
+        "runner",
+        "t"
+      ]
     },
     {
       "method": "runAndReset()",
       "scenario": "周期式运行成功后保留 NEW，并在异常或取消时结束",
-      "variables": ["state", "runner", "ran", "s"]
+      "variables": [
+        "state",
+        "runner",
+        "ran",
+        "s"
+      ]
     }
   ]
 }

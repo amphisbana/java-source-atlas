@@ -15,7 +15,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ForkJoinPoolDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/ForkJoinPoolDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.util.concurrent.ForkJoinPool",
@@ -106,59 +109,141 @@
       "purpose": "查询 worker 是否使用本地 FIFO 调度模式"
     }
   ],
-  "evidence": [{
-    "claim": "ForkJoinPool 能把递归任务拆分到工作队列并通过窃取和 join 合并结果。",
-    "entryPoint": "ForkJoinPool.externalPush(ForkJoinTask)",
-    "document": "/jdk/concurrent/forkjoinpool/#外部提交与任务内部-fork-不是同一路径",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.concurrent.ForkJoinPoolBehaviorTest",
-    "testMethod": "shouldComputeRecursiveRangeSum"
-  }],
+  "evidence": [
+    {
+      "id": "recursive-main",
+      "kind": "main",
+      "claim": "ForkJoinTask 通过递归拆分、fork 一个子任务并 join 结果完成分治汇总。",
+      "entryPoint": "ForkJoinTask.doExec()",
+      "document": "/jdk/concurrent/forkjoinpool/fork-join#doexec-如何提交完成状态",
+      "labMethod": "observeRecursiveSplitAndJoin",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ForkJoinPoolBehaviorTest",
+      "testMethod": "shouldComputeRecursiveRangeSum",
+      "expectedOutcome": "固定区间被拆成多个子任务后合并为正确总和，池能在限定时间内结束。"
+    },
+    {
+      "id": "fork-join-concurrency",
+      "kind": "concurrency",
+      "claim": "池内 fork 把任务压入工作队列，join 会优先帮助执行相关任务而不是被动等待。",
+      "entryPoint": "ForkJoinTask.doJoin()",
+      "document": "/jdk/concurrent/forkjoinpool/fork-join#dojoin-的完整决策",
+      "labMethod": "observeRecursiveSplitAndJoin",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ForkJoinPoolBehaviorTest",
+      "testMethod": "shouldForkAndJoinChildInsidePool",
+      "expectedOutcome": "父任务在同一 ForkJoinPool 中取得子任务结果且没有线程饥饿或死锁。"
+    },
+    {
+      "id": "join-get-failure",
+      "kind": "failure",
+      "claim": "join 与 Future.get 都传播任务失败，但包装形式与受检异常契约不同。",
+      "entryPoint": "ForkJoinTask.doJoin()",
+      "document": "/jdk/concurrent/forkjoinpool/fork-join#dojoin-的完整决策",
+      "labMethod": "observeExceptionReporting",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ForkJoinPoolBehaviorTest",
+      "testMethod": "shouldReportJoinAndGetFailuresDifferently",
+      "expectedOutcome": "join 抛运行时失败，get 通过 ExecutionException 暴露同一失败原因。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "ForkJoinPool.externalPush(ForkJoinTask)",
       "scenario": "从普通线程向自建 pool 提交根任务",
-      "variables": ["task", "r", "q", "q.base", "q.top"]
+      "variables": [
+        "task",
+        "r",
+        "q",
+        "q.base",
+        "q.top"
+      ]
     },
     {
       "method": "ForkJoinPool.WorkQueue.push(ForkJoinTask)",
       "scenario": "worker 在 compute 中 fork 右侧子任务",
-      "variables": ["base", "top", "array", "task", "n"]
+      "variables": [
+        "base",
+        "top",
+        "array",
+        "task",
+        "n"
+      ]
     },
     {
       "method": "ForkJoinPool.WorkQueue.pop()",
       "scenario": "默认模式 owner 从 top 取得最新任务",
-      "variables": ["s", "base", "top", "j", "t"]
+      "variables": [
+        "s",
+        "base",
+        "top",
+        "j",
+        "t"
+      ]
     },
     {
       "method": "ForkJoinPool.WorkQueue.pollAt(int)",
       "scenario": "空闲 worker 从 victim base 窃取任务",
-      "variables": ["b", "base", "top", "j", "t", "CAS result"]
+      "variables": [
+        "b",
+        "base",
+        "top",
+        "j",
+        "t",
+        "CAS result"
+      ]
     },
     {
       "method": "ForkJoinTask.doJoin()",
       "scenario": "分别观察本地 tryUnpush 成功和目标已被窃取两条路径",
-      "variables": ["status", "w", "tryUnpush result", "s"]
+      "variables": [
+        "status",
+        "w",
+        "tryUnpush result",
+        "s"
+      ],
+      "evidenceId": "fork-join-concurrency"
     },
     {
       "method": "ForkJoinPool.helpStealer(WorkQueue,ForkJoinTask)",
       "scenario": "joiner 沿依赖链帮助执行被窃取目标的后代",
-      "variables": ["task", "subtask", "j.currentJoin", "v.currentSteal", "v.base", "v.top"]
+      "variables": [
+        "task",
+        "subtask",
+        "j.currentJoin",
+        "v.currentSteal",
+        "v.base",
+        "v.top"
+      ]
     },
     {
       "method": "ForkJoinTask.doExec()",
       "scenario": "正常 RecursiveTask 与抛异常任务分别提交终态",
-      "variables": ["status", "completed", "rex"]
+      "variables": [
+        "status",
+        "completed",
+        "rex"
+      ],
+      "evidenceId": "recursive-main"
     },
     {
       "method": "ForkJoinPool.managedBlock(ManagedBlocker)",
       "scenario": "parallelism 一的 worker 进入受控阻塞",
-      "variables": ["t", "p", "w", "blocker.isReleasable()"]
+      "variables": [
+        "t",
+        "p",
+        "w",
+        "blocker.isReleasable()"
+      ]
     },
     {
       "method": "ForkJoinPool.tryCompensate(WorkQueue)",
       "scenario": "观察阻塞前选择唤醒、减活跃计数或创建 worker",
-      "variables": ["ctl", "pc", "ac", "tc", "sp", "canBlock"]
+      "variables": [
+        "ctl",
+        "pc",
+        "ac",
+        "tc",
+        "sp",
+        "canBlock"
+      ]
     }
   ]
 }

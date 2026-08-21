@@ -184,59 +184,145 @@
       "sourceClass": "org.springframework.beans.factory.annotation.QualifierAnnotationAutowireCandidateResolver"
     }
   ],
-  "evidence": [{
-    "claim": "IOC 容器会先处理 BeanDefinition 扩展点，再按生命周期顺序实例化、填充并初始化单例。",
-    "entryPoint": "AbstractApplicationContext.refresh()",
-    "document": "/spring/ioc/refresh",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.spring.ioc.SpringIocLifecycleTest",
-    "testMethod": "shouldRunDefinitionAndBeanLifecycleInOrder"
-  }],
+  "evidence": [
+    {
+      "id": "bean-lifecycle-main",
+      "kind": "main",
+      "claim": "refresh 会先处理 BeanDefinition，再创建单例并按属性填充、Aware、前后处理器、初始化和销毁顺序推进生命周期。",
+      "entryPoint": "AbstractApplicationContext.refresh()",
+      "document": "/spring/ioc/refresh",
+      "labMethod": "main",
+      "testClass": "io.github.javasourceatlas.spring.ioc.SpringIocLifecycleTest",
+      "testMethod": "shouldRunDefinitionAndBeanLifecycleInOrder",
+      "expectedOutcome": "事件序列严格满足 BFPP 早于实例化、属性早于 Aware、初始化前后处理器包围 init，关闭时执行 destroy。"
+    },
+    {
+      "id": "factory-bean-boundary",
+      "kind": "boundary",
+      "claim": "普通 Bean 名取得 FactoryBean 产品，& 前缀取得工厂自身，单例产品会被缓存复用。",
+      "entryPoint": "FactoryBeanRegistrySupport.getObjectFromFactoryBean(...)",
+      "document": "/spring/ioc/extension-points#factorybean-名称有两种取值语义",
+      "labMethod": "main",
+      "testClass": "io.github.javasourceatlas.spring.ioc.SpringIocLifecycleTest",
+      "testMethod": "shouldDistinguishFactoryBeanFromItsProduct",
+      "expectedOutcome": "两次普通名称查询返回同一产品实例，&traceProduct 返回 FactoryBean 对象。"
+    },
+    {
+      "id": "dependency-ambiguity-failure",
+      "kind": "failure",
+      "claim": "按类型注入剩余多个等价候选且没有 Primary、Qualifier 或名称裁决时，容器必须拒绝猜测。",
+      "entryPoint": "DefaultListableBeanFactory.doResolveDependency(DependencyDescriptor,String,Set,TypeConverter)",
+      "document": "/spring/ioc/dependency-resolution#doresolvedependency-的主线",
+      "labMethod": "main",
+      "testClass": "io.github.javasourceatlas.spring.ioc.DependencyResolutionBehaviorTest",
+      "testMethod": "shouldFailWhenSingleDependencyRemainsAmbiguous",
+      "expectedOutcome": "上下文 refresh 失败，最深层原因是 NoUniqueBeanDefinitionException，并列出冲突候选。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "AbstractApplicationContext.refresh()",
       "scenario": "观察容器启动的完整阶段和失败清理",
-      "variables": ["active", "closed", "beanFactory", "earlyApplicationEvents"]
+      "variables": [
+        "active",
+        "closed",
+        "beanFactory",
+        "earlyApplicationEvents"
+      ],
+      "evidenceId": "bean-lifecycle-main"
     },
     {
       "method": "DefaultListableBeanFactory.preInstantiateSingletons()",
       "scenario": "观察非懒单例如何进入 getBean 创建链",
-      "variables": ["beanName", "bd", "isFactoryBean"]
+      "variables": [
+        "beanName",
+        "bd",
+        "isFactoryBean"
+      ]
     },
     {
       "method": "AbstractBeanFactory.doGetBean(...)",
       "scenario": "观察名称转换、缓存命中、scope 与 FactoryBean 产品适配",
-      "variables": ["name", "beanName", "sharedInstance", "mbd", "scope"]
+      "variables": [
+        "name",
+        "beanName",
+        "sharedInstance",
+        "mbd",
+        "scope"
+      ],
+      "evidenceId": "factory-bean-boundary"
     },
     {
       "method": "AbstractAutowireCapableBeanFactory.doCreateBean(...)",
       "scenario": "观察实例化、注入、初始化和早期引用协调",
-      "variables": ["beanName", "mbd", "bean", "earlySingletonExposure", "exposedObject"]
+      "variables": [
+        "beanName",
+        "mbd",
+        "bean",
+        "earlySingletonExposure",
+        "exposedObject"
+      ]
     },
     {
       "method": "DefaultSingletonBeanRegistry.getSingleton(String,boolean)",
       "scenario": "观察 Setter 单例循环依赖的三级缓存迁移",
-      "variables": ["singletonObject", "earlySingletonObjects", "singletonFactories", "allowEarlyReference"]
+      "variables": [
+        "singletonObject",
+        "earlySingletonObjects",
+        "singletonFactories",
+        "allowEarlyReference"
+      ]
     },
     {
       "method": "SpringIocDeepDiveScenarios.observeFullAndLiteConfiguration()",
       "scenario": "对比 full 配置 CGLIB 拦截与 lite 配置普通 Java 自调用的对象身份",
-      "variables": ["managed", "client.getDependency()", "fullDependencyCreations", "liteDependencyCreations"]
+      "variables": [
+        "managed",
+        "client.getDependency()",
+        "fullDependencyCreations",
+        "liteDependencyCreations"
+      ]
     },
     {
       "method": "SpringIocDeepDiveScenarios.observeConfigurationClassExpansion()",
       "scenario": "观察 ComponentScan、直接 Import、立即与延迟选择器怎样扩展 Registry，并确认条件定义被跳过",
-      "variables": ["candidateNames", "configClasses", "alreadyParsed", "registry.beanDefinitionCount"]
+      "variables": [
+        "candidateNames",
+        "configClasses",
+        "alreadyParsed",
+        "registry.beanDefinitionCount"
+      ]
     },
     {
       "method": "SpringIocDeepDiveScenarios.observeDependencyResolution()",
       "scenario": "观察 Primary、Qualifier、泛型、集合、Optional、Provider 与 Lazy 的候选解析结果",
-      "variables": ["descriptor.resolvableType", "candidateNames", "matchingBeans", "autowiredBeanName"]
+      "variables": [
+        "descriptor.resolvableType",
+        "candidateNames",
+        "matchingBeans",
+        "autowiredBeanName"
+      ]
     },
     {
       "method": "SpringIocDeepDiveScenarios.observeAmbiguousDependencyFailure()",
       "scenario": "观察两个等价单值候选无法裁决时抛出 NoUniqueBeanDefinitionException",
-      "variables": ["descriptor", "candidates", "primaryCandidate", "exception.mostSpecificCause"]
+      "variables": [
+        "descriptor",
+        "candidates",
+        "primaryCandidate",
+        "exception.mostSpecificCause"
+      ]
+    },
+    {
+      "method": "DefaultListableBeanFactory.doResolveDependency(DependencyDescriptor,String,Set,TypeConverter)",
+      "scenario": "刷新歧义依赖上下文，观察候选集合无法通过 Primary、Qualifier 或名称完成裁决",
+      "variables": [
+        "descriptor",
+        "beanName",
+        "matchingBeans",
+        "autowiredBeanNames"
+      ],
+      "evidenceId": "dependency-ambiguity-failure"
     }
   ]
 }

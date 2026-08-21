@@ -17,15 +17,21 @@ export interface SourceBreakpoint {
   scenario: string
   variables: string[]
   sourceClass?: string | null
+  evidenceId?: string
 }
 
+export type SourceEvidenceKind = 'main' | 'boundary' | 'failure' | 'cleanup' | 'concurrency' | 'version'
+
 export interface SourceEvidence {
+  id: string
+  kind: SourceEvidenceKind
   claim: string
   entryPoint: string
   document: string
   labMethod: string
   testClass: string
   testMethod: string
+  expectedOutcome: string
 }
 
 export interface SourceVersionComparison {

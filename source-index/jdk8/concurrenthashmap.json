@@ -13,7 +13,11 @@
   "versionComparison": {
     "id": "concurrent-hashmap",
     "summary": "无锁读、空桶 CAS、桶头同步和协作扩容协议保持稳定，内部原子 API、视图删除和树桶等待持续演进。",
-    "supportedVersions": ["8", "17", "21"],
+    "supportedVersions": [
+      "8",
+      "17",
+      "21"
+    ],
     "migrationHint": "不要把 Unsafe 字段偏移、TreeBin waiter 或视图实现当成公共兼容契约。"
   },
   "lab": {
@@ -21,7 +25,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentHashMapDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/ConcurrentHashMapDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.util.concurrent.ConcurrentHashMap",
@@ -95,62 +102,139 @@
       "sourceClass": "java.util.concurrent.ConcurrentHashMap"
     }
   ],
-  "evidence": [{
-    "claim": "ConcurrentHashMap 禁止 null 键和值，使无锁读取可以用 null 明确表示未命中。",
-    "entryPoint": "ConcurrentHashMap.get(Object)",
-    "document": "/jdk/concurrent/concurrenthashmap/#get-为什么不锁桶",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentHashMapBehaviorTest",
-    "testMethod": "shouldRejectNullKeyAndValue"
-  }],
+  "evidence": [
+    {
+      "id": "compute-main",
+      "kind": "main",
+      "claim": "computeIfAbsent 对同一个缺失键只发布一个映射结果，并把并发计算协调在桶协议内。",
+      "entryPoint": "ConcurrentHashMap.computeIfAbsent(K,Function)",
+      "document": "/jdk/concurrent/concurrenthashmap/count-compute#computeifabsent-的原子语义",
+      "labMethod": "observeComputeIfAbsent",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentHashMapBehaviorTest",
+      "testMethod": "shouldComputeOneMappingForSharedKey",
+      "expectedOutcome": "多个线程竞争同一键后只保留一个值，映射函数的有效发布次数为一次。"
+    },
+    {
+      "id": "null-failure",
+      "kind": "failure",
+      "claim": "ConcurrentHashMap 禁止 null 键和值，用非空返回值保留“缺失”这一无歧义状态。",
+      "entryPoint": "ConcurrentHashMap.putVal(K,V,boolean)",
+      "document": "/jdk/concurrent/concurrenthashmap/put-resize#putval-主循环",
+      "labMethod": "observeNullBoundary",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentHashMapBehaviorTest",
+      "testMethod": "shouldRejectNullKeyAndValue",
+      "expectedOutcome": "put null 键、put null 值和 get null 键都稳定抛出 NullPointerException。"
+    },
+    {
+      "id": "resize-concurrency",
+      "kind": "concurrency",
+      "claim": "并发扩容通过 ForwardingNode 和 transferIndex 协作迁移，读写线程在迁移窗口仍能找到已有映射。",
+      "entryPoint": "ConcurrentHashMap.transfer(Node[],Node[])",
+      "document": "/jdk/concurrent/concurrenthashmap/put-resize#transfer-的协作迁移",
+      "labMethod": "observeResizeAndForwardingNode",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentHashMapBehaviorTest",
+      "testMethod": "shouldPreserveMappingsAcrossConcurrentResize",
+      "expectedOutcome": "扩容与读取并发发生后没有映射丢失，全部旧键和新键都保持正确值。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "ConcurrentHashMap.putVal(K,V,boolean)",
       "scenario": "观察空桶、碰撞桶和 MOVED 分支",
       "sourceClass": "java.util.concurrent.ConcurrentHashMap",
-      "variables": ["tab", "n", "i", "f", "fh", "binCount"]
+      "variables": [
+        "tab",
+        "n",
+        "i",
+        "f",
+        "fh",
+        "binCount"
+      ],
+      "evidenceId": "null-failure"
     },
     {
       "method": "ConcurrentHashMap.transfer(Node[],Node[])",
       "scenario": "观察区间领取、桶迁移和新表发布",
       "sourceClass": "java.util.concurrent.ConcurrentHashMap",
-      "variables": ["transferIndex", "nextTable", "i", "bound", "f"]
+      "variables": [
+        "transferIndex",
+        "nextTable",
+        "i",
+        "bound",
+        "f"
+      ],
+      "evidenceId": "resize-concurrency"
     },
     {
       "method": "ConcurrentHashMap.helpTransfer(Node[],Node)",
       "scenario": "观察写线程通过 ForwardingNode 登记协作",
       "sourceClass": "java.util.concurrent.ConcurrentHashMap",
-      "variables": ["tab", "f", "nextTab", "sc", "transferIndex"]
+      "variables": [
+        "tab",
+        "f",
+        "nextTab",
+        "sc",
+        "transferIndex"
+      ]
     },
     {
       "method": "ConcurrentHashMap.ForwardingNode.find(int,Object)",
       "scenario": "观察读取跨越一轮或多轮扩容",
       "sourceClass": "java.util.concurrent.ConcurrentHashMap",
-      "variables": ["tab", "e", "n", "h", "k"]
+      "variables": [
+        "tab",
+        "e",
+        "n",
+        "h",
+        "k"
+      ]
     },
     {
       "method": "ConcurrentHashMap.TreeBin.find(int,Object)",
       "scenario": "观察树桶读者计数与链表退路",
       "sourceClass": "java.util.concurrent.ConcurrentHashMap",
-      "variables": ["lockState", "first", "root", "e", "s"]
+      "variables": [
+        "lockState",
+        "first",
+        "root",
+        "e",
+        "s"
+      ]
     },
     {
       "method": "ConcurrentHashMap.TreeBin.putTreeVal(int,K,V)",
       "scenario": "观察强碰撞键的树搜索、插入和平衡",
       "sourceClass": "java.util.concurrent.ConcurrentHashMap",
-      "variables": ["root", "p", "dir", "searched", "kc"]
+      "variables": [
+        "root",
+        "p",
+        "dir",
+        "searched",
+        "kc"
+      ]
     },
     {
       "method": "ConcurrentHashMap.Traverser.advance()",
       "scenario": "观察遍历器跨新旧表保存和恢复位置",
       "sourceClass": "java.util.concurrent.ConcurrentHashMap",
-      "variables": ["tab", "index", "baseIndex", "baseSize", "stack"]
+      "variables": [
+        "tab",
+        "index",
+        "baseIndex",
+        "baseSize",
+        "stack"
+      ]
     },
     {
       "method": "ConcurrentHashMap.addCount(long,int)",
       "scenario": "观察基础计数和 CounterCell",
       "sourceClass": "java.util.concurrent.ConcurrentHashMap",
-      "variables": ["baseCount", "counterCells", "s", "sizeCtl"]
+      "variables": [
+        "baseCount",
+        "counterCells",
+        "s",
+        "sizeCtl"
+      ]
     }
   ]
 }

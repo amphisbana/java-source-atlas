@@ -13,7 +13,11 @@
   "versionComparison": {
     "id": "classloader-service-loader",
     "summary": "双亲委派和 META-INF/services 仍可用，JDK 17/21 增加平台类加载器、模块层服务和 Provider 惰性流。",
-    "supportedVersions": ["8", "17", "21"],
+    "supportedVersions": [
+      "8",
+      "17",
+      "21"
+    ],
     "migrationHint": "排查 SPI 先确认 load 重载、uses/provides 声明以及 provider 所在模块边界。"
   },
   "lab": {
@@ -21,7 +25,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.runtime.ClassLoaderServiceLoaderDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/runtime/ClassLoaderServiceLoaderDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.lang.ClassLoader",
@@ -141,59 +148,143 @@
       "purpose": "为父层框架显式提供当前调用环境的类与资源可见范围"
     }
   ],
-  "evidence": [{
-    "claim": "ClassLoader.loadClass 会先检查已加载类并优先委派父加载器，再尝试自身查找。",
-    "entryPoint": "ClassLoader.loadClass(String,boolean)",
-    "document": "/jdk/runtime/classloader/loading-delegation#loadclass-的四段决策",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.runtime.ClassLoaderServiceLoaderBehaviorTest",
-    "testMethod": "shouldDelegateToParentBeforeCallingFindClass"
-  }],
+  "evidence": [
+    {
+      "id": "parent-delegation-main",
+      "kind": "main",
+      "claim": "ClassLoader 默认先委派父加载器，只有父级找不到目标类才调用当前加载器的 findClass。",
+      "entryPoint": "ClassLoader.loadClass(String,boolean)",
+      "document": "/jdk/runtime/classloader/loading-delegation#loadclass-的四段决策",
+      "labMethod": "observeParentDelegation",
+      "testClass": "io.github.javasourceatlas.jdk.runtime.ClassLoaderServiceLoaderBehaviorTest",
+      "testMethod": "shouldDelegateToParentBeforeCallingFindClass",
+      "expectedOutcome": "平台类由父级加载且不触发自定义 findClass，实验类才进入自定义定义路径。"
+    },
+    {
+      "id": "initialization-boundary",
+      "kind": "boundary",
+      "claim": "类加载与类初始化是两个阶段，Class.forName 的 initialize 参数决定是否执行静态初始化。",
+      "entryPoint": "Class.forName(String,boolean,ClassLoader)",
+      "document": "/jdk/runtime/classloader/#先分清五个动作",
+      "labMethod": "observeInitializationBoundary",
+      "testClass": "io.github.javasourceatlas.jdk.runtime.ClassLoaderServiceLoaderBehaviorTest",
+      "testMethod": "shouldSeparateLoadingFromInitialization",
+      "expectedOutcome": "initialize=false 只得到 Class 对象，首次主动使用或 initialize=true 才产生初始化副作用。"
+    },
+    {
+      "id": "service-reload-cleanup",
+      "kind": "cleanup",
+      "claim": "ServiceLoader 延迟实例化并缓存 Provider，reload 会清空缓存后重新发现与创建。",
+      "entryPoint": "ServiceLoader.reload()",
+      "document": "/jdk/runtime/classloader/serviceloader-spi#reload-清理什么",
+      "labMethod": "observeServiceDiscoveryAndCache",
+      "testClass": "io.github.javasourceatlas.jdk.runtime.ClassLoaderServiceLoaderBehaviorTest",
+      "testMethod": "shouldInstantiateLazilyCacheAndReloadProviders",
+      "expectedOutcome": "第一次遍历按配置顺序创建 Provider，重复遍历复用实例，reload 后得到新实例。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "ClassLoader.loadClass(String,boolean)",
       "scenario": "子加载器先请求父层已有实验类，再请求一个父层不存在的名称",
-      "variables": ["this", "name", "resolve", "parent", "c", "getClassLoadingLock(name)"]
+      "variables": [
+        "this",
+        "name",
+        "resolve",
+        "parent",
+        "c",
+        "getClassLoadingLock(name)"
+      ],
+      "evidenceId": "parent-delegation-main"
     },
     {
       "method": "ClassLoader.findLoadedClass(String)",
       "scenario": "隔离加载器定义 LoaderInitiatingFixture 并在父类解析中委派 bootstrap ArrayList",
-      "variables": ["name", "返回 Class", "返回 Class.getClassLoader()", "当前 loader 是否等于 defining loader"]
+      "variables": [
+        "name",
+        "返回 Class",
+        "返回 Class.getClassLoader()",
+        "当前 loader 是否等于 defining loader"
+      ]
     },
     {
       "method": "ClassLoader.defineClass(String,byte[],int,int,ProtectionDomain)",
       "scenario": "两个隔离加载器各自定义同一份 LoaderIdentityFixture 字节",
-      "variables": ["this", "name", "b", "off", "len", "protectionDomain", "c"]
+      "variables": [
+        "this",
+        "name",
+        "b",
+        "off",
+        "len",
+        "protectionDomain",
+        "c"
+      ]
     },
     {
       "method": "Class.forName(String,boolean,ClassLoader)",
       "scenario": "先以 initialize=false 加载探针，再以 true 触发 static 初始化",
-      "variables": ["className", "initialize", "loader", "初始化标记"]
+      "variables": [
+        "className",
+        "initialize",
+        "loader",
+        "初始化标记"
+      ],
+      "evidenceId": "initialization-boundary"
     },
     {
       "method": "ServiceLoader.load(Class)",
       "scenario": "切换当前线程 TCCL 后使用默认入口发现 GreetingService",
-      "variables": ["service", "Thread.currentThread().getContextClassLoader()", "configured loader"]
+      "variables": [
+        "service",
+        "Thread.currentThread().getContextClassLoader()",
+        "configured loader"
+      ]
     },
     {
       "method": "ServiceLoader.LazyIterator.hasNextService()",
       "scenario": "首次迭代包含重复 provider 名称的教学 SPI 配置",
-      "variables": ["fullName", "configs", "pending", "nextName", "returned provider names"]
+      "variables": [
+        "fullName",
+        "configs",
+        "pending",
+        "nextName",
+        "returned provider names"
+      ]
     },
     {
       "method": "ServiceLoader.parseLine(Class<?>,URL,BufferedReader,int,List<String>)",
       "scenario": "解析注释、重复 Alpha 和 Beta provider 行",
-      "variables": ["service", "u", "lc", "ln", "names", "providers.containsKey(ln)"]
+      "variables": [
+        "service",
+        "u",
+        "lc",
+        "ln",
+        "names",
+        "providers.containsKey(ln)"
+      ]
     },
     {
       "method": "ServiceLoader.LazyIterator.nextService()",
       "scenario": "第一次 next 创建 AlphaGreetingService 并写入实例缓存",
-      "variables": ["cn", "c", "service", "loader", "provider instance", "providers"]
+      "variables": [
+        "cn",
+        "c",
+        "service",
+        "loader",
+        "provider instance",
+        "providers"
+      ]
     },
     {
       "method": "ServiceLoader.reload()",
       "scenario": "已有 Alpha 和 Beta 缓存后 reload，再推进新 iterator",
-      "variables": ["providers", "lookupIterator", "reload 前实例", "reload 后实例"]
+      "variables": [
+        "providers",
+        "lookupIterator",
+        "reload 前实例",
+        "reload 后实例"
+      ],
+      "evidenceId": "service-reload-cleanup"
     }
   ]
 }

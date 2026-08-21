@@ -15,7 +15,10 @@
     "mainClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentLinkedQueueDebugLab",
     "sourcePath": "labs/jdk-labs/src/main/java/io/github/javasourceatlas/jdk/concurrent/ConcurrentLinkedQueueDebugLab.java"
   },
-  "compatibleVersions": ["OpenJDK 17", "OpenJDK 21"],
+  "compatibleVersions": [
+    "OpenJDK 17",
+    "OpenJDK 21"
+  ],
   "source": {
     "repository": "https://github.com/openjdk/jdk8u",
     "className": "java.util.concurrent.ConcurrentLinkedQueue",
@@ -83,44 +86,107 @@
       "purpose": "观察弱一致来源如何按批次复制元素进行拆分"
     }
   ],
-  "evidence": [{
-    "claim": "ConcurrentLinkedQueue 用 CAS 发布节点并保持 FIFO，同时以禁止 null 区分空队列。",
-    "entryPoint": "ConcurrentLinkedQueue.offer(E)",
-    "document": "/jdk/concurrent/concurrentlinkedqueue/offer-tail#offer-的完整循环",
-    "labMethod": "main",
-    "testClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentLinkedQueueBehaviorTest",
-    "testMethod": "shouldKeepFifoAndRejectNull"
-  }],
+  "evidence": [
+    {
+      "id": "fifo-main",
+      "kind": "main",
+      "claim": "ConcurrentLinkedQueue 使用 CAS 链接节点并保持单线程可观察的 FIFO 顺序，同时拒绝 null。",
+      "entryPoint": "ConcurrentLinkedQueue.offer(E)",
+      "document": "/jdk/concurrent/concurrentlinkedqueue/offer-tail#offer-的完整循环",
+      "labMethod": "observeFifoAndNullBoundary",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentLinkedQueueBehaviorTest",
+      "testMethod": "shouldKeepFifoAndRejectNull",
+      "expectedOutcome": "连续 offer 后 poll 顺序与写入顺序一致，offer null 抛出 NullPointerException。"
+    },
+    {
+      "id": "producer-order-concurrency",
+      "kind": "concurrency",
+      "claim": "多生产者可以交错追加，但每个生产者自己的写入顺序不会反转。",
+      "entryPoint": "Node.casNext(Node,Node)",
+      "document": "/jdk/concurrent/concurrentlinkedqueue/offer-tail#casnext-是入队线性化点",
+      "labMethod": "observeConcurrentProducers",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentLinkedQueueBehaviorTest",
+      "testMethod": "shouldPreserveEachProducersOrder",
+      "expectedOutcome": "消费完整队列后每个生产者的序号都严格递增，且没有元素丢失。"
+    },
+    {
+      "id": "weak-iterator-boundary",
+      "kind": "boundary",
+      "claim": "弱一致迭代器允许遍历期间并发修改，但不会重复返回创建时已经存在的元素。",
+      "entryPoint": "ConcurrentLinkedQueue.Itr.advance()",
+      "document": "/jdk/concurrent/concurrentlinkedqueue/poll-iteration#迭代器为什么需要-nextitem",
+      "labMethod": "observeWeakIterator",
+      "testClass": "io.github.javasourceatlas.jdk.concurrent.ConcurrentLinkedQueueBehaviorTest",
+      "testMethod": "shouldIterateWeaklyWithoutDuplicateExistingElements",
+      "expectedOutcome": "遍历可以看到部分新元素，但初始元素不会重复，且迭代过程不抛 ConcurrentModificationException。"
+    }
+  ],
   "breakpoints": [
     {
       "method": "ConcurrentLinkedQueue.offer(E)",
       "scenario": "连续插入 A、B，观察 tail 先滞后一跳再两跳推进",
-      "variables": ["t", "p", "q", "newNode", "tail"]
+      "variables": [
+        "t",
+        "p",
+        "q",
+        "newNode",
+        "tail"
+      ],
+      "evidenceId": "fifo-main"
     },
     {
       "method": "Node.casNext(Node,Node)",
       "scenario": "两个生产者竞争同一个 null 后继",
-      "variables": ["cmp", "val", "next", "CAS result"]
+      "variables": [
+        "cmp",
+        "val",
+        "next",
+        "CAS result"
+      ],
+      "evidenceId": "producer-order-concurrency"
     },
     {
       "method": "ConcurrentLinkedQueue.poll()",
       "scenario": "多个消费者竞争同一个非 null item",
-      "variables": ["h", "p", "q", "item", "head"]
+      "variables": [
+        "h",
+        "p",
+        "q",
+        "item",
+        "head"
+      ]
     },
     {
       "method": "ConcurrentLinkedQueue.updateHead(Node,Node)",
       "scenario": "poll 跨过至少一个节点后推进 head",
-      "variables": ["h", "p", "h.next", "head"]
+      "variables": [
+        "h",
+        "p",
+        "h.next",
+        "head"
+      ]
     },
     {
       "method": "ConcurrentLinkedQueue.succ(Node)",
       "scenario": "暂停线程恢复后读取已自链接的旧 head",
-      "variables": ["p", "next", "head"]
+      "variables": [
+        "p",
+        "next",
+        "head"
+      ]
     },
     {
       "method": "ConcurrentLinkedQueue.Itr.advance()",
       "scenario": "创建迭代器后继续增删并遍历",
-      "variables": ["nextNode", "nextItem", "lastRet", "pred", "p", "item"]
+      "variables": [
+        "nextNode",
+        "nextItem",
+        "lastRet",
+        "pred",
+        "p",
+        "item"
+      ],
+      "evidenceId": "weak-iterator-boundary"
     }
   ]
 }
