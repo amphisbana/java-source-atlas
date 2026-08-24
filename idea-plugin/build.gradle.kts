@@ -9,7 +9,7 @@ val localIdeaPath = providers.gradleProperty("atlas.localIdeaPath")
     .orElse("/Applications/IntelliJ IDEA.app")
 
 group = "io.github.java-source-atlas"
-version = "0.2.5"
+version = "0.2.6"
 
 repositories {
     mavenCentral()
@@ -107,6 +107,8 @@ intellijPlatform {
               <li>新增源码调用链复制、推荐断点讲解、专题收藏筛选和最近阅读恢复。</li>
               <li>新增首次使用环境检查，集中诊断教程站、项目结构、源码、Lab 与 JUnit 场景。</li>
               <li>场景调试会自动创建或复用所选推荐断点，再启动精确 JUnit Debug 配置。</li>
+              <li>环境检查异常项提供配置 JDK、下载源码、刷新 Maven 等直接修复动作。</li>
+              <li>修复推荐断点落在方法声明行无法命中，断点现在定位到方法体第一条可执行语句。</li>
             </ul>
         """.trimIndent()
     }

@@ -10,6 +10,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiCodeBlock;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiMethod;
 import com.intellij.psi.PsiStatement;
 import com.intellij.util.concurrency.AppExecutorUtil;
@@ -112,22 +113,56 @@ public final class AtlasBreakpointManager {
      * @return 断点位置；文件或文档不可用时返回 null
      */
     private static BreakpointLocation toLocation(Project project, PsiMethod method, String signature) {
-        VirtualFile file = method.getContainingFile().getVirtualFile();
-        Document document = PsiDocumentManager.getInstance(project).getDocument(method.getContainingFile());
+        PsiMethod sourceMethod = sourceMethod(method);
+        PsiFile sourceFile = sourceMethod.getContainingFile();
+        VirtualFile file = sourceFile == null ? null : sourceFile.getVirtualFile();
+        Document document = sourceFile == null
+                ? null
+                : PsiDocumentManager.getInstance(project).getDocument(sourceFile);
         if (file == null || document == null) {
             return null;
         }
 
-        PsiElement lineElement = method;
-        PsiCodeBlock body = method.getBody();
-        if (body != null) {
-            PsiStatement[] statements = body.getStatements();
-            if (statements.length > 0) {
-                lineElement = statements[0];
-            }
+        // 2026-08-24：原逻辑在编译 PSI 没有方法体时回退到方法声明，创建的行断点无法在运行时命中。
+        // PsiElement lineElement = method;
+        // PsiCodeBlock body = method.getBody();
+        // if (body != null) {
+        //     PsiStatement[] statements = body.getStatements();
+        //     if (statements.length > 0) {
+        //         lineElement = statements[0];
+        //     }
+        // }
+        PsiStatement lineElement = firstExecutableStatement(sourceMethod);
+        if (lineElement == null || document.getTextLength() == 0) {
+            return null;
         }
         int safeOffset = Math.min(lineElement.getTextOffset(), Math.max(document.getTextLength() - 1, 0));
         return new BreakpointLocation(file, document.getLineNumber(safeOffset), signature);
+    }
+
+    /**
+     * 将编译方法切换到已经附加的源码导航元素，确保后续能够读取真实方法体。
+     *
+     * @param method PSI 解析到的方法
+     * @return 源码方法；没有独立导航元素时返回原方法
+     */
+    static PsiMethod sourceMethod(PsiMethod method) {
+        PsiElement navigationElement = method.getNavigationElement();
+        return navigationElement instanceof PsiMethod navigationMethod
+                ? navigationMethod
+                : method;
+    }
+
+    /**
+     * 返回源码方法体中的第一条可执行语句；声明、抽象方法和空方法均不生成断点。
+     *
+     * @param sourceMethod 已经切换到源码的 PSI 方法
+     * @return 第一条语句；方法体缺失或为空时返回 null
+     */
+    static PsiStatement firstExecutableStatement(PsiMethod sourceMethod) {
+        PsiCodeBlock body = sourceMethod.getBody();
+        PsiStatement[] statements = body == null ? PsiStatement.EMPTY_ARRAY : body.getStatements();
+        return statements.length == 0 ? null : statements[0];
     }
 
     /**
