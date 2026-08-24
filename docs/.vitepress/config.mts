@@ -492,6 +492,7 @@ export default defineConfig({
           text: '项目指南',
           items: [
             { text: '如何阅读一个主题', link: '/guide/reading' },
+            { text: 'IDEA 插件首次使用', link: '/guide/idea-plugin-quick-start' },
             { text: '贡献源码解析', link: '/guide/contributing' },
             { text: '完整贡献示例', link: '/guide/contribution-walkthrough' },
             { text: '新专题模板', link: '/guide/topic-template' },

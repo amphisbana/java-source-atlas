@@ -4,10 +4,13 @@ import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.projectRoots.Sdk;
+import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.ui.SimpleToolWindowPanel;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.ide.CopyPasteManager;
+import com.intellij.openapi.options.ShowSettingsUtil;
 import com.intellij.ui.ColoredListCellRenderer;
 import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.SearchTextField;
@@ -23,6 +26,7 @@ import io.github.javasourceatlas.idea.browser.AtlasEmbeddedBrowser;
 import io.github.javasourceatlas.idea.browser.AtlasEmbeddedBrowserFactory;
 import io.github.javasourceatlas.idea.context.AtlasContextResolver;
 import io.github.javasourceatlas.idea.debug.AtlasBreakpointManager;
+import io.github.javasourceatlas.idea.environment.AtlasEnvironmentChecker;
 import io.github.javasourceatlas.idea.icons.AtlasIcons;
 import io.github.javasourceatlas.idea.index.AtlasIndexService;
 import io.github.javasourceatlas.idea.lab.AtlasLabLauncher;
@@ -35,6 +39,7 @@ import io.github.javasourceatlas.idea.model.AtlasTopic;
 import io.github.javasourceatlas.idea.model.AtlasTopicRelation;
 import io.github.javasourceatlas.idea.model.AtlasVersionInfo;
 import io.github.javasourceatlas.idea.navigation.AtlasSourceNavigator;
+import io.github.javasourceatlas.idea.settings.AtlasConfigurable;
 import io.github.javasourceatlas.idea.settings.AtlasSettingsState;
 import io.github.javasourceatlas.idea.version.AtlasVersionDetector;
 import org.jetbrains.annotations.NotNull;
@@ -48,6 +53,7 @@ import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.ListCellRenderer;
 import javax.swing.JPanel;
+import javax.swing.ScrollPaneConstants;
 import javax.swing.ListSelectionModel;
 import javax.swing.Timer;
 import javax.swing.event.DocumentEvent;
@@ -56,6 +62,7 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.datatransfer.StringSelection;
@@ -65,6 +72,9 @@ import java.util.List;
  * 展示当前源码上下文、专题入口、推荐断点和版本信息。
  */
 public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements Disposable {
+
+    private static final int ENVIRONMENT_TAB_INDEX = 4;
+    private static final String PROJECT_REPOSITORY_URL = "https://github.com/amphisbana/java-source-atlas";
 
     private final Project project;
     private final AtlasIndexService index;
@@ -96,6 +106,14 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     private final JBLabel evidenceLabel = new JBLabel("可执行证据：0 条");
     private final JBLabel nextTopicLabel = new JBLabel("下一步：等待选择专题");
     private final JBLabel nextReasonLabel = new JBLabel();
+    private final JBLabel environmentOverviewLabel = new JBLabel("环境状态：等待检测");
+    private final JBLabel documentationEnvironmentLabel = new JBLabel("等待检测");
+    private final JBLabel jdkEnvironmentLabel = new JBLabel("等待检测");
+    private final JBLabel projectEnvironmentLabel = new JBLabel("等待检测");
+    private final JBLabel sourceEnvironmentLabel = new JBLabel("等待选择专题");
+    private final JBLabel labEnvironmentLabel = new JBLabel("等待选择专题");
+    private final JBLabel evidenceEnvironmentLabel = new JBLabel("等待选择推荐断点");
+    private final JBLabel browserEnvironmentLabel = new JBLabel("等待检测");
     private final JBCheckBox readMainCheckBox = new JBCheckBox("我已完成主线阅读");
     private final JBCheckBox ranLabCheckBox = new JBCheckBox("我已运行并理解 Lab");
     private final JBCheckBox favoritesOnlyCheckBox = new JBCheckBox("只看收藏");
@@ -110,13 +128,17 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     private final JButton addAllBreakpointsButton = new JButton("添加全部断点");
     private final JButton openLabButton = new JButton("打开 Lab");
     private final JButton debugLabButton = new JButton("Debug Lab");
-    private final JButton debugEvidenceButton = new JButton("Debug 当前场景");
+    private final JButton debugEvidenceButton = new JButton("添加断点并 Debug");
     private final JButton viewBreakpointExplanationButton = new JButton("查看断点讲解");
     private final JButton favoriteTopicButton = new JButton("收藏当前专题");
     private final JButton clearRecentButton = new JButton("清空最近阅读");
     private final JButton backToNavigationButton = new JButton("返回专题导航");
     private final JButton tutorialExternalDocumentationButton = new JButton("浏览器打开");
     private final JButton enterNextTopicButton = new JButton("进入下一专题");
+    private final JButton refreshEnvironmentButton = new JButton("重新检测");
+    private final JButton openEnvironmentGuideButton = new JButton("使用指南");
+    private final JButton openProjectRepositoryButton = new JButton("项目仓库");
+    private final JButton openAtlasSettingsButton = new JButton("教程设置");
     private final Timer contextTimer;
 
     private AtlasEmbeddedBrowser tutorialBrowser;
@@ -124,6 +146,18 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     private AtlasEditorContext editorContext = new AtlasEditorContext(null, null, null, null);
     private boolean contextRefreshPending;
     private boolean updatingProgressControls;
+    private boolean evidenceDebugPending;
+    private boolean documentationCheckPending;
+    private int environmentCheckGeneration;
+    private int documentationCheckGeneration;
+    private String checkedDocumentationUrl = "";
+    private AtlasEnvironmentChecker.DocumentationStatus documentationStatus;
+    private EnvironmentCheckState documentationEnvironmentState = EnvironmentCheckState.PENDING;
+    private EnvironmentCheckState jdkEnvironmentState = EnvironmentCheckState.PENDING;
+    private EnvironmentCheckState projectEnvironmentState = EnvironmentCheckState.PENDING;
+    private EnvironmentCheckState sourceEnvironmentState = EnvironmentCheckState.NOT_APPLICABLE;
+    private EnvironmentCheckState labEnvironmentState = EnvironmentCheckState.NOT_APPLICABLE;
+    private EnvironmentCheckState evidenceEnvironmentState = EnvironmentCheckState.NOT_APPLICABLE;
 
     /**
      * 构建工具窗口并启动轻量上下文刷新计时器。
@@ -141,6 +175,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         setContent(createMainContent());
         rebuildTopicList("");
         refreshFromEditor(true);
+        showEnvironmentGuideOnFirstUse();
 
         contextTimer = new Timer(800, ignored -> refreshFromEditor(false));
         contextTimer.setRepeats(true);
@@ -262,7 +297,9 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         addAllBreakpointsButton.addActionListener(ignored -> addAllBreakpoints());
         openLabButton.addActionListener(ignored -> openLab());
         debugLabButton.addActionListener(ignored -> debugLab());
-        debugEvidenceButton.addActionListener(ignored -> debugCurrentEvidence());
+        // 2026-08-21：原操作只启动 JUnit，保留 debugCurrentEvidence 方法作为单独启动实现，新入口先添加断点。
+        // debugEvidenceButton.addActionListener(ignored -> debugCurrentEvidence());
+        debugEvidenceButton.addActionListener(ignored -> addBreakpointAndDebugCurrentEvidence());
         viewBreakpointExplanationButton.addActionListener(ignored -> viewBreakpointExplanation());
         favoriteTopicButton.addActionListener(ignored -> toggleFavoriteTopic());
         clearRecentButton.addActionListener(ignored -> clearRecentTopics());
@@ -271,6 +308,15 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         readMainCheckBox.addActionListener(ignored -> saveLearningProgress());
         ranLabCheckBox.addActionListener(ignored -> saveLearningProgress());
         enterNextTopicButton.addActionListener(ignored -> enterRecommendedNextTopic());
+        refreshEnvironmentButton.addActionListener(ignored -> refreshEnvironmentChecks(true));
+        openEnvironmentGuideButton.addActionListener(ignored -> BrowserUtil.browse(
+                AtlasSettingsState.getInstance().documentationUrl("/guide/idea-plugin-quick-start")
+        ));
+        openProjectRepositoryButton.addActionListener(ignored -> BrowserUtil.browse(PROJECT_REPOSITORY_URL));
+        openAtlasSettingsButton.addActionListener(ignored -> {
+            ShowSettingsUtil.getInstance().showSettingsDialog(project, AtlasConfigurable.class);
+            refreshEnvironmentChecks(true);
+        });
 
         // 2026-08-19：把“IDE 内阅读”设为当前专题的主操作，降低首次使用时的选择成本。
         openDocumentationButton.putClientProperty("JButton.buttonType", "default");
@@ -282,11 +328,15 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         addAllBreakpointsButton.setToolTipText("添加当前专题的全部推荐断点");
         openLabButton.setToolTipText("打开当前专题的 Lab 主类");
         debugLabButton.setToolTipText("创建临时配置并 Debug 当前专题 Lab");
-        debugEvidenceButton.setToolTipText("选择已绑定证据的推荐断点后，Debug 对应 JUnit 测试方法");
+        debugEvidenceButton.setToolTipText("自动添加当前推荐断点，再 Debug 对应的单个 JUnit 测试方法");
         viewBreakpointExplanationButton.setToolTipText("打开与当前断点最匹配的源码入口讲解");
         favoriteTopicButton.setToolTipText("把当前专题加入或移出本地收藏");
         clearRecentButton.setToolTipText("清空本地最近阅读记录，不影响学习进度");
         enterNextTopicButton.setToolTipText("切换到索引推荐的下一专题");
+        refreshEnvironmentButton.setToolTipText("重新检查教程站、项目结构、源码、Lab 和 JUnit 场景");
+        openEnvironmentGuideButton.setToolTipText("打开 IDEA 插件首次使用与问题修复指南");
+        openProjectRepositoryButton.setToolTipText("打开 Java Source Atlas GitHub 仓库");
+        openAtlasSettingsButton.setToolTipText("修改教程站点地址");
     }
 
     /**
@@ -328,8 +378,15 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                 viewBreakpointExplanationButton
         ));
         navigationTabs.addTab("学习路径", createLearningSection());
+        navigationTabs.addTab("环境检查", createEnvironmentSection());
         navigationTabs.setBorder(JBUI.Borders.emptyTop(2));
-        navigationTabs.addChangeListener(ignored -> updateActionState());
+        // 2026-08-21：原逻辑仅刷新页签按钮状态；环境页需要在用户进入时重新检查当前专题的依赖条件。
+        navigationTabs.addChangeListener(ignored -> {
+            updateActionState();
+            if (navigationTabs.getSelectedIndex() == ENVIRONMENT_TAB_INDEX) {
+                refreshEnvironmentChecks(false);
+            }
+        });
         root.add(navigationTabs, BorderLayout.CENTER);
         return root;
     }
@@ -519,6 +576,337 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     }
 
     /**
+     * 创建首次使用环境检查页，把阅读和调试所需条件集中展示为可恢复的检查项。
+     *
+     * @return 环境检查页组件
+     */
+    private JComponent createEnvironmentSection() {
+        JPanel content = new JPanel();
+        content.setLayout(new javax.swing.BoxLayout(content, javax.swing.BoxLayout.Y_AXIS));
+        content.setBorder(JBUI.Borders.empty(2, 2, 8, 2));
+
+        environmentOverviewLabel.setFont(environmentOverviewLabel.getFont().deriveFont(Font.BOLD, 14f));
+        environmentOverviewLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        content.add(environmentOverviewLabel);
+        content.add(javax.swing.Box.createVerticalStrut(JBUI.scale(5)));
+
+        JBLabel readingWorkflowLabel = new JBLabel("阅读：教程站 → 项目 JDK → 源码入口");
+        readingWorkflowLabel.setForeground(UIUtil.getLabelInfoForeground());
+        readingWorkflowLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        content.add(readingWorkflowLabel);
+        content.add(javax.swing.Box.createVerticalStrut(JBUI.scale(2)));
+        JBLabel debugWorkflowLabel = new JBLabel("调试：Maven 仓库 → Lab → JUnit 场景");
+        debugWorkflowLabel.setForeground(UIUtil.getLabelInfoForeground());
+        debugWorkflowLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        content.add(debugWorkflowLabel);
+        content.add(javax.swing.Box.createVerticalStrut(JBUI.scale(10)));
+
+        content.add(createEnvironmentRow("教程站点", documentationEnvironmentLabel));
+        content.add(createEnvironmentRow("项目 JDK", jdkEnvironmentLabel));
+        content.add(createEnvironmentRow("Maven 与仓库", projectEnvironmentLabel));
+        content.add(createEnvironmentRow("当前源码入口", sourceEnvironmentLabel));
+        content.add(createEnvironmentRow("当前 Lab 模块", labEnvironmentLabel));
+        content.add(createEnvironmentRow("当前 JUnit 场景", evidenceEnvironmentLabel));
+        content.add(createEnvironmentRow("IDE 内教程", browserEnvironmentLabel));
+        content.add(javax.swing.Box.createVerticalStrut(JBUI.scale(8)));
+
+        JPanel actionBar = new JPanel(new GridLayout(2, 2, JBUI.scale(6), JBUI.scale(6)));
+        actionBar.add(refreshEnvironmentButton);
+        actionBar.add(openEnvironmentGuideButton);
+        actionBar.add(openProjectRepositoryButton);
+        actionBar.add(openAtlasSettingsButton);
+        actionBar.setAlignmentX(Component.LEFT_ALIGNMENT);
+        actionBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, JBUI.scale(62)));
+        content.add(actionBar);
+
+        JBScrollPane scrollPane = new JBScrollPane(content);
+        scrollPane.setBorder(JBUI.Borders.empty());
+        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        return scrollPane;
+    }
+
+    /**
+     * 创建一条带标题和诊断详情的环境状态行。
+     *
+     * @param title       检查项标题
+     * @param statusLabel 状态详情标签
+     * @return 环境状态行
+     */
+    private JComponent createEnvironmentRow(String title, JBLabel statusLabel) {
+        JPanel row = new JPanel();
+        row.setLayout(new javax.swing.BoxLayout(row, javax.swing.BoxLayout.Y_AXIS));
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, UIUtil.getBoundsColor()),
+                JBUI.Borders.empty(7, 2)
+        ));
+        JBLabel titleLabel = new JBLabel(title);
+        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 13f));
+        titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        statusLabel.setForeground(UIUtil.getLabelInfoForeground());
+        statusLabel.setFont(statusLabel.getFont().deriveFont(Font.PLAIN, 12f));
+        statusLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.add(titleLabel);
+        row.add(javax.swing.Box.createVerticalStrut(JBUI.scale(3)));
+        row.add(statusLabel);
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, JBUI.scale(54)));
+        return row;
+    }
+
+    /**
+     * 首次打开插件时自动进入环境检查页；展示一次后恢复用户主动选择页签的行为。
+     */
+    private void showEnvironmentGuideOnFirstUse() {
+        AtlasSettingsState settings = AtlasSettingsState.getInstance();
+        if (!settings.shouldShowEnvironmentGuide()) {
+            return;
+        }
+        // 2026-08-21：原逻辑首次打开直接停在专题列表；现在先展示可操作的环境准备状态。
+        settings.markEnvironmentGuideSeen();
+        navigationTabs.setSelectedIndex(ENVIRONMENT_TAB_INDEX);
+    }
+
+    /**
+     * 检查当前专题所需的教程、项目结构、源码、Lab 与 JUnit 场景。
+     *
+     * @param forceDocumentation 是否忽略教程站点缓存并重新发起网络探测
+     */
+    private void refreshEnvironmentChecks(boolean forceDocumentation) {
+        int generation = ++environmentCheckGeneration;
+        AtlasTopic topic = topicList.getSelectedValue();
+        AtlasEntryPoint entryPoint = entryPointList.getSelectedValue();
+        AtlasBreakpoint breakpoint = breakpointList.getSelectedValue();
+        AtlasEvidence evidence = index.evidenceForBreakpoint(topic, breakpoint).orElse(null);
+
+        checkDocumentationEnvironment(forceDocumentation);
+        checkJdkEnvironment();
+        checkProjectEnvironment();
+        applyEnvironmentStatus(
+                browserEnvironmentLabel,
+                tutorialBrowser == null ? EnvironmentCheckState.NOT_APPLICABLE : EnvironmentCheckState.READY,
+                tutorialBrowser == null
+                        ? "当前 IDEA 未提供 JCEF，教程会使用系统浏览器打开"
+                        : "JCEF 可用，可以在 IDEA 内阅读教程"
+        );
+
+        if (topic == null || entryPoint == null) {
+            sourceEnvironmentState = EnvironmentCheckState.NOT_APPLICABLE;
+            applyEnvironmentStatus(sourceEnvironmentLabel, sourceEnvironmentState, "请先选择专题和源码入口");
+        } else {
+            sourceEnvironmentState = EnvironmentCheckState.CHECKING;
+            applyEnvironmentStatus(sourceEnvironmentLabel, sourceEnvironmentState, "正在检查 " + entryPoint.method());
+            AtlasSourceNavigator.checkAvailability(project, this, topic, entryPoint, available -> {
+                if (generation != environmentCheckGeneration) {
+                    return;
+                }
+                sourceEnvironmentState = available
+                        ? EnvironmentCheckState.READY
+                        : EnvironmentCheckState.ACTION_REQUIRED;
+                applyEnvironmentStatus(
+                        sourceEnvironmentLabel,
+                        sourceEnvironmentState,
+                        available
+                                ? "已找到 " + entryPoint.method()
+                                : "未找到目标类或方法，请附加对应 JDK/Spring 源码"
+                );
+                updateEnvironmentOverview();
+            });
+        }
+
+        if (topic == null || topic.lab() == null) {
+            labEnvironmentState = EnvironmentCheckState.NOT_APPLICABLE;
+            applyEnvironmentStatus(labEnvironmentLabel, labEnvironmentState, "当前专题没有 Lab 配置");
+        } else {
+            labEnvironmentState = EnvironmentCheckState.CHECKING;
+            applyEnvironmentStatus(labEnvironmentLabel, labEnvironmentState, "正在检查 " + topic.lab().module());
+            AtlasLabLauncher.checkAvailability(project, this, topic, available -> {
+                if (generation != environmentCheckGeneration) {
+                    return;
+                }
+                labEnvironmentState = available
+                        ? EnvironmentCheckState.READY
+                        : EnvironmentCheckState.ACTION_REQUIRED;
+                applyEnvironmentStatus(
+                        labEnvironmentLabel,
+                        labEnvironmentState,
+                        available
+                                ? "已导入 " + topic.lab().module()
+                                : "未导入 " + topic.lab().module() + "，请打开完整仓库并刷新 Maven"
+                );
+                updateEnvironmentOverview();
+            });
+        }
+
+        if (evidence == null) {
+            evidenceEnvironmentState = EnvironmentCheckState.NOT_APPLICABLE;
+            applyEnvironmentStatus(
+                    evidenceEnvironmentLabel,
+                    evidenceEnvironmentState,
+                    breakpoint == null
+                            ? "请在推荐断点页选择带“可调试场景”标记的断点"
+                            : "当前断点没有绑定独立 JUnit 场景"
+            );
+        } else {
+            evidenceEnvironmentState = EnvironmentCheckState.CHECKING;
+            applyEnvironmentStatus(
+                    evidenceEnvironmentLabel,
+                    evidenceEnvironmentState,
+                    "正在检查 " + evidence.testClass() + "#" + evidence.testMethod()
+            );
+            AtlasLabLauncher.checkEvidenceAvailability(project, this, evidence, available -> {
+                if (generation != environmentCheckGeneration) {
+                    return;
+                }
+                evidenceEnvironmentState = available
+                        ? EnvironmentCheckState.READY
+                        : EnvironmentCheckState.ACTION_REQUIRED;
+                applyEnvironmentStatus(
+                        evidenceEnvironmentLabel,
+                        evidenceEnvironmentState,
+                        available
+                                ? "已找到 " + evidence.testClass() + "#" + evidence.testMethod()
+                                : "未找到测试方法，请导入对应 labs 模块并刷新 Maven"
+                );
+                updateEnvironmentOverview();
+            });
+        }
+        updateEnvironmentOverview();
+    }
+
+    /**
+     * 读取当前项目 SDK，判断源码阅读和 Lab 编译是否具备 Java 环境。
+     */
+    private void checkJdkEnvironment() {
+        Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
+        String version = sdk == null ? null : sdk.getVersionString();
+        jdkEnvironmentState = version == null || version.isBlank()
+                ? EnvironmentCheckState.ACTION_REQUIRED
+                : EnvironmentCheckState.READY;
+        applyEnvironmentStatus(
+                jdkEnvironmentLabel,
+                jdkEnvironmentState,
+                jdkEnvironmentState == EnvironmentCheckState.READY
+                        ? version
+                        : "当前项目未配置 Project SDK"
+        );
+    }
+
+    /**
+     * 检查当前 IDEA 项目是否为包含根 pom、source-index 和 labs 的完整 Atlas 仓库。
+     */
+    private void checkProjectEnvironment() {
+        AtlasEnvironmentChecker.ProjectFiles files =
+                AtlasEnvironmentChecker.inspectProjectFiles(project.getBasePath());
+        projectEnvironmentState = files.atlasRepository()
+                ? EnvironmentCheckState.READY
+                : EnvironmentCheckState.ACTION_REQUIRED;
+        String detail;
+        if (files.atlasRepository()) {
+            detail = "已找到根 pom.xml、source-index 和 labs";
+        } else if (files.rootPom()) {
+            detail = "已找到 Maven 根工程，但不是完整 Atlas 仓库；Lab 调试需要打开项目仓库";
+        } else {
+            detail = "当前项目没有 Atlas 根 pom.xml；Lab 调试需要打开完整项目仓库";
+        }
+        applyEnvironmentStatus(projectEnvironmentLabel, projectEnvironmentState, detail);
+    }
+
+    /**
+     * 使用缓存或后台网络请求检查当前配置的教程站点。
+     *
+     * @param force 是否强制重新访问站点
+     */
+    private void checkDocumentationEnvironment(boolean force) {
+        String docsUrl = StringUtil.notNullize(AtlasSettingsState.getInstance().docsBaseUrl).trim();
+        if (!force && documentationStatus != null && docsUrl.equals(checkedDocumentationUrl)) {
+            documentationEnvironmentState = documentationStatus.available()
+                    ? EnvironmentCheckState.READY
+                    : EnvironmentCheckState.ACTION_REQUIRED;
+            applyEnvironmentStatus(documentationEnvironmentLabel, documentationEnvironmentState, documentationStatus.detail());
+            return;
+        }
+        if (!force && documentationCheckPending && docsUrl.equals(checkedDocumentationUrl)) {
+            return;
+        }
+
+        int generation = ++documentationCheckGeneration;
+        checkedDocumentationUrl = docsUrl;
+        documentationCheckPending = true;
+        documentationEnvironmentState = EnvironmentCheckState.CHECKING;
+        applyEnvironmentStatus(documentationEnvironmentLabel, documentationEnvironmentState, "正在访问 " + docsUrl);
+        AtlasEnvironmentChecker.checkDocumentationAsync(this, docsUrl, status -> {
+            if (generation != documentationCheckGeneration) {
+                return;
+            }
+            documentationCheckPending = false;
+            documentationStatus = status;
+            documentationEnvironmentState = status.available()
+                    ? EnvironmentCheckState.READY
+                    : EnvironmentCheckState.ACTION_REQUIRED;
+            applyEnvironmentStatus(documentationEnvironmentLabel, documentationEnvironmentState, status.detail());
+            updateEnvironmentOverview();
+        });
+    }
+
+    /**
+     * 根据环境状态生成统一的符号、短文本和完整悬浮说明。
+     *
+     * @param label  状态标签
+     * @param state  检查状态
+     * @param detail 完整诊断说明
+     */
+    private void applyEnvironmentStatus(JBLabel label, EnvironmentCheckState state, String detail) {
+        String marker = switch (state) {
+            case READY -> "✓";
+            case ACTION_REQUIRED -> "!";
+            case CHECKING -> "…";
+            case PENDING, NOT_APPLICABLE -> "·";
+        };
+        label.setText(marker + " "
+                + StringUtil.shortenTextWithEllipsis(StringUtil.notNullize(detail), 34, 0));
+        label.setToolTipText(detail);
+    }
+
+    /**
+     * 汇总阅读与调试条件，并把结论同步到环境页签标题。
+     */
+    private void updateEnvironmentOverview() {
+        List<EnvironmentCheckState> states = List.of(
+                documentationEnvironmentState,
+                jdkEnvironmentState,
+                projectEnvironmentState,
+                sourceEnvironmentState,
+                labEnvironmentState,
+                evidenceEnvironmentState
+        );
+        boolean checking = states.stream().anyMatch(state -> state == EnvironmentCheckState.CHECKING);
+        long required = states.stream().filter(state -> state == EnvironmentCheckState.ACTION_REQUIRED).count();
+        boolean readingReady = documentationEnvironmentState == EnvironmentCheckState.READY
+                && jdkEnvironmentState == EnvironmentCheckState.READY
+                && sourceEnvironmentState == EnvironmentCheckState.READY;
+        boolean debugReady = projectEnvironmentState == EnvironmentCheckState.READY
+                && labEnvironmentState == EnvironmentCheckState.READY
+                && evidenceEnvironmentState == EnvironmentCheckState.READY;
+
+        if (checking) {
+            environmentOverviewLabel.setText("环境状态：正在检测…");
+            navigationTabs.setTitleAt(ENVIRONMENT_TAB_INDEX, "环境检查 …");
+        } else if (readingReady && debugReady) {
+            environmentOverviewLabel.setText("环境状态：源码阅读与场景调试已就绪");
+            navigationTabs.setTitleAt(ENVIRONMENT_TAB_INDEX, "环境检查 ✓");
+        } else if (readingReady) {
+            environmentOverviewLabel.setText("环境状态：源码阅读可用，场景调试仍需准备");
+            navigationTabs.setTitleAt(ENVIRONMENT_TAB_INDEX, "环境检查 !");
+        } else if (required > 0) {
+            environmentOverviewLabel.setText("环境状态：有 " + required + " 项需要处理");
+            navigationTabs.setTitleAt(ENVIRONMENT_TAB_INDEX, "环境检查 !");
+        } else {
+            environmentOverviewLabel.setText("环境状态：选择专题与可调试断点后继续检查");
+            navigationTabs.setTitleAt(ENVIRONMENT_TAB_INDEX, "环境检查");
+        }
+    }
+
+    /**
      * 创建带紧凑标题的内容分区。
      *
      * @param title   分区标题
@@ -549,7 +937,10 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
 
         // 2026-08-19：操作跟随所属页签展示，减少跨场景按钮造成的认知负担。
         if (actions.length > 0) {
-            JComponent actionBar = createTabActionBar(actions);
+            // 2026-08-21：原逻辑始终使用单行 FlowLayout；场景调试按钮增加后，窄工具窗口改用两列网格避免截断。
+            JComponent actionBar = actions.length > 3
+                    ? createMultiRowActionBar(actions)
+                    : createTabActionBar(actions);
             actionBar.setAlignmentX(Component.LEFT_ALIGNMENT);
             sectionHeader.add(actionBar);
             sectionHeader.add(javax.swing.Box.createVerticalStrut(JBUI.scale(5)));
@@ -576,6 +967,25 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         for (JButton action : actions) {
             actionBar.add(action);
         }
+        return actionBar;
+    }
+
+    /**
+     * 为四个以上操作创建两列多行布局，保证窄工具窗口中的按钮文案完整可见。
+     *
+     * @param actions 当前页签可执行的操作
+     * @return 两列操作栏
+     */
+    private JComponent createMultiRowActionBar(JButton... actions) {
+        int rows = (actions.length + 1) / 2;
+        JPanel actionBar = new JPanel(new GridLayout(rows, 2, JBUI.scale(6), JBUI.scale(6)));
+        for (JButton action : actions) {
+            actionBar.add(action);
+        }
+        if (actions.length % 2 != 0) {
+            actionBar.add(new JPanel());
+        }
+        actionBar.setMaximumSize(new Dimension(Integer.MAX_VALUE, JBUI.scale(rows * 30)));
         return actionBar;
     }
 
@@ -645,6 +1055,9 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
             refreshLearningSection(null);
             updateNavigationTabTitles();
             updateActionState();
+            if (navigationTabs.getSelectedIndex() == ENVIRONMENT_TAB_INDEX) {
+                refreshEnvironmentChecks(false);
+            }
             return;
         }
 
@@ -667,6 +1080,9 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
             entryPointList.setSelectedIndex(0);
         }
         updateActionState();
+        if (navigationTabs.getSelectedIndex() == ENVIRONMENT_TAB_INDEX) {
+            refreshEnvironmentChecks(false);
+        }
     }
 
     /**
@@ -773,7 +1189,9 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         openLabButton.setEnabled(false);
         debugLabButton.setEnabled(false);
         debugEvidenceButton.setEnabled(false);
-        if (topic != null && navigationTabs.getSelectedIndex() == 3) {
+        if (topic != null && navigationTabs.getSelectedIndex() == ENVIRONMENT_TAB_INDEX) {
+            actionHintLabel.setText("检查教程、源码和 Lab 状态，按提示补齐调试环境");
+        } else if (topic != null && navigationTabs.getSelectedIndex() == 3) {
             actionHintLabel.setText("确认阅读与实验进度，再沿推荐关系进入下一专题");
         } else if (topic != null && navigationTabs.getSelectedIndex() == 2) {
             // 2026-08-21：原逻辑统一提示启动整个 Debug Lab；现在优先提示断点绑定的单个 JUnit 证据场景。
@@ -781,7 +1199,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                     ? "双击列表项添加单个断点；也可以一次添加全部断点并打开 Lab"
                     : evidence == null
                     ? "当前断点可双击添加；该断点暂未绑定独立测试场景"
-                    : "当前断点已绑定行为测试，可直接 Debug 当前场景观察变量变化");
+                    : "当前断点已绑定行为测试，可自动添加断点并 Debug 精确场景");
         } else if (topic != null && navigationTabs.getSelectedIndex() == 1) {
             actionHintLabel.setText(entryPoint == null
                     ? "选择一个源码入口开始阅读"
@@ -826,10 +1244,10 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                         || !breakpoint.equals(breakpointList.getSelectedValue())) {
                     return;
                 }
-                debugEvidenceButton.setEnabled(available);
+                debugEvidenceButton.setEnabled(available && !evidenceDebugPending);
                 debugEvidenceButton.setToolTipText(available
                         ? evidence.testClass() + "#" + evidence.testMethod()
-                        + "；预期：" + evidence.expectedOutcome()
+                        + "；将先添加当前断点；预期：" + evidence.expectedOutcome()
                         : "当前项目未导入测试 " + evidence.testClass() + "#" + evidence.testMethod());
             });
         }
@@ -1149,6 +1567,44 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     }
 
     /**
+     * 先添加当前推荐断点，确认断点能够解析后再启动绑定的单个 JUnit 证据场景。
+     */
+    private void addBreakpointAndDebugCurrentEvidence() {
+        AtlasTopic topic = topicList.getSelectedValue();
+        AtlasBreakpoint breakpoint = breakpointList.getSelectedValue();
+        AtlasEvidence evidence = index.evidenceForBreakpoint(topic, breakpoint).orElse(null);
+        if (topic == null || breakpoint == null || evidence == null) {
+            return;
+        }
+
+        evidenceDebugPending = true;
+        debugEvidenceButton.setEnabled(false);
+        debugEvidenceButton.setText("准备场景…");
+        AtlasBreakpointManager.addBreakpointsAsync(
+                project,
+                this,
+                topic,
+                List.of(breakpoint),
+                result -> {
+                    if (result.added() + result.existing() == 0) {
+                        evidenceDebugPending = false;
+                        debugEvidenceButton.setText("添加断点并 Debug");
+                        updateActionState();
+                        Messages.showInfoMessage(
+                                project,
+                                "没有找到断点方法 " + breakpoint.method()
+                                        + "。请先在环境检查中确认源码已经附加。",
+                                "Java Source Atlas"
+                        );
+                        return;
+                    }
+                    debugEvidenceButton.setText("启动 Debug…");
+                    startEvidenceDebug(evidence);
+                }
+        );
+    }
+
+    /**
      * 为当前推荐断点绑定的单个 JUnit 证据创建临时 Debug 配置。
      */
     private void debugCurrentEvidence() {
@@ -1158,8 +1614,21 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         if (evidence == null) {
             return;
         }
+        startEvidenceDebug(evidence);
+    }
+
+    /**
+     * 启动已经确认存在的 JUnit 证据场景，并在结束启动流程后恢复操作按钮。
+     *
+     * @param evidence 要调试的证据场景
+     */
+    private void startEvidenceDebug(AtlasEvidence evidence) {
+        evidenceDebugPending = true;
         debugEvidenceButton.setEnabled(false);
         AtlasLabLauncher.debugEvidenceAsync(project, this, evidence, started -> {
+            // 2026-08-21：原逻辑只恢复按钮可用性；串联断点添加后还需要清除场景准备状态和按钮文案。
+            evidenceDebugPending = false;
+            debugEvidenceButton.setText("添加断点并 Debug");
             updateActionState();
             if (!started) {
                 Messages.showInfoMessage(
@@ -1469,6 +1938,17 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
             scenarioLabel.setForeground(colors.secondaryForeground());
             variablesLabel.setForeground(colors.secondaryForeground());
         }
+    }
+
+    /**
+     * 描述环境检查项在等待、检查、可用和需要处理之间的状态。
+     */
+    private enum EnvironmentCheckState {
+        PENDING,
+        CHECKING,
+        READY,
+        ACTION_REQUIRED,
+        NOT_APPLICABLE
     }
 
     /**

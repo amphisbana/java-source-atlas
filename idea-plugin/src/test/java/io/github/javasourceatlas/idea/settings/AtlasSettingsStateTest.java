@@ -3,6 +3,8 @@ package io.github.javasourceatlas.idea.settings;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 验证教程站点默认值、升级迁移和自定义地址拼接。
@@ -53,5 +55,21 @@ class AtlasSettingsStateTest {
                 "https://docs.example.com/atlas/jdk/collections/hashmap/#putval",
                 currentState.documentationUrl("jdk/collections/hashmap/#putval")
         );
+    }
+
+    /**
+     * 验证环境向导只在首次打开时自动展示，并能随插件设置持久化恢复。
+     */
+    @Test
+    void shouldRememberEnvironmentGuideWasShown() {
+        AtlasSettingsState currentState = new AtlasSettingsState();
+        assertTrue(currentState.shouldShowEnvironmentGuide());
+
+        currentState.markEnvironmentGuideSeen();
+        assertFalse(currentState.shouldShowEnvironmentGuide());
+
+        AtlasSettingsState restored = new AtlasSettingsState();
+        restored.loadState(currentState);
+        assertFalse(restored.shouldShowEnvironmentGuide());
     }
 }

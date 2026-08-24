@@ -112,6 +112,7 @@ flowchart LR
 | [JDK 8 / 17 / 21 版本对比](docs/jdk/version-comparison/index.md) | 正在升级 JDK，想确认同一机制在不同版本中的实现变化。 |
 | [JDK 专题首页](docs/index.md) | 按分类浏览全部 JDK 与 Spring 专题。 |
 | [如何阅读一个专题](docs/guide/reading.md) | 不确定应该先看文档、源码、动画还是 Lab。 |
+| [IDEA 插件首次使用](docs/guide/idea-plugin-quick-start.md) | 检查教程、源码和 Lab 环境，并跑通一次推荐断点调试。 |
 | [项目路线图](docs/roadmap/index.md) | 了解当前能力、下一阶段重点和不在近期范围内的内容。 |
 | [反馈与问题定位](docs/guide/feedback.md) | 提交可复现 Bug、专题建议或文档修正。 |
 
@@ -194,6 +195,8 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
 可安装 ZIP 位于 `idea-plugin/build/distributions/`。正式版本也可以从 [GitHub Releases](https://github.com/amphisbana/java-source-atlas/releases) 下载，然后在 IDEA 的 `Settings | Plugins | Install Plugin from Disk...` 中安装。
 
 插件默认连接公开文档站；开发仓库内容时，可在 IDEA 设置中临时使用 `http://127.0.0.1:4180`。要使用 Lab 打开和 Debug，需要在 IDEA 中导入完整仓库及对应 Maven 模块。
+
+插件首次打开会进入环境检查，分别确认教程站、项目 JDK、Maven 根工程、源码入口、Lab 和 JUnit 场景。选择带可调试标记的推荐断点后，“添加断点并 Debug”会先创建或复用断点，再启动绑定的单个 JUnit 测试。
 
 ## 仓库结构
 

@@ -20,6 +20,7 @@ public final class AtlasSettingsState implements PersistentStateComponent<AtlasS
     private static final String LEGACY_PUBLIC_DOCS_BASE_URL = "https://amphisbana.github.io/java-source-atlas";
 
     public String docsBaseUrl = DEFAULT_DOCS_BASE_URL;
+    public boolean environmentGuideSeen;
 
     /**
      * 取得应用级设置实例。
@@ -72,5 +73,21 @@ public final class AtlasSettingsState implements PersistentStateComponent<AtlasS
                 ? "/"
                 : (documentPath.startsWith("/") ? documentPath : "/" + documentPath);
         return normalizedBase + normalizedPath;
+    }
+
+    /**
+     * 判断是否需要在插件首次打开时展示环境检查页。
+     *
+     * @return 尚未展示过环境检查页时返回 true
+     */
+    public boolean shouldShowEnvironmentGuide() {
+        return !environmentGuideSeen;
+    }
+
+    /**
+     * 记录环境检查页已经展示，后续打开插件时恢复常规专题导航。
+     */
+    public void markEnvironmentGuideSeen() {
+        environmentGuideSeen = true;
     }
 }

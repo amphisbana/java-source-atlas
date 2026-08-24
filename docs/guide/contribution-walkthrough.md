@@ -125,7 +125,7 @@ mvn --batch-mode -pl labs/jdk-labs -Dtest=HashMapBehaviorTest#shouldKeepMappings
 }
 ```
 
-绑定后，IDEA 插件会在“推荐断点”页启用“Debug 当前场景”，创建只运行 `HashMapBehaviorTest#shouldKeepMappingsAfterResize` 的临时 JUnit Debug 配置。没有稳定测试映射的断点应省略 `evidenceId`，不要为了点亮按钮绑定不相关场景。
+绑定后，IDEA 插件会在“推荐断点”页启用“添加断点并 Debug”，先创建或复用对应 Java 行断点，再创建只运行 `HashMapBehaviorTest#shouldKeepMappingsAfterResize` 的临时 JUnit Debug 配置。没有稳定测试映射的断点应省略 `evidenceId`，不要为了点亮按钮绑定不相关场景。
 
 ## 7. 写清讲解和断点观察
 
