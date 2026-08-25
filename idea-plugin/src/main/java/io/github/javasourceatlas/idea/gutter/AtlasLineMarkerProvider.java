@@ -60,7 +60,14 @@ public final class AtlasLineMarkerProvider implements LineMarkerProvider {
         GutterIconNavigationHandler<PsiElement> handler =
                 (MouseEvent event, PsiElement ignored) -> {
                     // 2026-08-20：gutter 主动阅读入口纳入最近阅读历史，便于在学习路径中恢复上下文。
-                    AtlasLearningProgressState.getInstance().recordRecent(topic.topicId());
+                    // 2026-08-24：原逻辑只记录专题编号，现在同步方法、文档锚点和阅读版本。
+                    // AtlasLearningProgressState.getInstance().recordRecent(topic.topicId());
+                    AtlasLearningProgressState.getInstance().recordEntry(
+                            topic.topicId(),
+                            entryPoint.method(),
+                            entryPoint.document(),
+                            topic.primaryVersion()
+                    );
                     BrowserUtil.browse(
                             AtlasSettingsState.getInstance().documentationUrl(entryPoint.document())
                     );

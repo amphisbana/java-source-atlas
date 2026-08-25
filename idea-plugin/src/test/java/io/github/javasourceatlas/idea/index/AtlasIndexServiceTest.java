@@ -131,8 +131,12 @@ class AtlasIndexServiceTest {
                 .filter(item -> item.method().startsWith("putVal"))
                 .findFirst()
                 .orElseThrow();
+        io.github.javasourceatlas.idea.model.AtlasEntryPoint entryPoint = index
+                .explanationForBreakpoint(topic, breakpoint)
+                .orElseThrow();
 
         assertTrue(index.explanationForBreakpoint(topic, breakpoint).isPresent());
+        assertEquals(breakpoint, index.breakpointForEntryPoint(topic, entryPoint).orElseThrow());
         assertEquals("put-main", index.evidenceForBreakpoint(topic, breakpoint).orElseThrow().id());
         assertFalse(index.explanationForBreakpoint(
                 topic,

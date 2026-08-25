@@ -163,6 +163,28 @@ public final class AtlasIndexService {
     }
 
     /**
+     * 为当前源码入口查找最贴近的推荐断点，优先返回带可执行证据的断点。
+     *
+     * @param topic      当前专题
+     * @param entryPoint 当前源码入口
+     * @return 对应推荐断点
+     */
+    public Optional<AtlasBreakpoint> breakpointForEntryPoint(AtlasTopic topic, AtlasEntryPoint entryPoint) {
+        if (topic == null || entryPoint == null) {
+            return Optional.empty();
+        }
+        List<AtlasBreakpoint> matches = topic.breakpoints().stream()
+                .filter(breakpoint -> explanationForBreakpoint(topic, breakpoint)
+                        .map(entryPoint::equals)
+                        .orElse(false))
+                .toList();
+        return matches.stream()
+                .filter(breakpoint -> breakpoint.evidenceId() != null && !breakpoint.evidenceId().isBlank())
+                .findFirst()
+                .or(() -> matches.stream().findFirst());
+    }
+
+    /**
      * 解析推荐断点绑定的可执行证据，未绑定或索引失配时保持禁用状态。
      *
      * @param topic      当前专题

@@ -93,12 +93,64 @@ public final class AtlasLearningProgressState implements PersistentStateComponen
         if (topicId == null || topicId.isBlank()) {
             return new TopicProgress();
         }
-        TopicProgress updated = new TopicProgress();
+        // 2026-08-24：原逻辑每次勾选专题进度都会新建对象，加入方法级阅读会话后会丢失入口和断点轨迹。
+        // TopicProgress updated = new TopicProgress();
+        TopicProgress updated = progressByTopic.computeIfAbsent(topicId, ignored -> new TopicProgress());
         updated.readMain = readMain;
         updated.ranLab = ranLab;
         updated.updatedAt = Instant.now().toString();
         progressByTopic.put(topicId, updated);
         return updated.copy();
+    }
+
+    /**
+     * 记录一次真实的源码入口阅读，并保存精确恢复所需的方法、文档锚点和版本。
+     *
+     * @param topicId       专题编号
+     * @param entryMethod   入口方法签名
+     * @param document      教程文档锚点
+     * @param primaryVersion 阅读时使用的教程基线
+     * @return 更新后的专题进度快照
+     */
+    public TopicProgress recordEntry(
+            String topicId,
+            String entryMethod,
+            String document,
+            String primaryVersion
+    ) {
+        if (topicId == null || topicId.isBlank() || entryMethod == null || entryMethod.isBlank()) {
+            return new TopicProgress();
+        }
+        TopicProgress progress = progressByTopic.computeIfAbsent(topicId, ignored -> new TopicProgress());
+        progress.lastEntryMethod = entryMethod;
+        progress.lastDocument = normalized(document);
+        progress.lastVersion = normalized(primaryVersion);
+        addDistinct(progress.visitedEntryMethods, entryMethod);
+        progress.updatedAt = Instant.now().toString();
+        recordRecent(topicId);
+        return progress.copy();
+    }
+
+    /**
+     * 记录用户已经添加或启动过的推荐断点，便于恢复断点阅读上下文。
+     *
+     * @param topicId         专题编号
+     * @param breakpointMethod 推荐断点方法签名
+     * @param primaryVersion  阅读时使用的教程基线
+     * @return 更新后的专题进度快照
+     */
+    public TopicProgress recordBreakpoint(String topicId, String breakpointMethod, String primaryVersion) {
+        if (topicId == null || topicId.isBlank()
+                || breakpointMethod == null || breakpointMethod.isBlank()) {
+            return new TopicProgress();
+        }
+        TopicProgress progress = progressByTopic.computeIfAbsent(topicId, ignored -> new TopicProgress());
+        progress.lastBreakpointMethod = breakpointMethod;
+        progress.lastVersion = normalized(primaryVersion);
+        addDistinct(progress.preparedBreakpointMethods, breakpointMethod);
+        progress.updatedAt = Instant.now().toString();
+        recordRecent(topicId);
+        return progress.copy();
     }
 
     /**
@@ -188,6 +240,28 @@ public final class AtlasLearningProgressState implements PersistentStateComponen
     }
 
     /**
+     * 将非空值追加到有序集合语义的列表中，保持首次阅读顺序稳定。
+     *
+     * @param values 当前持久化列表
+     * @param value  待追加值
+     */
+    private static void addDistinct(List<String> values, String value) {
+        if (!values.contains(value)) {
+            values.add(value);
+        }
+    }
+
+    /**
+     * 把可空持久化文本规范化为空字符串，避免旧配置恢复后出现空指针。
+     *
+     * @param value 原始文本
+     * @return 非空文本
+     */
+    private static String normalized(String value) {
+        return value == null ? "" : value;
+    }
+
+    /**
      * 可由 IDEA XML 序列化器恢复的单专题进度 Bean。
      */
     public static final class TopicProgress {
@@ -195,6 +269,12 @@ public final class AtlasLearningProgressState implements PersistentStateComponen
         public boolean readMain;
         public boolean ranLab;
         public String updatedAt = "";
+        public String lastEntryMethod = "";
+        public String lastDocument = "";
+        public String lastBreakpointMethod = "";
+        public String lastVersion = "";
+        public List<String> visitedEntryMethods = new ArrayList<>();
+        public List<String> preparedBreakpointMethods = new ArrayList<>();
 
         /**
          * 创建与当前记录相同的快照。
@@ -206,6 +286,12 @@ public final class AtlasLearningProgressState implements PersistentStateComponen
             copied.readMain = readMain;
             copied.ranLab = ranLab;
             copied.updatedAt = updatedAt == null ? "" : updatedAt;
+            copied.lastEntryMethod = normalized(lastEntryMethod);
+            copied.lastDocument = normalized(lastDocument);
+            copied.lastBreakpointMethod = normalized(lastBreakpointMethod);
+            copied.lastVersion = normalized(lastVersion);
+            copied.visitedEntryMethods = distinctNonBlank(visitedEntryMethods);
+            copied.preparedBreakpointMethods = distinctNonBlank(preparedBreakpointMethods);
             return copied;
         }
     }

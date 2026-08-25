@@ -9,7 +9,7 @@ val localIdeaPath = providers.gradleProperty("atlas.localIdeaPath")
     .orElse("/Applications/IntelliJ IDEA.app")
 
 group = "io.github.java-source-atlas"
-version = "0.2.6"
+version = "0.2.7"
 
 repositories {
     mavenCentral()
@@ -109,6 +109,10 @@ intellijPlatform {
               <li>场景调试会自动创建或复用所选推荐断点，再启动精确 JUnit Debug 配置。</li>
               <li>环境检查异常项提供配置 JDK、下载源码、刷新 Maven 等直接修复动作。</li>
               <li>修复推荐断点落在方法声明行无法命中，断点现在定位到方法体第一条可执行语句。</li>
+              <li>新增源码阅读会话、方法级进度、上次入口恢复与调用链前后导航。</li>
+              <li>新增 Atlas 断点启停清理、观察清单和当前 Debug 会话 Watches。</li>
+              <li>新增编辑器 Java Source Atlas 上下文菜单，可直接定位、断点、调试证据和进入下一入口。</li>
+              <li>重构工具窗口视觉层级，新增原生图标、紧凑页签、多行列表和主次命令布局。</li>
             </ul>
         """.trimIndent()
     }

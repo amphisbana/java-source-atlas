@@ -101,7 +101,7 @@ public final class AtlasBreakpointManager {
                 locations.add(location);
             }
         }
-        return new Resolution(List.copyOf(locations), List.copyOf(unresolved));
+        return new Resolution(topic.topicId(), List.copyOf(locations), List.copyOf(unresolved));
     }
 
     /**
@@ -183,12 +183,27 @@ public final class AtlasBreakpointManager {
 
         int added = 0;
         int existing = 0;
+        AtlasBreakpointState state = AtlasBreakpointState.getInstance(project);
         for (BreakpointLocation location : resolution.locations()) {
             if (containsLineBreakpoint(manager, location.file().getUrl(), location.line())) {
                 existing++;
                 continue;
             }
-            addLineBreakpoint(manager, breakpointType, location);
+            // 2026-08-24：原逻辑只创建断点，不记录归属，插件之后无法只清理自己创建的断点。
+            // addLineBreakpoint(manager, breakpointType, location);
+            XLineBreakpoint<JavaLineBreakpointProperties> created = addLineBreakpoint(
+                    manager,
+                    breakpointType,
+                    location
+            );
+            if (created != null) {
+                state.register(
+                        resolution.topicId(),
+                        location.file().getUrl(),
+                        location.line(),
+                        location.signature()
+                );
+            }
             added++;
         }
         consumer.accept(new AddResult(added, existing, resolution.unresolved()));
@@ -201,7 +216,7 @@ public final class AtlasBreakpointManager {
      * @param breakpointType Java 行断点类型
      * @param location       文件位置
      */
-    private static void addLineBreakpoint(
+    private static XLineBreakpoint<JavaLineBreakpointProperties> addLineBreakpoint(
             XBreakpointManager manager,
             JavaLineBreakpointType breakpointType,
             BreakpointLocation location
@@ -210,7 +225,7 @@ public final class AtlasBreakpointManager {
                 location.file(),
                 location.line()
         );
-        manager.addLineBreakpoint(
+        return manager.addLineBreakpoint(
                 breakpointType,
                 location.file().getUrl(),
                 location.line(),
@@ -227,14 +242,102 @@ public final class AtlasBreakpointManager {
      * @return 是否已存在
      */
     private static boolean containsLineBreakpoint(XBreakpointManager manager, String fileUrl, int line) {
+        return findLineBreakpoint(manager, fileUrl, line) != null;
+    }
+
+    /**
+     * 查找同一文件同一行的现有行断点。
+     *
+     * @param manager 断点管理器
+     * @param fileUrl 文件 URL
+     * @param line    零基行号
+     * @return 行断点；不存在时返回 null
+     */
+    private static XLineBreakpoint<?> findLineBreakpoint(XBreakpointManager manager, String fileUrl, int line) {
         for (XBreakpoint<?> breakpoint : manager.getAllBreakpoints()) {
             if (breakpoint instanceof XLineBreakpoint<?> lineBreakpoint
                     && fileUrl.equals(lineBreakpoint.getFileUrl())
                     && line == lineBreakpoint.getLine()) {
-                return true;
+                return lineBreakpoint;
             }
         }
-        return false;
+        return null;
+    }
+
+    /**
+     * 启用或禁用插件创建的断点，并清理用户已经手动删除的过期归属记录。
+     *
+     * @param project 当前项目
+     * @param enabled 目标启用状态
+     * @return 本次管理结果
+     */
+    public static ManageResult setManagedBreakpointsEnabled(Project project, boolean enabled) {
+        XBreakpointManager manager = XDebuggerManager.getInstance(project).getBreakpointManager();
+        AtlasBreakpointState state = AtlasBreakpointState.getInstance(project);
+        int affected = 0;
+        int stale = 0;
+        for (AtlasBreakpointState.ManagedBreakpoint location : state.locations()) {
+            XLineBreakpoint<?> breakpoint = findLineBreakpoint(manager, location.fileUrl, location.line);
+            if (breakpoint == null) {
+                state.removeLocation(location.fileUrl, location.line);
+                stale++;
+                continue;
+            }
+            breakpoint.setEnabled(enabled);
+            affected++;
+        }
+        return new ManageResult(affected, stale, state.locations().size(), enabled);
+    }
+
+    /**
+     * 删除当前专题或全部由插件创建的断点，不触碰复用的用户断点。
+     *
+     * @param project 当前项目
+     * @param topicId 专题编号；为空时删除全部 Atlas 断点
+     * @return 本次管理结果
+     */
+    public static ManageResult removeManagedBreakpoints(Project project, String topicId) {
+        XBreakpointManager manager = XDebuggerManager.getInstance(project).getBreakpointManager();
+        AtlasBreakpointState state = AtlasBreakpointState.getInstance(project);
+        int removed = 0;
+        int stale = 0;
+        for (AtlasBreakpointState.ManagedBreakpoint location : state.locations()) {
+            if (topicId != null && !topicId.isBlank() && !topicId.equals(location.topicId)) {
+                continue;
+            }
+            XLineBreakpoint<?> breakpoint = findLineBreakpoint(manager, location.fileUrl, location.line);
+            if (breakpoint == null) {
+                stale++;
+            } else {
+                manager.removeBreakpoint(breakpoint);
+                removed++;
+            }
+            state.removeLocation(location.fileUrl, location.line);
+        }
+        return new ManageResult(removed, stale, state.locations().size(), true);
+    }
+
+    /**
+     * 汇总当前仍然存在的 Atlas 断点数量和启用状态。
+     *
+     * @param project 当前项目
+     * @return 断点管理摘要
+     */
+    public static ManagedSummary managedSummary(Project project) {
+        XBreakpointManager manager = XDebuggerManager.getInstance(project).getBreakpointManager();
+        AtlasBreakpointState state = AtlasBreakpointState.getInstance(project);
+        int count = 0;
+        boolean allEnabled = true;
+        for (AtlasBreakpointState.ManagedBreakpoint location : state.locations()) {
+            XLineBreakpoint<?> breakpoint = findLineBreakpoint(manager, location.fileUrl, location.line);
+            if (breakpoint == null) {
+                state.removeLocation(location.fileUrl, location.line);
+                continue;
+            }
+            count++;
+            allEnabled &= breakpoint.isEnabled();
+        }
+        return new ManagedSummary(count, count == 0 || allEnabled);
     }
 
     /**
@@ -245,6 +348,26 @@ public final class AtlasBreakpointManager {
      * @param unresolved 未找到的方法签名
      */
     public record AddResult(int added, int existing, List<String> unresolved) {
+    }
+
+    /**
+     * 保存一次 Atlas 断点启停或清理操作的结果。
+     *
+     * @param affected  实际修改的断点数
+     * @param stale     清理的过期归属记录数
+     * @param remaining 当前仍由 Atlas 管理的断点数
+     * @param enabled   操作后的目标启用状态
+     */
+    public record ManageResult(int affected, int stale, int remaining, boolean enabled) {
+    }
+
+    /**
+     * 保存当前 Atlas 断点数量和整体启用状态。
+     *
+     * @param count      当前断点数
+     * @param allEnabled 是否全部启用
+     */
+    public record ManagedSummary(int count, boolean allEnabled) {
     }
 
     /**
@@ -263,6 +386,6 @@ public final class AtlasBreakpointManager {
      * @param locations 已解析位置
      * @param unresolved 未解析签名
      */
-    private record Resolution(List<BreakpointLocation> locations, List<String> unresolved) {
+    private record Resolution(String topicId, List<BreakpointLocation> locations, List<String> unresolved) {
     }
 }

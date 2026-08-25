@@ -102,4 +102,43 @@ class AtlasLearningProgressStateTest {
         assertEquals(20, restored.recentTopicIds().size());
         assertEquals("topic-0", restored.recentTopicIds().getFirst());
     }
+
+    /**
+     * 验证源码入口和推荐断点会保存方法、文档、版本以及有序访问轨迹。
+     */
+    @Test
+    void shouldRecordMethodLevelReadingSession() {
+        AtlasLearningProgressState state = new AtlasLearningProgressState();
+
+        state.recordEntry("hashmap", "put(K,V)", "/jdk/hashmap/put", "OpenJDK 8u");
+        state.recordEntry("hashmap", "resize()", "/jdk/hashmap/resize", "OpenJDK 8u");
+        state.recordEntry("hashmap", "put(K,V)", "/jdk/hashmap/put", "OpenJDK 8u");
+        state.recordBreakpoint("hashmap", "resize()", "OpenJDK 8u");
+
+        AtlasLearningProgressState.TopicProgress progress = state.progressFor("hashmap");
+        assertEquals("put(K,V)", progress.lastEntryMethod);
+        assertEquals("/jdk/hashmap/put", progress.lastDocument);
+        assertEquals("resize()", progress.lastBreakpointMethod);
+        assertEquals("OpenJDK 8u", progress.lastVersion);
+        assertEquals(java.util.List.of("put(K,V)", "resize()"), progress.visitedEntryMethods);
+        assertEquals(java.util.List.of("resize()"), progress.preparedBreakpointMethods);
+        assertEquals(java.util.List.of("hashmap"), state.recentTopicIds());
+    }
+
+    /**
+     * 验证更新专题复选框时会保留已经记录的方法级阅读上下文。
+     */
+    @Test
+    void shouldKeepReadingSessionWhenUpdatingTopicProgress() {
+        AtlasLearningProgressState state = new AtlasLearningProgressState();
+        state.recordEntry("hashmap", "resize()", "/jdk/hashmap/resize", "OpenJDK 8u");
+
+        state.update("hashmap", true, true);
+
+        AtlasLearningProgressState.TopicProgress progress = state.progressFor("hashmap");
+        assertTrue(progress.readMain);
+        assertTrue(progress.ranLab);
+        assertEquals("resize()", progress.lastEntryMethod);
+        assertEquals(java.util.List.of("resize()"), progress.visitedEntryMethods);
+    }
 }

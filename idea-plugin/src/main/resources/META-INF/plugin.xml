@@ -18,6 +18,7 @@
         <applicationService serviceImplementation="io.github.javasourceatlas.idea.index.AtlasIndexService"/>
         <applicationService serviceImplementation="io.github.javasourceatlas.idea.learning.AtlasLearningProgressState"/>
         <applicationService serviceImplementation="io.github.javasourceatlas.idea.settings.AtlasSettingsState"/>
+        <projectService serviceImplementation="io.github.javasourceatlas.idea.debug.AtlasBreakpointState"/>
         <applicationConfigurable
                 id="io.github.javasourceatlas.idea.settings"
                 displayName="Java Source Atlas"
@@ -39,8 +40,56 @@
                 text="在 Source Atlas 中查看解析"
                 description="打开当前 Java 类或方法对应的源码解析"
                 icon="/icons/atlas.svg">
+            <!-- 2026-08-24：原动作直接占用编辑器和 Tools 菜单，新增上下文动作后统一收进 Source Atlas 子菜单。 -->
+            <!-- <add-to-group group-id="EditorPopupMenu" anchor="last"/> -->
+            <!-- <add-to-group group-id="ToolsMenu" anchor="last"/> -->
+        </action>
+        <action
+                id="JavaSourceAtlas.NavigateSource"
+                class="io.github.javasourceatlas.idea.action.AtlasNavigateSourceAction"
+                text="定位当前源码入口"
+                description="定位当前类或方法对应的 Source Atlas 源码入口"
+                icon="/icons/atlas.svg"/>
+        <action
+                id="JavaSourceAtlas.AddRecommendedBreakpoint"
+                class="io.github.javasourceatlas.idea.action.AtlasAddRecommendedBreakpointAction"
+                text="添加当前方法推荐断点"
+                description="添加当前源码入口对应的 Source Atlas 推荐断点"
+                icon="/icons/atlas.svg"/>
+        <action
+                id="JavaSourceAtlas.DebugEvidence"
+                class="io.github.javasourceatlas.idea.action.AtlasDebugEvidenceAction"
+                text="Debug 当前证据场景"
+                description="添加推荐断点并 Debug 当前方法对应的证据测试"
+                icon="/icons/atlas.svg"/>
+        <action
+                id="JavaSourceAtlas.NextEntry"
+                class="io.github.javasourceatlas.idea.action.AtlasNextEntryAction"
+                text="进入调用链下一入口"
+                description="定位当前专题调用链中的下一个源码入口"
+                icon="/icons/atlas.svg"/>
+        <action
+                id="JavaSourceAtlas.ToggleFavorite"
+                class="io.github.javasourceatlas.idea.action.AtlasToggleFavoriteAction"
+                text="收藏或取消收藏当前专题"
+                description="切换当前源码专题的本地收藏状态"
+                icon="/icons/atlas.svg"/>
+        <group
+                id="JavaSourceAtlas.EditorActions"
+                text="Java Source Atlas"
+                description="当前源码上下文的阅读、断点与证据操作"
+                popup="true"
+                icon="/icons/atlas.svg">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <add-to-group group-id="ToolsMenu" anchor="last"/>
-        </action>
+            <reference ref="JavaSourceAtlas.OpenDocumentation"/>
+            <reference ref="JavaSourceAtlas.NavigateSource"/>
+            <separator/>
+            <reference ref="JavaSourceAtlas.AddRecommendedBreakpoint"/>
+            <reference ref="JavaSourceAtlas.DebugEvidence"/>
+            <separator/>
+            <reference ref="JavaSourceAtlas.NextEntry"/>
+            <reference ref="JavaSourceAtlas.ToggleFavorite"/>
+        </group>
     </actions>
 </idea-plugin>

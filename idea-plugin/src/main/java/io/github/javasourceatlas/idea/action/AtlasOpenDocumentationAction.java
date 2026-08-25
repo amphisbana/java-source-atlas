@@ -67,12 +67,40 @@ public final class AtlasOpenDocumentationAction extends DumbAwareAction {
             Messages.showInfoMessage(project, "当前 Java 类尚未收录到 Source Atlas。", "Java Source Atlas");
             return;
         }
-        AtlasEntryPoint entryPoint = context.entryPoint() == null
-                ? context.topic().entryPoints().get(0)
-                : context.entryPoint();
+        // 2026-08-24：原逻辑在光标只命中类时固定打开第一个入口，和阅读会话的恢复语义不一致。
+        // AtlasEntryPoint entryPoint = context.entryPoint() == null
+        //         ? context.topic().entryPoints().get(0)
+        //         : context.entryPoint();
+        AtlasEntryPoint entryPoint = resolveEntryPoint(context);
         // 2026-08-20：编辑器右键主动打开教程也计入最近阅读，和工具窗口入口保持一致。
-        AtlasLearningProgressState.getInstance().recordRecent(context.topic().topicId());
+        // 2026-08-24：原逻辑只记录专题编号，方法级阅读会话需要同步入口、锚点和版本。
+        // AtlasLearningProgressState.getInstance().recordRecent(context.topic().topicId());
+        AtlasLearningProgressState.getInstance().recordEntry(
+                context.topic().topicId(),
+                entryPoint.method(),
+                entryPoint.document(),
+                context.topic().primaryVersion()
+        );
         BrowserUtil.browse(AtlasSettingsState.getInstance().documentationUrl(entryPoint.document()));
+    }
+
+    /**
+     * 优先返回光标命中的方法入口，其次恢复上次阅读入口，最后回退到专题第一项。
+     *
+     * @param context 当前编辑器匹配结果
+     * @return 本次需要打开的源码入口
+     */
+    private AtlasEntryPoint resolveEntryPoint(AtlasEditorContext context) {
+        if (context.entryPoint() != null) {
+            return context.entryPoint();
+        }
+        String lastMethod = AtlasLearningProgressState.getInstance()
+                .progressFor(context.topic().topicId())
+                .lastEntryMethod;
+        return context.topic().entryPoints().stream()
+                .filter(entryPoint -> entryPoint.method().equals(lastMethod))
+                .findFirst()
+                .orElse(context.topic().entryPoints().get(0));
     }
 
     /**
