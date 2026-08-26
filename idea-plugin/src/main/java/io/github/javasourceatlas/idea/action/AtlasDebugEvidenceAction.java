@@ -41,7 +41,9 @@ public final class AtlasDebugEvidenceAction extends AtlasEditorContextAction {
                     if (result.added() + result.existing() == 0) {
                         Messages.showInfoMessage(
                                 project,
-                                "没有找到推荐断点方法，请先附加对应源码。",
+                                result.failed().isEmpty()
+                                        ? "没有找到推荐断点方法，请先附加对应源码。"
+                                        : "IDEA 创建推荐断点失败，请检查断点类型和当前调试配置。",
                                 "Java Source Atlas"
                         );
                         return;

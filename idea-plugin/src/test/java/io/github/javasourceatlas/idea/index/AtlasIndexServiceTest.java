@@ -121,6 +121,24 @@ class AtlasIndexServiceTest {
     }
 
     /**
+     * 验证共享源码类会返回全部专题候选，而不是静默丢弃后续专题。
+     */
+    @Test
+    void shouldReturnAllTopicsForSharedSourceClass() {
+        AtlasIndexService index = new AtlasIndexService();
+
+        List<String> topicIds = index.findBySourceClassCandidates("java.util.HashMap").stream()
+                .map(AtlasTopic::topicId)
+                .toList();
+
+        assertEquals(
+                Set.of("openjdk8-java-util-hashmap", "openjdk8-java-util-linkedhashmap"),
+                Set.copyOf(topicIds)
+        );
+        assertEquals(2, topicIds.size());
+    }
+
+    /**
      * 验证推荐断点能匹配精确入口，并为所属类相同的简单方法名提供讲解回退。
      */
     @Test

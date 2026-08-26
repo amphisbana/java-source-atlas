@@ -56,7 +56,7 @@ public final class AtlasBreakpointManager {
             Consumer<AddResult> consumer
     ) {
         if (topic == null || breakpoints == null || breakpoints.isEmpty()) {
-            consumer.accept(new AddResult(0, 0, List.of()));
+            consumer.accept(new AddResult(0, 0, List.of(), List.of()));
             return;
         }
         ReadAction.nonBlocking(
@@ -177,12 +177,18 @@ public final class AtlasBreakpointManager {
         JavaLineBreakpointType breakpointType = com.intellij.xdebugger.XDebuggerUtil.getInstance()
                 .findBreakpointType(JavaLineBreakpointType.class);
         if (breakpointType == null) {
-            consumer.accept(new AddResult(0, 0, resolution.unresolved()));
+            consumer.accept(new AddResult(
+                    0,
+                    0,
+                    resolution.unresolved(),
+                    resolution.locations().stream().map(BreakpointLocation::signature).toList()
+            ));
             return;
         }
 
         int added = 0;
         int existing = 0;
+        List<String> failed = new ArrayList<>();
         AtlasBreakpointState state = AtlasBreakpointState.getInstance(project);
         for (BreakpointLocation location : resolution.locations()) {
             if (containsLineBreakpoint(manager, location.file().getUrl(), location.line())) {
@@ -203,10 +209,14 @@ public final class AtlasBreakpointManager {
                         location.line(),
                         location.signature()
                 );
+                added++;
+            } else {
+                // 2026-08-26：原逻辑无论 IDEA 是否真正创建断点都会递增 added，导致 UI 和 Debug 流程误判成功。
+                // added++;
+                failed.add(location.signature());
             }
-            added++;
         }
-        consumer.accept(new AddResult(added, existing, resolution.unresolved()));
+        consumer.accept(new AddResult(added, existing, resolution.unresolved(), List.copyOf(failed)));
     }
 
     /**
@@ -341,13 +351,33 @@ public final class AtlasBreakpointManager {
     }
 
     /**
-     * 保存一次断点添加的统计与未解析签名。
+     * 保存一次断点添加的统计、未解析签名和创建失败签名。
      *
      * @param added      新增数量
      * @param existing   已存在数量
      * @param unresolved 未找到的方法签名
+     * @param failed     IDEA 创建断点失败的方法签名
      */
-    public record AddResult(int added, int existing, List<String> unresolved) {
+    public record AddResult(int added, int existing, List<String> unresolved, List<String> failed) {
+
+        /**
+         * 保留旧调用方的三参数构造方式，旧调用方默认没有创建失败明细。
+         *
+         * @param added      新增数量
+         * @param existing   已存在数量
+         * @param unresolved 未找到的方法签名
+         */
+        public AddResult(int added, int existing, List<String> unresolved) {
+            this(added, existing, unresolved, List.of());
+        }
+
+        /**
+         * 规范化异步回调中的明细集合，避免调用方修改结果对象。
+         */
+        public AddResult {
+            unresolved = unresolved == null ? List.of() : List.copyOf(unresolved);
+            failed = failed == null ? List.of() : List.copyOf(failed);
+        }
     }
 
     /**

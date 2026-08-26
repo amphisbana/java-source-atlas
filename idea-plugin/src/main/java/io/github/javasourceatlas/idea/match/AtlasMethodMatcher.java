@@ -87,6 +87,34 @@ public final class AtlasMethodMatcher {
     }
 
     /**
+     * 将 PSI 方法转换为稳定的完整签名，用于区分同名重载的编辑器上下文。
+     *
+     * @param method IDEA 方法
+     * @return 类名、方法名和参数类型组成的签名
+     */
+    public static String signatureOf(PsiMethod method) {
+        if (method == null) {
+            return "";
+        }
+        String owner = method.getContainingClass() == null
+                ? ""
+                : method.getContainingClass().getQualifiedName();
+        StringBuilder signature = new StringBuilder();
+        if (owner != null && !owner.isBlank()) {
+            signature.append(owner).append('.');
+        }
+        signature.append(method.getName()).append('(');
+        PsiParameter[] parameters = method.getParameterList().getParameters();
+        for (int index = 0; index < parameters.length; index++) {
+            if (index > 0) {
+                signature.append(',');
+            }
+            signature.append(parameters[index].getType().getCanonicalText());
+        }
+        return signature.append(')').toString();
+    }
+
+    /**
      * 判断 PSI 方法是否与索引签名精确匹配。
      *
      * @param method    IDEA 方法

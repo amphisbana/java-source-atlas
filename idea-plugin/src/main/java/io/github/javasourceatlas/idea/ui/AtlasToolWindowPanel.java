@@ -1694,12 +1694,48 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         contextLabel.setText(latest.className() == null
                 ? "当前光标：未识别到 Java 类"
                 : "当前光标：" + latest.className()
-                + (latest.methodName() == null ? "" : "#" + latest.methodName()));
+                + (latest.methodName() == null ? "" : "#" + latest.methodName())
+                + (latest.topic() == null && latest.topicCandidates().size() > 1
+                ? "（匹配到多个专题，请选择）"
+                : ""));
+
+        if (latest.topic() == null && latest.topicCandidates().size() > 1) {
+            // 2026-08-26：共享源码类无法唯一判断时不再静默切换到第一个专题，改为让用户明确选择。
+            showTopicCandidateChooser(latest.topicCandidates());
+            return;
+        }
 
         if (latest.topic() != null) {
             searchField.setText("");
             topicList.setSelectedValue(latest.topic(), true);
             showTopic(latest.topic(), latest.entryPoint());
+        }
+    }
+
+    /**
+     * 展示共享源码类对应的专题候选，避免用户在多个专题之间被动跳转。
+     *
+     * @param candidates 已按方法入口、版本和源码类排序的专题候选
+     */
+    private void showTopicCandidateChooser(List<AtlasTopic> candidates) {
+        if (candidates == null || candidates.size() < 2) {
+            return;
+        }
+        String[] options = candidates.stream()
+                .map(topic -> topic.title() + "（" + topic.primaryVersion() + "）")
+                .toArray(String[]::new);
+        int selected = Messages.showChooseDialog(
+                project,
+                "当前源码类对应多个 Source Atlas 专题，请选择要阅读的专题：",
+                "选择 Source Atlas 专题",
+                AtlasIcons.ATLAS,
+                options,
+                options[0]
+        );
+        if (selected >= 0 && selected < candidates.size()) {
+            AtlasTopic topic = candidates.get(selected);
+            topicList.setSelectedValue(topic, true);
+            showTopic(topic, null);
         }
     }
 
@@ -2155,9 +2191,32 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         menu.add(removeTopic);
 
         JMenuItem removeAll = new JMenuItem("清理全部 Atlas 断点");
-        removeAll.addActionListener(ignored -> removeManagedBreakpoints(true));
+        // 2026-08-26：原逻辑直接执行批量清理，缺少数量确认。
+        // removeAll.addActionListener(ignored -> removeManagedBreakpoints(true));
+        removeAll.addActionListener(ignored -> confirmRemoveAllManagedBreakpoints());
         menu.add(removeAll);
         menu.show(breakpointManagementButton, 0, breakpointManagementButton.getHeight());
+    }
+
+    /**
+     * 清理全部 Atlas 断点前展示数量确认，避免用户误触发批量删除。
+     */
+    private void confirmRemoveAllManagedBreakpoints() {
+        AtlasBreakpointManager.ManagedSummary summary = AtlasBreakpointManager.managedSummary(project);
+        if (summary.count() == 0) {
+            removeManagedBreakpoints(true);
+            return;
+        }
+        int answer = Messages.showYesNoDialog(
+                project,
+                "将清理 " + summary.count() + " 个由 Source Atlas 创建的断点。\n"
+                        + "用户手动创建的同位置断点不会被删除。是否继续？",
+                "确认清理全部 Atlas 断点",
+                Messages.getQuestionIcon()
+        );
+        if (answer == Messages.YES) {
+            removeManagedBreakpoints(true);
+        }
     }
 
     /**
@@ -2288,6 +2347,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         AtlasBreakpointManager.addBreakpointsAsync(project, this, topic, breakpoints, result -> {
             breakpoints.stream()
                     .filter(breakpoint -> !result.unresolved().contains(breakpoint.method()))
+                    .filter(breakpoint -> !result.failed().contains(breakpoint.method()))
                     .forEach(breakpoint -> learningProgress.recordBreakpoint(
                             topic.topicId(),
                             breakpoint.method(),
@@ -2298,10 +2358,14 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
             String unresolved = result.unresolved().isEmpty()
                     ? ""
                     : "\n未找到：" + summarizeUnresolved(result.unresolved());
+            String failed = result.failed().isEmpty()
+                    ? ""
+                    : "\n创建失败：" + summarizeUnresolved(result.failed());
             Messages.showInfoMessage(
                     project,
                     "新增 " + result.added() + " 个，已存在 " + result.existing() + " 个，未解析 "
-                            + result.unresolved().size() + " 个。" + unresolved,
+                            + result.unresolved().size() + " 个，创建失败 " + result.failed().size()
+                            + " 个。" + unresolved + failed,
                     "Source Atlas 推荐断点"
             );
         });

@@ -47,7 +47,8 @@ public final class AtlasAddRecommendedBreakpointAction extends AtlasEditorContex
                     Messages.showInfoMessage(
                             project,
                             "新增 " + result.added() + " 个，已存在 " + result.existing()
-                                    + " 个，未解析 " + result.unresolved().size() + " 个。",
+                                    + " 个，未解析 " + result.unresolved().size()
+                                    + " 个，创建失败 " + result.failed().size() + " 个。",
                             "Source Atlas 推荐断点"
                     );
                 }

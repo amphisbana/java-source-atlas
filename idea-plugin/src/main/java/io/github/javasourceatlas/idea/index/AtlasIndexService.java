@@ -60,13 +60,29 @@ public final class AtlasIndexService {
     }
 
     /**
-     * 按完整源码类名查找第一个专题。
+     * 按完整源码类名查找全部候选专题，并保持索引中的稳定顺序。
      *
      * @param className 完整类名
-     * @return 命中的专题
+     * @return 命中的候选专题
      */
+    public List<AtlasTopic> findBySourceClassCandidates(String className) {
+        return topics.stream()
+                .filter(topic -> topic.containsSourceClass(className))
+                .toList();
+    }
+
+    /**
+     * 按完整源码类名查找第一个专题，保留旧调用方的兼容行为。
+     *
+     * @param className 完整类名
+     * @return 兼容模式下的第一个专题
+     * @deprecated 编辑器上下文应使用 {@link #findBySourceClassCandidates(String)} 后自行消歧。
+     */
+    @Deprecated
     public Optional<AtlasTopic> findBySourceClass(String className) {
-        return topics.stream().filter(topic -> topic.containsSourceClass(className)).findFirst();
+        // 2026-08-26：原逻辑保留给旧调用方；编辑器和 gutter 已改为候选专题匹配，避免共享类静默命中第一个专题。
+        // return topics.stream().filter(topic -> topic.containsSourceClass(className)).findFirst();
+        return findBySourceClassCandidates(className).stream().findFirst();
     }
 
     /**

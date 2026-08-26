@@ -7,7 +7,9 @@ import com.intellij.psi.PsiStatement;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
+import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
@@ -44,6 +46,23 @@ class AtlasBreakpointManagerTest {
 
         assertSame(compiledMethod, resolvedSource);
         assertNull(AtlasBreakpointManager.firstExecutableStatement(resolvedSource));
+    }
+
+    /**
+     * 验证断点创建失败会单独保留失败签名，并且结果明细不可变。
+     */
+    @Test
+    void shouldExposeFailedBreakpointDetails() {
+        AtlasBreakpointManager.AddResult result = new AtlasBreakpointManager.AddResult(
+                0,
+                0,
+                List.of("missing()"),
+                List.of("cannot-create()")
+        );
+
+        assertEquals(List.of("missing()"), result.unresolved());
+        assertEquals(List.of("cannot-create()"), result.failed());
+        assertEquals(0, result.added());
     }
 
     /**

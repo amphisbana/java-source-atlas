@@ -99,10 +99,16 @@ public final class AtlasContextResolver {
 
         String className = psiClass.getQualifiedName();
         String methodName = method == null ? null : method.getName();
-        AtlasTopic topic = index.findBySourceClass(className).orElse(null);
-        AtlasEntryPoint entryPoint = topic == null
-                ? null
-                : AtlasMethodMatcher.findBestEntryPoint(topic, className, method).orElse(null);
-        return new AtlasEditorContext(className, methodName, topic, entryPoint);
+        // 2026-08-26：原逻辑只取共享源码类对应的第一个专题；现在按方法入口、项目 JDK 版本和主源码类排序。
+        // AtlasTopic topic = index.findBySourceClass(className).orElse(null);
+        AtlasTopicMatcher.Resolution resolution = AtlasTopicMatcher.resolve(index, project, className, method);
+        return new AtlasEditorContext(
+                className,
+                methodName,
+                resolution.topic(),
+                resolution.entryPoint(),
+                resolution.candidates(),
+                AtlasMethodMatcher.signatureOf(method)
+        );
     }
 }
