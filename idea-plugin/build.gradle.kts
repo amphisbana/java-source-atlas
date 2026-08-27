@@ -9,7 +9,7 @@ val localIdeaPath = providers.gradleProperty("atlas.localIdeaPath")
     .orElse("/Applications/IntelliJ IDEA.app")
 
 group = "io.github.java-source-atlas"
-version = "0.2.7"
+version = "0.2.9"
 
 repositories {
     mavenCentral()
@@ -95,24 +95,12 @@ intellijPlatform {
 
         changeNotes = """
             <ul>
-              <li>默认连接公开教程站点，安装后无需启动本地 VitePress 服务。</li>
-              <li>默认教程地址切换到自定义域名，并自动迁移旧版本地或 GitHub Pages 默认地址。</li>
-              <li>修复 IDEA 2026.2 拆分 JCEF 模块后工具窗口无法显示内容的问题。</li>
-              <li>JCEF 不可用时保留完整专题导航，并降级为系统浏览器阅读教程。</li>
-              <li>在 IDEA 工具窗口内嵌阅读专题教程。</li>
-              <li>支持推荐断点一键添加，以及配套 Lab 的打开和 Debug。</li>
-              <li>增强重载方法签名与 JDK、Spring Framework、Spring Boot 版本匹配。</li>
-              <li>按专题、源码入口和推荐断点分组展示操作按钮，优化窄工具窗口布局。</li>
-              <li>新增学习路径页签，支持本地完成状态、下一专题推荐、关联专题切换和证据数量提示。</li>
-              <li>新增源码调用链复制、推荐断点讲解、专题收藏筛选和最近阅读恢复。</li>
-              <li>新增首次使用环境检查，集中诊断教程站、项目结构、源码、Lab 与 JUnit 场景。</li>
-              <li>场景调试会自动创建或复用所选推荐断点，再启动精确 JUnit Debug 配置。</li>
-              <li>环境检查异常项提供配置 JDK、下载源码、刷新 Maven 等直接修复动作。</li>
-              <li>修复推荐断点落在方法声明行无法命中，断点现在定位到方法体第一条可执行语句。</li>
-              <li>新增源码阅读会话、方法级进度、上次入口恢复与调用链前后导航。</li>
-              <li>新增 Atlas 断点启停清理、观察清单和当前 Debug 会话 Watches。</li>
-              <li>新增编辑器 Java Source Atlas 上下文菜单，可直接定位、断点、调试证据和进入下一入口。</li>
-              <li>重构工具窗口视觉层级，新增原生图标、紧凑页签、多行列表和主次命令布局。</li>
+              <li>共享源码类支持多专题候选匹配，并按方法签名、源码入口、项目 JDK 和主源码类排序。</li>
+              <li>无法唯一判断专题时由用户选择，工具窗口和 gutter 不再静默打开第一个专题。</li>
+              <li>编辑器上下文使用完整方法签名，修复同名重载之间无法正确切换的问题。</li>
+              <li>修复断点创建失败仍计入新增数量和学习进度的问题，并独立展示失败明细。</li>
+              <li>清理全部 Atlas 断点前显示数量确认，不影响用户手动创建的断点。</li>
+              <li>取消工具窗口持续跟随编辑器光标，首次识别后保持用户手动选择的专题和源码入口。</li>
             </ul>
         """.trimIndent()
     }
