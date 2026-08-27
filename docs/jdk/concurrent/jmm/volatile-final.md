@@ -1,5 +1,14 @@
 # volatile、final 与 DCL：发布不等于互斥
 
+这一页包含三个层次。第一次阅读先掌握 volatile 的能力边界和 `count++` 反例；final 与双重检查锁定（DCL）可以第二遍再读。
+
+| 代码真正需要什么 | volatile 是否够用 | 更合适的选择 |
+| --- | --- | --- |
+| 让读线程看到写线程已经准备好的 payload | 够用，需要配对读写同一个 volatile 标志 | volatile 发布 |
+| 多线程精确执行 `count++` | 不够 | `AtomicInteger` 或锁 |
+| 多个字段必须一起变化 | 不够 | `synchronized` 或 `Lock` |
+| 构造后保持稳定的对象状态 | volatile 不是重点 | final 字段、不可变设计与安全发布 |
+
 ## volatile 的精确能力
 
 对一个 volatile 字段：

@@ -8,6 +8,7 @@ import ArrayListMutationAnimation from './ArrayListMutationAnimation.vue'
 import ConcurrentHashMapAnimation from './ConcurrentHashMapAnimation.vue'
 import AtomicStripedAnimation from './AtomicStripedAnimation.vue'
 import JmmMemoryModelAnimation from './JmmMemoryModelAnimation.vue'
+import JmmPublicationAnimation from './JmmPublicationAnimation.vue'
 import SynchronizedMonitorAnimation from './SynchronizedMonitorAnimation.vue'
 import ThreadPoolExecutorAnimation from './ThreadPoolExecutorAnimation.vue'
 import ThreadPoolWorkerAnimation from './ThreadPoolWorkerAnimation.vue'
@@ -60,6 +61,7 @@ export default {
     app.component('ConcurrentHashMapAnimation', ConcurrentHashMapAnimation)
     app.component('AtomicStripedAnimation', AtomicStripedAnimation)
     app.component('JmmMemoryModelAnimation', JmmMemoryModelAnimation)
+    app.component('JmmPublicationAnimation', JmmPublicationAnimation)
     app.component('SynchronizedMonitorAnimation', SynchronizedMonitorAnimation)
     app.component('ThreadPoolExecutorAnimation', ThreadPoolExecutorAnimation)
     app.component('ThreadPoolWorkerAnimation', ThreadPoolWorkerAnimation)

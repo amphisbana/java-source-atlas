@@ -59,8 +59,8 @@
   </a>
   <a class="topic-list__row" role="listitem" href="./jdk/concurrent/jmm/">
     <span class="topic-list__area">内存模型</span>
-    <strong><code>JMM + volatile + final + VarHandle</code></strong>
-    <span class="topic-list__question">跨线程可见性如何建立，发布、复合原子性与 final 构造语义又有什么边界？</span>
+    <strong><code>JMM：另一个线程能看见吗</code></strong>
+    <span class="topic-list__question">从 payload + volatile ready 的四动作链开始，分清可见性、原子性与互斥。</span>
     <span class="topic-list__action">开始阅读 →</span>
   </a>
   <a class="topic-list__row" role="listitem" href="./jdk/concurrent/synchronized-monitor/">

@@ -1,5 +1,9 @@
 # 从 Unsafe 到 VarHandle：把内存顺序写进 API
 
+::: tip 这是进阶页
+VarHandle 解决的是“用哪一种 API 表达所需的内存顺序”，不是 JMM 入门的前置知识。如果还不能独立画出 `payload → volatile ready → payload read`，先回到[专题首页](./index.md)和 [happens-before](./happens-before.md)。
+:::
+
 ## JDK 8 为什么大量出现 Unsafe
 
 OpenJDK 8 并发类需要完成：

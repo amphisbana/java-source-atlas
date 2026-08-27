@@ -39,7 +39,7 @@ export default defineConfig({
           { text: 'LinkedHashMap', link: '/jdk/collections/linkedhashmap/' },
           { text: 'TreeMap', link: '/jdk/collections/treemap/' },
           { text: 'ArrayList', link: '/jdk/collections/arraylist/' },
-          { text: 'JMM / volatile / final / VarHandle', link: '/jdk/concurrent/jmm/' },
+          { text: 'Java 内存模型（JMM）', link: '/jdk/concurrent/jmm/' },
           { text: 'synchronized / ObjectMonitor', link: '/jdk/concurrent/synchronized-monitor/' },
           { text: 'Atomic 与 Striped64', link: '/jdk/concurrent/atomic/' },
           { text: 'Thread / LockSupport', link: '/jdk/concurrent/thread-locksupport/' },
@@ -195,12 +195,12 @@ export default defineConfig({
       ],
       '/jdk/concurrent/jmm/': [
         {
-          text: 'JMM 与内存语义',
+          text: 'Java 内存模型（JMM）',
           items: [
-            { text: '内存模型阅读主线', link: '/jdk/concurrent/jmm/' },
+            { text: '先建立可见性直觉', link: '/jdk/concurrent/jmm/' },
             { text: 'happens-before 与安全发布', link: '/jdk/concurrent/jmm/happens-before' },
-            { text: 'volatile、final 与 DCL', link: '/jdk/concurrent/jmm/volatile-final' },
-            { text: 'Unsafe 到 VarHandle', link: '/jdk/concurrent/jmm/varhandle-version' },
+            { text: 'volatile 边界、final 与 DCL', link: '/jdk/concurrent/jmm/volatile-final' },
+            { text: '进阶：Unsafe 到 VarHandle', link: '/jdk/concurrent/jmm/varhandle-version' },
             { text: '断点与并发实验', link: '/jdk/concurrent/jmm/debug-lab' }
           ]
         }

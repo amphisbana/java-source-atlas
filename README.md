@@ -85,7 +85,7 @@ flowchart LR
 | 方向 | 专题 |
 | --- | --- |
 | 集合与数据结构 | [ArrayList](docs/jdk/collections/arraylist/index.md)、[HashMap](docs/jdk/collections/hashmap/index.md)、[LinkedHashMap](docs/jdk/collections/linkedhashmap/index.md)、[TreeMap](docs/jdk/collections/treemap/index.md) |
-| 内存模型与锁 | [JMM、volatile、final 与 VarHandle](docs/jdk/concurrent/jmm/index.md)、[synchronized 与 ObjectMonitor](docs/jdk/concurrent/synchronized-monitor/index.md)、[AQS 与 ReentrantLock](docs/jdk/concurrent/locks/index.md)、[Atomic 与 Striped64](docs/jdk/concurrent/atomic/index.md) |
+| 内存模型与锁 | [Java 内存模型：从 volatile 可见性开始](docs/jdk/concurrent/jmm/index.md)、[synchronized 与 ObjectMonitor](docs/jdk/concurrent/synchronized-monitor/index.md)、[AQS 与 ReentrantLock](docs/jdk/concurrent/locks/index.md)、[Atomic 与 Striped64](docs/jdk/concurrent/atomic/index.md) |
 | 线程与并发容器 | [Thread 与 LockSupport](docs/jdk/concurrent/thread-locksupport/index.md)、[ThreadLocal](docs/jdk/concurrent/threadlocal/index.md)、[ConcurrentHashMap](docs/jdk/concurrent/concurrenthashmap/index.md)、[ConcurrentLinkedQueue](docs/jdk/concurrent/concurrentlinkedqueue/index.md)、[CopyOnWriteArrayList](docs/jdk/concurrent/copyonwritearraylist/index.md)、[BlockingQueue](docs/jdk/concurrent/blockingqueue/index.md) |
 | 任务与线程池 | [CompletableFuture](docs/jdk/concurrent/completablefuture/index.md)、[FutureTask](docs/jdk/concurrent/futuretask/index.md)、[ThreadPoolExecutor](docs/jdk/concurrent/threadpoolexecutor/index.md)、[ScheduledThreadPoolExecutor](docs/jdk/concurrent/scheduledthreadpoolexecutor/index.md)、[ForkJoinPool](docs/jdk/concurrent/forkjoinpool/index.md) |
 | 函数式与 NIO | [Stream 与 Spliterator](docs/jdk/functional/stream/index.md)、[ByteBuffer 与 Selector](docs/jdk/io/nio/index.md) |
