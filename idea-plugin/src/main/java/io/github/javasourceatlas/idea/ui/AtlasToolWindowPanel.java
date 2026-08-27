@@ -170,7 +170,8 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     private final JButton fixLabButton = new JButton("刷新 Maven");
     private final JButton fixEvidenceButton = new JButton("选择断点");
     private final JButton fixBrowserButton = new JButton("浏览器打开");
-    private final Timer contextTimer;
+    // 2026-08-26：取消编辑器光标的持续跟随，原上下文计时器字段不再需要。
+    // private final Timer contextTimer;
 
     private AtlasEmbeddedBrowser tutorialBrowser;
     private String lastContextKey = "";
@@ -192,7 +193,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     private EnvironmentCheckState browserEnvironmentState = EnvironmentCheckState.PENDING;
 
     /**
-     * 构建工具窗口并启动轻量上下文刷新计时器。
+     * 构建工具窗口并在首次打开时识别一次编辑器上下文。
      *
      * @param project 当前项目
      */
@@ -209,9 +210,10 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         refreshFromEditor(true);
         showEnvironmentGuideOnFirstUse();
 
-        contextTimer = new Timer(800, ignored -> refreshFromEditor(false));
-        contextTimer.setRepeats(true);
-        contextTimer.start();
+        // 2026-08-26：原逻辑每 800ms 跟随编辑器光标，会覆盖用户手动选择的专题和源码入口，现取消持续刷新。
+        // contextTimer = new Timer(800, ignored -> refreshFromEditor(false));
+        // contextTimer.setRepeats(true);
+        // contextTimer.start();
     }
 
     /**
@@ -2541,11 +2543,12 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     }
 
     /**
-     * 工具窗口关闭时停止刷新计时器并释放 JCEF 浏览器资源。
+     * 工具窗口关闭时释放 JCEF 浏览器资源。
      */
     @Override
     public void dispose() {
-        contextTimer.stop();
+        // 2026-08-26：持续跟随编辑器的计时器已经取消，不再需要在关闭时停止。
+        // contextTimer.stop();
         if (tutorialBrowser != null) {
             tutorialBrowser.dispose();
         }
