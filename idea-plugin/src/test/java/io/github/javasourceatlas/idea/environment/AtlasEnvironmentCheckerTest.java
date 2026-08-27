@@ -23,6 +23,8 @@ class AtlasEnvironmentCheckerTest {
         assertTrue(AtlasEnvironmentChecker.isSupportedDocumentationUrl("https://docs.example.com/atlas/"));
         assertFalse(AtlasEnvironmentChecker.isSupportedDocumentationUrl("file:///tmp/atlas"));
         assertFalse(AtlasEnvironmentChecker.isSupportedDocumentationUrl("source.shaojie.wang/atlas"));
+        assertFalse(AtlasEnvironmentChecker.isSupportedDocumentationUrl("https://docs.example.com/atlas?preview=true"));
+        assertFalse(AtlasEnvironmentChecker.isSupportedDocumentationUrl("https://docs.example.com/atlas#section"));
         assertFalse(AtlasEnvironmentChecker.isSupportedDocumentationUrl(""));
     }
 

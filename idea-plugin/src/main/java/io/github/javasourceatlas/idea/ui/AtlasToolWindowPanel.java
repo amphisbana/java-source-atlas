@@ -1723,19 +1723,22 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         if (candidates == null || candidates.size() < 2) {
             return;
         }
-        String[] options = candidates.stream()
-                .map(topic -> topic.title() + "（" + topic.primaryVersion() + "）")
-                .toArray(String[]::new);
-        int selected = Messages.showChooseDialog(
-                project,
-                "当前源码类对应多个 Source Atlas 专题，请选择要阅读的专题：",
-                "选择 Source Atlas 专题",
-                AtlasIcons.ATLAS,
-                options,
-                options[0]
-        );
-        if (selected >= 0 && selected < candidates.size()) {
-            AtlasTopic topic = candidates.get(selected);
+        // 2026-08-27：原逻辑在工具窗口内单独维护选择器，编辑器动作无法复用同一交互。
+        // String[] options = candidates.stream()
+        //         .map(topic -> topic.title() + "（" + topic.primaryVersion() + "）")
+        //         .toArray(String[]::new);
+        // int selected = Messages.showChooseDialog(
+        //         project,
+        //         "当前源码类对应多个 Source Atlas 专题，请选择要阅读的专题：",
+        //         "选择 Source Atlas 专题",
+        //         AtlasIcons.ATLAS,
+        //         options,
+        //         options[0]
+        // );
+        // if (selected >= 0 && selected < candidates.size()) {
+        //     AtlasTopic topic = candidates.get(selected);
+        AtlasTopic topic = AtlasTopicChooser.choose(project, candidates);
+        if (topic != null) {
             topicList.setSelectedValue(topic, true);
             showTopic(topic, null);
         }

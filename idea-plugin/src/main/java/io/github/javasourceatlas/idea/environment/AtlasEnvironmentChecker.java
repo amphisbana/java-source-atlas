@@ -78,14 +78,20 @@ public final class AtlasEnvironmentChecker {
      * @param baseUrl 待检查地址
      * @return 地址结构是否合法
      */
-    static boolean isSupportedDocumentationUrl(String baseUrl) {
+    public static boolean isSupportedDocumentationUrl(String baseUrl) {
         if (baseUrl == null || baseUrl.isBlank()) {
             return false;
         }
         try {
             URI uri = new URI(baseUrl.trim());
             String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
-            return ("http".equals(scheme) || "https".equals(scheme)) && uri.getHost() != null;
+            // 2026-08-27：原逻辑允许查询参数和锚点，后续拼接教程路由时会生成无效地址。
+            // return ("http".equals(scheme) || "https".equals(scheme)) && uri.getHost() != null;
+            return ("http".equals(scheme) || "https".equals(scheme))
+                    && uri.getHost() != null
+                    && uri.getUserInfo() == null
+                    && uri.getRawQuery() == null
+                    && uri.getRawFragment() == null;
         } catch (URISyntaxException ignored) {
             return false;
         }

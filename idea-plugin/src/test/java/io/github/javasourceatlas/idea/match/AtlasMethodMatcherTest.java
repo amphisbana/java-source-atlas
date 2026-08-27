@@ -55,6 +55,7 @@ class AtlasMethodMatcherTest {
     @Test
     void shouldMatchEntryPointByClassAndMethod() {
         AtlasEntryPoint primaryEntry = new AtlasEntryPoint("put(K,V)", "/put", "公开入口", null);
+        AtlasEntryPoint overloadedEntry = new AtlasEntryPoint("put(K)", "/put-one", "单参数入口", null);
         AtlasEntryPoint relatedEntry = new AtlasEntryPoint(
                 "Helper.resize()",
                 "/resize",
@@ -76,7 +77,7 @@ class AtlasMethodMatcherTest {
                 new AtlasSource("sample.Map", "Map.java"),
                 List.of(new AtlasSource("sample.Helper", "Helper.java")),
                 null,
-                List.of(primaryEntry, relatedEntry),
+                List.of(overloadedEntry, primaryEntry, relatedEntry),
                 List.of(),
                 List.of()
         );
@@ -84,6 +85,15 @@ class AtlasMethodMatcherTest {
         assertEquals(
                 relatedEntry,
                 AtlasMethodMatcher.findBestEntryPoint(topic, "sample.Helper", "resize").orElseThrow()
+        );
+        assertEquals(
+                primaryEntry,
+                AtlasMethodMatcher.findBestEntryPoint(
+                        topic,
+                        "sample.Map",
+                        "put",
+                        "sample.Map.put(java.lang.Object,java.lang.Object)"
+                ).orElseThrow()
         );
         assertTrue(AtlasMethodMatcher.findBestEntryPoint(topic, "sample.Map", "resize").isEmpty());
     }

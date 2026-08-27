@@ -6,6 +6,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.DumbAwareAction;
 import io.github.javasourceatlas.idea.context.AtlasContextResolver;
+import io.github.javasourceatlas.idea.context.AtlasEditorContextSupport;
 import io.github.javasourceatlas.idea.icons.AtlasIcons;
 import io.github.javasourceatlas.idea.index.AtlasIndexService;
 import io.github.javasourceatlas.idea.learning.AtlasLearningProgressState;
@@ -14,7 +15,10 @@ import io.github.javasourceatlas.idea.model.AtlasEditorContext;
 import io.github.javasourceatlas.idea.model.AtlasEntryPoint;
 import io.github.javasourceatlas.idea.model.AtlasEvidence;
 import io.github.javasourceatlas.idea.model.AtlasTopic;
+import io.github.javasourceatlas.idea.ui.AtlasTopicChooser;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.List;
 
 /**
  * 使用模板方法统一解析编辑器中的专题、入口、断点和证据上下文。
@@ -46,8 +50,11 @@ abstract class AtlasEditorContextAction extends DumbAwareAction {
     @Override
     public final void update(@NotNull AnActionEvent event) {
         Project project = event.getProject();
-        ActionContext context = project == null ? null : resolveContext(project);
-        event.getPresentation().setEnabledAndVisible(context != null && isAvailable(context));
+        // 2026-08-27：原逻辑只检查唯一命中的 topic，歧义候选会导致编辑器动作全部隐藏。
+        // ActionContext context = project == null ? null : resolveContext(project);
+        // event.getPresentation().setEnabledAndVisible(context != null && isAvailable(context));
+        List<ActionContext> contexts = project == null ? List.of() : resolveContexts(project);
+        event.getPresentation().setEnabledAndVisible(contexts.stream().anyMatch(this::isAvailable));
     }
 
     /**
@@ -61,9 +68,17 @@ abstract class AtlasEditorContextAction extends DumbAwareAction {
         if (project == null) {
             return;
         }
-        ActionContext context = resolveContext(project);
-        if (isAvailable(context)) {
-            perform(project, context);
+        // 2026-08-27：原逻辑无法在共享源码类命中多个专题时选择动作上下文。
+        // ActionContext context = resolveContext(project);
+        // if (isAvailable(context)) {
+        //     perform(project, context);
+        // }
+        List<ActionContext> availableContexts = resolveContexts(project).stream()
+                .filter(this::isAvailable)
+                .toList();
+        ActionContext selectedContext = selectContext(project, availableContexts);
+        if (selectedContext != null) {
+            perform(project, selectedContext);
         }
     }
 
@@ -87,39 +102,73 @@ abstract class AtlasEditorContextAction extends DumbAwareAction {
      * 解析当前编辑器上下文，并用上次阅读入口补足光标没有命中方法的场景。
      *
      * @param project 当前项目
-     * @return 完整动作上下文
+     * @return 唯一专题或全部歧义候选对应的动作上下文
      */
-    private ActionContext resolveContext(Project project) {
+    private List<ActionContext> resolveContexts(Project project) {
         AtlasIndexService index = ApplicationManager.getApplication().getService(AtlasIndexService.class);
         AtlasEditorContext editorContext = AtlasContextResolver.resolve(project, index);
-        AtlasTopic topic = editorContext.topic();
-        AtlasEntryPoint entryPoint = resolveEntryPoint(topic, editorContext.entryPoint());
+        // 2026-08-27：原逻辑只为 editorContext.topic() 构造一个上下文，歧义候选中的 topic 为空。
+        // AtlasTopic topic = editorContext.topic();
+        // AtlasEntryPoint entryPoint = resolveEntryPoint(topic, editorContext.entryPoint());
+        // AtlasBreakpoint breakpoint = index.breakpointForEntryPoint(topic, entryPoint).orElse(null);
+        // AtlasEvidence evidence = index.evidenceForBreakpoint(topic, breakpoint).orElse(null);
+        // return new ActionContext(index, editorContext, topic, entryPoint, breakpoint, evidence);
+        return AtlasEditorContextSupport.availableTopics(editorContext).stream()
+                .map(topic -> createActionContext(index, editorContext, topic))
+                .toList();
+    }
+
+    /**
+     * 为一个候选专题补齐入口、推荐断点和证据场景。
+     *
+     * @param index         专题索引
+     * @param editorContext 当前编辑器上下文
+     * @param topic         当前候选专题
+     * @return 完整动作上下文
+     */
+    private ActionContext createActionContext(
+            AtlasIndexService index,
+            AtlasEditorContext editorContext,
+            AtlasTopic topic
+    ) {
+        String lastMethod = AtlasLearningProgressState.getInstance()
+                .progressFor(topic.topicId())
+                .lastEntryMethod;
+        // 2026-08-27：原逻辑只接收唯一专题的 editorEntry，无法为用户选中的歧义专题恢复当前重载入口。
+        // AtlasEntryPoint entryPoint = editorEntry != null
+        //         ? editorEntry
+        //         : topic.entryPoints().stream()
+        //         .filter(candidate -> candidate.method().equals(lastMethod))
+        //         .findFirst()
+        //         .orElse(topic.entryPoints().get(0));
+        AtlasEntryPoint entryPoint = AtlasEditorContextSupport.resolveEntryPoint(topic, editorContext, lastMethod);
         AtlasBreakpoint breakpoint = index.breakpointForEntryPoint(topic, entryPoint).orElse(null);
         AtlasEvidence evidence = index.evidenceForBreakpoint(topic, breakpoint).orElse(null);
         return new ActionContext(index, editorContext, topic, entryPoint, breakpoint, evidence);
     }
 
     /**
-     * 优先使用光标命中的入口，其次恢复上次入口，最后使用专题第一个入口。
+     * 在动作真正执行时选择共享源码类的专题，菜单更新阶段只计算可用性而不弹窗。
      *
-     * @param topic       当前专题
-     * @param editorEntry 光标命中的入口
-     * @return 动作使用的入口
+     * @param project  当前 IDEA 项目
+     * @param contexts 满足具体动作条件的候选上下文
+     * @return 用户选中的动作上下文；取消时返回 null
      */
-    private AtlasEntryPoint resolveEntryPoint(AtlasTopic topic, AtlasEntryPoint editorEntry) {
-        if (topic == null || topic.entryPoints().isEmpty()) {
+    private ActionContext selectContext(Project project, List<ActionContext> contexts) {
+        if (contexts.isEmpty()) {
             return null;
         }
-        if (editorEntry != null) {
-            return editorEntry;
+        AtlasTopic selectedTopic = AtlasTopicChooser.choose(
+                project,
+                contexts.stream().map(ActionContext::topic).toList()
+        );
+        if (selectedTopic == null) {
+            return null;
         }
-        String lastMethod = AtlasLearningProgressState.getInstance()
-                .progressFor(topic.topicId())
-                .lastEntryMethod;
-        return topic.entryPoints().stream()
-                .filter(entryPoint -> entryPoint.method().equals(lastMethod))
+        return contexts.stream()
+                .filter(context -> selectedTopic.equals(context.topic()))
                 .findFirst()
-                .orElse(topic.entryPoints().get(0));
+                .orElse(null);
     }
 
     /**

@@ -9,7 +9,7 @@ val localIdeaPath = providers.gradleProperty("atlas.localIdeaPath")
     .orElse("/Applications/IntelliJ IDEA.app")
 
 group = "io.github.java-source-atlas"
-version = "0.2.9"
+version = "0.2.10"
 
 repositories {
     mavenCentral()
@@ -95,12 +95,12 @@ intellijPlatform {
 
         changeNotes = """
             <ul>
-              <li>共享源码类支持多专题候选匹配，并按方法签名、源码入口、项目 JDK 和主源码类排序。</li>
-              <li>无法唯一判断专题时由用户选择，工具窗口和 gutter 不再静默打开第一个专题。</li>
-              <li>编辑器上下文使用完整方法签名，修复同名重载之间无法正确切换的问题。</li>
-              <li>修复断点创建失败仍计入新增数量和学习进度的问题，并独立展示失败明细。</li>
-              <li>清理全部 Atlas 断点前显示数量确认，不影响用户手动创建的断点。</li>
-              <li>取消工具窗口持续跟随编辑器光标，首次识别后保持用户手动选择的专题和源码入口。</li>
+              <li>工具窗口、gutter、右键菜单和快捷键统一使用专题选择器，完整支持共享源码类的歧义候选。</li>
+              <li>用户选择专题后按完整方法签名恢复重载入口，并兼容最近阅读进度。</li>
+              <li>教程设置新增地址格式校验、异步连接测试和恢复默认地址操作。</li>
+              <li>教程根地址拒绝账号、查询参数和锚点，避免拼接专题路由后产生无效链接。</li>
+              <li>文档站右侧目录限定当前正文并按锚点去重，修复路由更新后的重复目录。</li>
+              <li>文档站侧栏增加响应式布局兜底，避免临界宽度或路由切换时遮挡正文。</li>
             </ul>
         """.trimIndent()
     }

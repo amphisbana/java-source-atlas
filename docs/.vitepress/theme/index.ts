@@ -42,10 +42,12 @@ import SpringMvcDispatchAnimation from './SpringMvcDispatchAnimation.vue'
 import SpringDeepDiveMap from './SpringDeepDiveMap.vue'
 import SourceExplorer from './SourceExplorer.vue'
 import TopicStudyPanel from './TopicStudyPanel.vue'
+import AtlasLayout from './AtlasLayout.vue'
 import './custom.css'
 
 export default {
   extends: DefaultTheme,
+  Layout: AtlasLayout,
   /**
    * 注册源码专题使用的交互式学习组件。
    */

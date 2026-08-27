@@ -5,7 +5,6 @@ import com.intellij.codeInsight.daemon.LineMarkerInfo;
 import com.intellij.codeInsight.daemon.LineMarkerProvider;
 import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.editor.markup.GutterIconRenderer;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiClass;
@@ -20,6 +19,7 @@ import io.github.javasourceatlas.idea.match.AtlasMethodMatcher;
 import io.github.javasourceatlas.idea.model.AtlasEntryPoint;
 import io.github.javasourceatlas.idea.model.AtlasTopic;
 import io.github.javasourceatlas.idea.settings.AtlasSettingsState;
+import io.github.javasourceatlas.idea.ui.AtlasTopicChooser;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -116,16 +116,19 @@ public final class AtlasLineMarkerProvider implements LineMarkerProvider {
      * @return 选中下标；取消时返回负数
      */
     private int chooseTopic(List<AtlasTopic> candidates, Project project) {
-        String[] options = candidates.stream()
-                .map(candidate -> candidate.title() + "（" + candidate.primaryVersion() + "）")
-                .toArray(String[]::new);
-        return Messages.showChooseDialog(
-                project,
-                "当前源码类对应多个 Source Atlas 专题，请选择要阅读的专题：",
-                "选择 Source Atlas 专题",
-                AtlasIcons.ATLAS,
-                options,
-                options[0]
-        );
+        // 2026-08-27：原逻辑由 gutter 单独构造选择器，现在复用统一专题选择交互。
+        // String[] options = candidates.stream()
+        //         .map(candidate -> candidate.title() + "（" + candidate.primaryVersion() + "）")
+        //         .toArray(String[]::new);
+        // return Messages.showChooseDialog(
+        //         project,
+        //         "当前源码类对应多个 Source Atlas 专题，请选择要阅读的专题：",
+        //         "选择 Source Atlas 专题",
+        //         AtlasIcons.ATLAS,
+        //         options,
+        //         options[0]
+        // );
+        AtlasTopic selected = AtlasTopicChooser.choose(project, candidates);
+        return selected == null ? -1 : candidates.indexOf(selected);
     }
 }

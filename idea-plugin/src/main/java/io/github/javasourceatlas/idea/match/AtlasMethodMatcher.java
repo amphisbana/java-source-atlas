@@ -188,6 +188,38 @@ public final class AtlasMethodMatcher {
     }
 
     /**
+     * 使用编辑器保存的完整方法签名匹配专题入口，供用户从歧义专题中选择后的动作恢复使用。
+     *
+     * @param topic           当前专题
+     * @param className       当前完整类名
+     * @param methodName      当前简单方法名
+     * @param methodSignature 当前完整方法签名
+     * @return 优先精确匹配参数类型的源码入口
+     */
+    public static Optional<AtlasEntryPoint> findBestEntryPoint(
+            AtlasTopic topic,
+            String className,
+            String methodName,
+            String methodSignature
+    ) {
+        if (topic == null || className == null || methodName == null) {
+            return Optional.empty();
+        }
+        List<AtlasEntryPoint> candidates = topic.entryPoints().stream()
+                .filter(entryPoint -> className.equals(entryPoint.effectiveSourceClass(topic)))
+                .filter(entryPoint -> methodName.equals(entryPoint.simpleMethodName()))
+                .toList();
+        ParsedSignature actual = parse(methodSignature);
+        if (!actual.parameterListSpecified()) {
+            return candidates.stream().findFirst();
+        }
+        return candidates.stream()
+                .filter(entryPoint -> parse(entryPoint.method()).matchesParameterTypes(actual.parameterTypes()))
+                .findFirst()
+                .or(() -> candidates.stream().findFirst());
+    }
+
+    /**
      * 按泛型嵌套层级切分参数，避免把泛型内部逗号误认为参数分隔符。
      *
      * @param parameterText 参数列表文本

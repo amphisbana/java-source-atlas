@@ -21,6 +21,33 @@ body {
   overflow-x: clip;
 }
 
+/* 2026-08-27：保留 VitePress 原目录 DOM，由限定当前正文并按锚点去重的目录接管展示。 */
+.VPDocAside > .VPDocAsideOutline {
+  display: none !important;
+}
+
+/* 桌面端根据实际存在的侧栏节点兜底正文偏移，避免路由更新时状态类短暂不同步。 */
+@media (min-width: 960px) {
+  .VPSidebar + .VPContent {
+    padding-left: var(--vp-sidebar-width);
+  }
+}
+
+@media (min-width: 1440px) {
+  .VPSidebar + .VPContent {
+    padding-left: calc((100vw - var(--vp-layout-max-width)) / 2 + var(--vp-sidebar-width));
+  }
+}
+
+/* 窄屏关闭侧栏后立即退出布局与交互，避免断点切换动画短暂覆盖正文。 */
+@media (max-width: 959px) {
+  .VPSidebar:not(.open) {
+    visibility: hidden;
+    pointer-events: none;
+    transition: none;
+  }
+}
+
 .dark {
   --atlas-ink: #ecf2f0;
   --atlas-coral: #f28b7e;
