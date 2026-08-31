@@ -2,6 +2,10 @@
 
 Java Source Atlas IDEA 插件有两种使用方式：在普通业务项目中阅读教程、定位当前依赖源码；在完整 `java-source-atlas` 仓库中运行 Lab，并通过推荐断点调试精确的 JUnit 证据场景。
 
+正式发布后可以在 IDEA 的 `Settings | Plugins | Marketplace` 中搜索 `Java Source Atlas` 安装，
+也可以从 GitHub Releases 下载 ZIP，再通过 `Install Plugin from Disk...` 安装。Marketplace 版本
+支持 IDEA 自动发现更新；首次审核完成前仍以 GitHub Release 为可用安装入口。
+
 ## 第一次打开
 
 安装插件并重启 IDEA 后，打开右侧 `Source Atlas` 工具窗口。插件首次打开会自动进入“环境检查”，以后可以随时从专题导航的同名页签重新进入。
@@ -63,6 +67,10 @@ Java Source Atlas IDEA 插件有两种使用方式：在普通业务项目中阅
 选择推荐断点后，页面下方会单独展示观察场景、预期结果和变量表达式。可以先“复制观察变量”；Debug 会话启动后，再点击“添加 Watches”把尚未存在的表达式一次加入 IDEA Watches。
 
 “断点管理”只处理插件自己新建的断点，可以统一启用或禁用，也可以清理当前专题或全部 Atlas 断点。若同一文件同一行原本已有用户断点，插件只会复用，不会把它登记为 Atlas 断点，因此后续清理不会误删。
+
+当 Debug 会话命中插件创建的 Atlas 断点时，“断点”页会自动恢复对应专题和方法，并展示本次
+需要验证的结论、预期状态与下一推荐断点。观察变量仍由用户决定是否加入 Watches，插件不会在
+后台执行可能改变程序状态的求值表达式。普通用户断点不会触发这组教学提示。
 
 ## JDK 与版本边界
 

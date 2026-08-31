@@ -26,6 +26,7 @@
 - 推荐断点固定添加在方法体第一条可执行语句；没有源码方法体时提示未解析，不再添加到方法声明行。
 - 源码入口支持“继续阅读”和前后导航，精确恢复上次方法、文档锚点与阅读版本。
 - 推荐断点提供独立观察清单，可复制变量或添加到当前 Debug 会话 Watches。
+- 命中 Atlas 断点后展示当前证据结论、预期状态和下一推荐断点，并自动恢复对应专题。
 - 断点管理只启停和清理插件自己创建的断点，不会删除同位置原本存在的用户断点。
 - 断点创建失败会独立统计；清理全部 Atlas 断点前会显示数量确认。
 - 编辑器右键 `Java Source Atlas` 子菜单可直接定位源码、添加推荐断点、Debug 证据、进入下一入口和收藏专题。
@@ -52,8 +53,21 @@ cd idea-plugin
 ./gradlew runIde
 ```
 
-`verifyPlugin` 固定检查最低支持版本 IDEA 2024.2.5；若本机存在
+`verifyPlugin` 固定检查最低支持版本 IDEA 2024.2.5 和最高支持版本 IDEA 2026.2；若本机存在
 `/Applications/IntelliJ IDEA.app`，还会同时检查该版本。其他安装位置可通过
 `-Patlas.localIdeaPath=/absolute/path/to/IntelliJ IDEA.app` 指定。
 
 可安装 ZIP 位于 `build/distributions/`。在 IDEA 中通过 `Settings | Plugins | Install Plugin from Disk...` 选择该文件。
+
+## JetBrains Marketplace 发布
+
+插件已经接入 JetBrains Marketplace 发布任务。仓库推送 `v*` 标签时会先执行测试、最低与最高
+IDEA 版本兼容性检查和 GitHub Release；配置发布令牌后，再自动上传 Marketplace 默认频道。
+
+1. 在 JetBrains Marketplace Vendor 页面创建插件并取得永久发布令牌。
+2. 在 GitHub 仓库 `Settings | Secrets and variables | Actions` 中添加
+   `JETBRAINS_MARKETPLACE_TOKEN`。
+3. 确认插件版本和 `.github/release-notes/vX.Y.Z.md` 后推送版本标签。
+
+发布令牌只通过 GitHub Secrets 注入。未配置令牌时 Marketplace 步骤会跳过，不影响 GitHub
+Release。首次上架仍需等待 JetBrains Marketplace 审核，后续版本可以沿同一流程自动更新。

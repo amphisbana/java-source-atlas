@@ -4,6 +4,9 @@ node_modules/
 **/build/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
+playwright-report/
+test-results/
+blob-report/
 target/
 **/target/
 .idea/

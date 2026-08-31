@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>io.github.java-source-atlas.idea</id>
     <name>Java Source Atlas</name>
-    <vendor>Java Source Atlas</vendor>
+    <vendor url="https://github.com/amphisbana/java-source-atlas">Java Source Atlas</vendor>
 
     <description><![CDATA[
       Java Source Atlas connects JDK and Spring source guides directly to the IntelliJ IDEA editor.
@@ -19,6 +19,7 @@
         <applicationService serviceImplementation="io.github.javasourceatlas.idea.learning.AtlasLearningProgressState"/>
         <applicationService serviceImplementation="io.github.javasourceatlas.idea.settings.AtlasSettingsState"/>
         <projectService serviceImplementation="io.github.javasourceatlas.idea.debug.AtlasBreakpointState"/>
+        <projectService serviceImplementation="io.github.javasourceatlas.idea.debug.AtlasDebugGuidanceService"/>
         <applicationConfigurable
                 id="io.github.javasourceatlas.idea.settings"
                 displayName="Java Source Atlas"

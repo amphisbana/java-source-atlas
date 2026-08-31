@@ -32,6 +32,8 @@ import io.github.javasourceatlas.idea.browser.AtlasEmbeddedBrowser;
 import io.github.javasourceatlas.idea.browser.AtlasEmbeddedBrowserFactory;
 import io.github.javasourceatlas.idea.context.AtlasContextResolver;
 import io.github.javasourceatlas.idea.debug.AtlasBreakpointManager;
+import io.github.javasourceatlas.idea.debug.AtlasDebugGuidance;
+import io.github.javasourceatlas.idea.debug.AtlasDebugGuidanceService;
 import io.github.javasourceatlas.idea.debug.AtlasWatchManager;
 import io.github.javasourceatlas.idea.environment.AtlasEnvironmentChecker;
 import io.github.javasourceatlas.idea.icons.AtlasIcons;
@@ -77,6 +79,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.datatransfer.StringSelection;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 展示当前源码上下文、专题入口、推荐断点和版本信息。
@@ -119,6 +122,11 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     private final JBLabel readingSessionLabel = new JBLabel("阅读会话：选择专题后开始");
     private final JBLabel breakpointScenarioLabel = new JBLabel("观察场景：选择一个推荐断点");
     private final JBLabel breakpointExpectedLabel = new JBLabel("预期结果：等待选择证据场景");
+    private final JPanel debugGuidancePanel = new JPanel();
+    private final JBLabel debugGuidanceTitleLabel = new JBLabel("调试引导：等待命中 Atlas 断点");
+    private final JBLabel debugGuidanceClaimLabel = new JBLabel();
+    private final JBLabel debugGuidanceExpectedLabel = new JBLabel();
+    private final JBLabel debugGuidanceNextLabel = new JBLabel();
     private final JBLabel learningStatusLabel = new JBLabel("进度：选择一个源码专题");
     private final JBLabel learningGoalLabel = new JBLabel("完成标准：等待选择专题");
     private final JBLabel evidenceLabel = new JBLabel("可执行证据：0 条");
@@ -154,6 +162,8 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     private final JButton breakpointManagementButton = new ActionLink("断点管理");
     private final JButton copyWatchExpressionsButton = new ActionLink("复制变量");
     private final JButton addWatchExpressionsButton = new JButton("添加 Watches");
+    private final JButton selectCurrentGuidanceButton = new ActionLink("查看当前断点");
+    private final JButton selectNextGuidanceButton = new ActionLink("选择下一断点");
     private final JButton favoriteTopicButton = new ActionLink("收藏当前专题");
     private final JButton clearRecentButton = new ActionLink("清空最近阅读");
     private final JButton backToNavigationButton = new ActionLink("返回专题导航");
@@ -174,6 +184,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     // private final Timer contextTimer;
 
     private AtlasEmbeddedBrowser tutorialBrowser;
+    private AtlasDebugGuidance currentDebugGuidance;
     private String lastContextKey = "";
     private AtlasEditorContext editorContext = new AtlasEditorContext(null, null, null, null);
     private boolean contextRefreshPending;
@@ -209,6 +220,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         rebuildTopicList("");
         refreshFromEditor(true);
         showEnvironmentGuideOnFirstUse();
+        AtlasDebugGuidanceService.getInstance(project).addListener(this, this::applyDebugGuidance);
 
         // 2026-08-26：原逻辑每 800ms 跟随编辑器光标，会覆盖用户手动选择的专题和源码入口，现取消持续刷新。
         // contextTimer = new Timer(800, ignored -> refreshFromEditor(false));
@@ -343,6 +355,8 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         breakpointManagementButton.addActionListener(ignored -> showBreakpointManagementMenu());
         copyWatchExpressionsButton.addActionListener(ignored -> copyObservationExpressions());
         addWatchExpressionsButton.addActionListener(ignored -> addObservationWatches());
+        selectCurrentGuidanceButton.addActionListener(ignored -> selectGuidanceBreakpoint(false));
+        selectNextGuidanceButton.addActionListener(ignored -> selectGuidanceBreakpoint(true));
         favoriteTopicButton.addActionListener(ignored -> toggleFavoriteTopic());
         clearRecentButton.addActionListener(ignored -> clearRecentTopics());
         backToNavigationButton.addActionListener(ignored -> tabs.setSelectedIndex(0));
@@ -387,6 +401,8 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         breakpointManagementButton.setToolTipText("启用、禁用或清理由 Source Atlas 创建的断点");
         copyWatchExpressionsButton.setToolTipText("复制当前断点建议观察的变量表达式");
         addWatchExpressionsButton.setToolTipText("把观察变量加入当前 IDEA Debug 会话的 Watches");
+        selectCurrentGuidanceButton.setToolTipText("恢复到本次暂停命中的 Atlas 推荐断点");
+        selectNextGuidanceButton.setToolTipText("选择调用链中的下一推荐断点，便于继续调试");
         favoriteTopicButton.setToolTipText("把当前专题加入或移出本地收藏");
         clearRecentButton.setToolTipText("清空本地最近阅读记录，不影响学习进度");
         enterNextTopicButton.setToolTipText("切换到索引推荐的下一专题");
@@ -423,6 +439,8 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         breakpointManagementButton.setIcon(AllIcons.Debugger.ViewBreakpoints);
         copyWatchExpressionsButton.setIcon(AllIcons.Actions.Copy);
         addWatchExpressionsButton.setIcon(AllIcons.Debugger.AddToWatch);
+        selectCurrentGuidanceButton.setIcon(AllIcons.Debugger.Db_set_breakpoint);
+        selectNextGuidanceButton.setIcon(AllIcons.Actions.Forward);
         favoriteTopicButton.setIcon(AllIcons.Nodes.Favorite);
         clearRecentButton.setIcon(AllIcons.General.Remove);
         backToNavigationButton.setIcon(AllIcons.Actions.Back);
@@ -462,6 +480,8 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                 viewBreakpointExplanationButton,
                 breakpointManagementButton,
                 copyWatchExpressionsButton,
+                selectCurrentGuidanceButton,
+                selectNextGuidanceButton,
                 favoriteTopicButton,
                 clearRecentButton,
                 backToNavigationButton,
@@ -1385,6 +1405,9 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         JPanel observation = new JPanel(new BorderLayout(0, JBUI.scale(4)));
         JPanel observationHeader = new JPanel();
         observationHeader.setLayout(new javax.swing.BoxLayout(observationHeader, javax.swing.BoxLayout.Y_AXIS));
+        JComponent guidance = createDebugGuidancePanel();
+        guidance.setAlignmentX(Component.LEFT_ALIGNMENT);
+        observationHeader.add(guidance);
         breakpointScenarioLabel.setFont(breakpointScenarioLabel.getFont().deriveFont(Font.BOLD, 13f));
         breakpointScenarioLabel.setIcon(AllIcons.Debugger.Watch);
         breakpointScenarioLabel.setIconTextGap(JBUI.scale(5));
@@ -1414,6 +1437,42 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         splitter.setDividerSize(JBUI.scale(5));
         section.add(splitter, BorderLayout.CENTER);
         return section;
+    }
+
+    /**
+     * 创建仅在命中 Atlas 断点后显示的结论与下一步区域。
+     *
+     * @return 调试引导区域
+     */
+    private JComponent createDebugGuidancePanel() {
+        debugGuidancePanel.setLayout(new javax.swing.BoxLayout(
+                debugGuidancePanel,
+                javax.swing.BoxLayout.Y_AXIS
+        ));
+        debugGuidancePanel.setBorder(JBUI.Borders.empty(0, 0, 8, 0));
+        debugGuidanceTitleLabel.setFont(debugGuidanceTitleLabel.getFont().deriveFont(Font.BOLD, 13f));
+        debugGuidanceTitleLabel.setIcon(AllIcons.Actions.StartDebugger);
+        debugGuidanceTitleLabel.setIconTextGap(JBUI.scale(5));
+        debugGuidanceClaimLabel.setForeground(UIUtil.getLabelInfoForeground());
+        debugGuidanceExpectedLabel.setForeground(UIUtil.getLabelInfoForeground());
+        debugGuidanceNextLabel.setForeground(UIUtil.getLabelInfoForeground());
+        debugGuidanceTitleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        debugGuidanceClaimLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        debugGuidanceExpectedLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        debugGuidanceNextLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        debugGuidancePanel.add(debugGuidanceTitleLabel);
+        debugGuidancePanel.add(javax.swing.Box.createVerticalStrut(JBUI.scale(3)));
+        debugGuidancePanel.add(debugGuidanceClaimLabel);
+        debugGuidancePanel.add(javax.swing.Box.createVerticalStrut(JBUI.scale(2)));
+        debugGuidancePanel.add(debugGuidanceExpectedLabel);
+        debugGuidancePanel.add(javax.swing.Box.createVerticalStrut(JBUI.scale(2)));
+        debugGuidancePanel.add(debugGuidanceNextLabel);
+        debugGuidancePanel.add(javax.swing.Box.createVerticalStrut(JBUI.scale(4)));
+        JComponent actions = createTabActionBar(selectCurrentGuidanceButton, selectNextGuidanceButton);
+        actions.setAlignmentX(Component.LEFT_ALIGNMENT);
+        debugGuidancePanel.add(actions);
+        debugGuidancePanel.setVisible(false);
+        return debugGuidancePanel;
     }
 
     /**
@@ -2120,6 +2179,75 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         breakpointExpectedLabel.setText(shortLabel("预期结果：" + expected));
         breakpointExpectedLabel.setToolTipText(expected);
         breakpoint.variables().forEach(observationModel::addElement);
+    }
+
+    /**
+     * 展示或清除当前 Debug 会话命中的 Atlas 证据，并自动选中对应推荐断点。
+     *
+     * @param guidance 当前暂停位置解析结果
+     */
+    private void applyDebugGuidance(Optional<AtlasDebugGuidance> guidance) {
+        currentDebugGuidance = guidance.orElse(null);
+        if (currentDebugGuidance == null) {
+            debugGuidancePanel.setVisible(false);
+            debugGuidancePanel.revalidate();
+            debugGuidancePanel.repaint();
+            return;
+        }
+
+        String title = "调试引导 · 已命中 " + currentDebugGuidance.breakpointMethod();
+        String claim = "正在验证：" + currentDebugGuidance.claim();
+        String expected = "预期状态：" + currentDebugGuidance.expectedOutcome();
+        String next = currentDebugGuidance.nextBreakpointMethod().isBlank()
+                ? "下一步：当前专题的推荐断点已经走完"
+                : "下一断点：" + currentDebugGuidance.nextBreakpointMethod();
+        debugGuidanceTitleLabel.setText(shortLabel(title));
+        debugGuidanceTitleLabel.setToolTipText(title);
+        debugGuidanceClaimLabel.setText(shortLabel(claim));
+        debugGuidanceClaimLabel.setToolTipText(claim);
+        debugGuidanceExpectedLabel.setText(shortLabel(expected));
+        debugGuidanceExpectedLabel.setToolTipText(expected);
+        debugGuidanceNextLabel.setText(shortLabel(next));
+        debugGuidanceNextLabel.setToolTipText(next);
+        selectNextGuidanceButton.setVisible(!currentDebugGuidance.nextBreakpointMethod().isBlank());
+        debugGuidancePanel.setVisible(true);
+        selectGuidanceBreakpoint(false);
+        debugGuidancePanel.revalidate();
+        debugGuidancePanel.repaint();
+    }
+
+    /**
+     * 从调试引导切换到当前或下一推荐断点，不自动创建新断点。
+     *
+     * @param next 是否选择下一推荐断点
+     */
+    private void selectGuidanceBreakpoint(boolean next) {
+        if (currentDebugGuidance == null) {
+            return;
+        }
+        String method = next
+                ? currentDebugGuidance.nextBreakpointMethod()
+                : currentDebugGuidance.breakpointMethod();
+        if (method == null || method.isBlank()) {
+            return;
+        }
+        AtlasTopic topic = index.findById(currentDebugGuidance.topicId()).orElse(null);
+        if (topic == null) {
+            return;
+        }
+        if (!topic.equals(topicList.getSelectedValue())) {
+            navigateToTopic(topic);
+        }
+        for (int index = 0; index < breakpointModel.size(); index++) {
+            if (method.equals(breakpointModel.get(index).method())) {
+                breakpointList.setSelectedIndex(index);
+                breakpointList.ensureIndexIsVisible(index);
+                break;
+            }
+        }
+        tabs.setSelectedIndex(0);
+        navigationTabs.setSelectedIndex(2);
+        updateActionState();
     }
 
     /**

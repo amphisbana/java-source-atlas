@@ -7,6 +7,8 @@ plugins {
 
 val localIdeaPath = providers.gradleProperty("atlas.localIdeaPath")
     .orElse("/Applications/IntelliJ IDEA.app")
+val minimumIdeaVersion = "2024.2.5"
+val maximumIdeaVersion = "2026.2"
 
 group = "io.github.java-source-atlas"
 version = "0.2.10"
@@ -20,7 +22,7 @@ repositories {
 
 dependencies {
     intellijPlatform {
-        intellijIdeaCommunity("2024.2.5")
+        intellijIdeaCommunity(minimumIdeaVersion)
         bundledPlugin("com.intellij.java")
         bundledPlugin("JUnit")
         pluginVerifier()
@@ -85,6 +87,7 @@ intellijPlatform {
 
         vendor {
             name = "Java Source Atlas"
+            url = "https://github.com/amphisbana/java-source-atlas"
         }
 
         description = """
@@ -108,10 +111,20 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            ide(IntelliJPlatformType.IntellijIdeaCommunity, "2024.2.5")
+            ide(IntelliJPlatformType.IntellijIdeaCommunity, minimumIdeaVersion)
+            // 2026-08-31：2026.2 不再提供 ideaIC Community 分发，最高版本改用可下载的 Ultimate 构件验证。
+            // ide(IntelliJPlatformType.IntellijIdeaCommunity, maximumIdeaVersion)
+            ide(IntelliJPlatformType.IntellijIdeaUltimate, maximumIdeaVersion)
             if (file(localIdeaPath.get()).exists()) {
                 local(localIdeaPath.get())
             }
         }
+    }
+
+    publishing {
+        token = providers.environmentVariable("JETBRAINS_MARKETPLACE_TOKEN")
+        channels = providers.environmentVariable("JETBRAINS_MARKETPLACE_CHANNEL")
+            .map { listOf(it) }
+            .orElse(listOf("default"))
     }
 }

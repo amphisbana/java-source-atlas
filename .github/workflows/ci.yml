@@ -201,7 +201,30 @@ jobs:
 
       - name: Test and package IDEA plugin
         working-directory: idea-plugin
-        run: ./gradlew test buildPlugin --no-daemon
+        run: ./gradlew test verifyPlugin buildPlugin --no-daemon
+
+  docs-ui:
+    name: Documentation UI interactions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install website dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify documentation interactions
+        run: npm run test:ui
 
   docs-quality:
     name: Documentation quality
