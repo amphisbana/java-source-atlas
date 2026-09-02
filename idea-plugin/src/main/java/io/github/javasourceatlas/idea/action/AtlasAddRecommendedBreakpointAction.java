@@ -20,7 +20,7 @@ public final class AtlasAddRecommendedBreakpointAction extends AtlasEditorContex
      */
     @Override
     protected boolean isAvailable(ActionContext context) {
-        return context.topic() != null && context.breakpoint() != null;
+        return context.sourceActionsAllowed() && context.topic() != null && context.breakpoint() != null;
     }
 
     /**

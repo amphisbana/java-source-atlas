@@ -36,16 +36,31 @@ public final class AtlasVersionDetector {
     }
 
     /**
+     * 只读取项目 SDK 版本，不扫描依赖类路径，供高频编辑器动作选择 JDK 专题视图。
+     *
+     * @param project 当前项目
+     * @return SDK 版本文本；未配置时返回“未配置”
+     */
+    public static String projectJdkVersion(Project project) {
+        Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
+        return sdk == null || sdk.getVersionString() == null
+                ? "未配置"
+                : sdk.getVersionString();
+    }
+
+    /**
      * 扫描项目 SDK 与依赖根目录并返回展示用版本信息。
      *
      * @param project 当前项目
      * @return 版本信息
      */
     public static AtlasVersionInfo detect(Project project) {
-        Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
-        String jdkVersion = sdk == null || sdk.getVersionString() == null
-                ? "未配置"
-                : sdk.getVersionString();
+        // 2026-09-02：原逻辑在完整版本检测中单独读取 SDK，新版本视图与检测流程统一复用同一入口。
+        // Sdk sdk = ProjectRootManager.getInstance(project).getProjectSdk();
+        // String jdkVersion = sdk == null || sdk.getVersionString() == null
+        //         ? "未配置"
+        //         : sdk.getVersionString();
+        String jdkVersion = projectJdkVersion(project);
 
         String springVersion = null;
         String springBootVersion = null;

@@ -20,6 +20,116 @@
     ],
     "migrationHint": "跨版本断点应先确认 Node 状态模型和 acquire 入口；不要把 waitStatus、ConditionNode 或 cleanQueue 的私有字段当作稳定 API。"
   },
+  "versionMethodMappings": [
+    {
+      "version": "17",
+      "sourceMethod": "NonfairSync.lock()",
+      "targetMethod": "Sync.lock()",
+      "document": "/jdk/version-comparison/?topic=aqs-reentrantlock&version=17",
+      "scenario": "观察 Sync.lock 先执行 initialTryLock，再进入统一 AQS acquire",
+      "variables": ["this", "initialTryLock()", "getState()", "getExclusiveOwnerThread()"]
+    },
+    {
+      "version": "21",
+      "sourceMethod": "NonfairSync.lock()",
+      "targetMethod": "Sync.lock()",
+      "document": "/jdk/version-comparison/?topic=aqs-reentrantlock&version=21",
+      "scenario": "观察 Sync.lock 先执行 initialTryLock，再进入统一 AQS acquire",
+      "variables": ["this", "initialTryLock()", "getState()", "getExclusiveOwnerThread()"]
+    },
+    {
+      "version": "17",
+      "sourceMethod": "addWaiter(Node)",
+      "targetMethod": "AbstractQueuedSynchronizer.acquire(Node,int,boolean,boolean,boolean,long)",
+      "document": "/jdk/version-comparison/?topic=aqs-reentrantlock&version=17",
+      "purpose": "统一主循环在 node 为空时创建节点，并在 pred 为空时完成尾插"
+    },
+    {
+      "version": "21",
+      "sourceMethod": "addWaiter(Node)",
+      "targetMethod": "AbstractQueuedSynchronizer.acquire(Node,int,boolean,boolean,boolean,long)",
+      "document": "/jdk/version-comparison/?topic=aqs-reentrantlock&version=21",
+      "purpose": "统一主循环同时承担节点创建、入队、重试、停放和取消清理"
+    },
+    {
+      "version": "17",
+      "sourceMethod": "acquireQueued(Node,int)",
+      "targetMethod": "AbstractQueuedSynchronizer.acquire(Node,int,boolean,boolean,boolean,long)",
+      "document": "/jdk/version-comparison/?topic=aqs-reentrantlock&version=17",
+      "scenario": "观察 unified acquire 的独占、不可中断分支",
+      "variables": ["node", "arg", "shared", "interruptible", "timed", "pred", "first", "interrupted"]
+    },
+    {
+      "version": "21",
+      "sourceMethod": "acquireQueued(Node,int)",
+      "targetMethod": "AbstractQueuedSynchronizer.acquire(Node,int,boolean,boolean,boolean,long)",
+      "document": "/jdk/version-comparison/?topic=aqs-reentrantlock&version=21",
+      "scenario": "观察 unified acquire 的独占分支与唤醒后自旋",
+      "variables": ["node", "arg", "shared", "pred", "first", "spins", "postSpins"]
+    },
+    {
+      "version": "17",
+      "sourceMethod": "doAcquireShared(int)",
+      "targetMethod": "AbstractQueuedSynchronizer.acquire(Node,int,boolean,boolean,boolean,long)",
+      "document": "/jdk/version-comparison/?topic=aqs-reentrantlock&version=17",
+      "scenario": "观察 unified acquire 的 shared=true 分支和 SharedNode 入队",
+      "variables": ["node", "arg", "shared", "pred", "first", "tryAcquireShared(arg)"]
+    },
+    {
+      "version": "21",
+      "sourceMethod": "doAcquireShared(int)",
+      "targetMethod": "AbstractQueuedSynchronizer.acquire(Node,int,boolean,boolean,boolean,long)",
+      "document": "/jdk/version-comparison/?topic=aqs-reentrantlock&version=21",
+      "scenario": "观察 unified acquire 的 shared=true 分支和 SharedNode 入队",
+      "variables": ["node", "arg", "shared", "pred", "first", "tryAcquireShared(arg)"]
+    },
+    {
+      "version": "17",
+      "sourceMethod": "setHeadAndPropagate(Node,int)",
+      "targetMethod": "AbstractQueuedSynchronizer.signalNextIfShared(Node)",
+      "document": "/jdk/version-comparison/?topic=aqs-reentrantlock&version=17",
+      "scenario": "观察 SharedNode 成为 head 后只唤醒共享后继",
+      "variables": ["h", "h.next", "h.next.status", "h.next.waiter"]
+    },
+    {
+      "version": "21",
+      "sourceMethod": "setHeadAndPropagate(Node,int)",
+      "targetMethod": "AbstractQueuedSynchronizer.signalNextIfShared(Node)",
+      "document": "/jdk/version-comparison/?topic=aqs-reentrantlock&version=21",
+      "scenario": "观察 SharedNode 成为 head 后只唤醒共享后继",
+      "variables": ["h", "h.next", "h.next.status", "h.next.waiter"]
+    },
+    {
+      "version": "17",
+      "sourceMethod": "doReleaseShared()",
+      "targetMethod": "AbstractQueuedSynchronizer.signalNext(Node)",
+      "document": "/jdk/version-comparison/?topic=aqs-reentrantlock&version=17",
+      "scenario": "观察 releaseShared 成功后从 head 唤醒有效后继",
+      "variables": ["h", "h.next", "h.next.status", "h.next.waiter"]
+    },
+    {
+      "version": "21",
+      "sourceMethod": "doReleaseShared()",
+      "targetMethod": "AbstractQueuedSynchronizer.signalNext(Node)",
+      "document": "/jdk/version-comparison/?topic=aqs-reentrantlock&version=21",
+      "scenario": "观察 releaseShared 成功后从 head 唤醒有效后继",
+      "variables": ["h", "h.next", "h.next.status", "h.next.waiter"]
+    },
+    {
+      "version": "17",
+      "sourceMethod": "transferForSignal(Node)",
+      "targetMethod": "ConditionObject.doSignal(ConditionNode,boolean)",
+      "document": "/jdk/version-comparison/?topic=aqs-reentrantlock&version=17",
+      "purpose": "清除条件状态并把 ConditionNode 转入同步队列"
+    },
+    {
+      "version": "21",
+      "sourceMethod": "transferForSignal(Node)",
+      "targetMethod": "ConditionObject.doSignal(ConditionNode,boolean)",
+      "document": "/jdk/version-comparison/?topic=aqs-reentrantlock&version=21",
+      "purpose": "清除条件状态并把 ConditionNode 转入同步队列"
+    }
+  ],
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.lock.ReentrantLockDebugLab",

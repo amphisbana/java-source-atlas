@@ -154,6 +154,37 @@ public final class AtlasLearningProgressState implements PersistentStateComponen
     }
 
     /**
+     * 记录 Debug 会话中真正命中的推荐断点及其证据，与仅添加断点的准备状态区分保存。
+     *
+     * @param topicId          专题编号
+     * @param evidenceId       断点绑定的证据编号；未绑定时为空
+     * @param breakpointMethod 实际命中的方法签名
+     * @param primaryVersion   本次调试使用的源码版本
+     * @return 更新后的专题进度快照
+     */
+    public TopicProgress recordVerifiedEvidence(
+            String topicId,
+            String evidenceId,
+            String breakpointMethod,
+            String primaryVersion
+    ) {
+        if (topicId == null || topicId.isBlank()
+                || breakpointMethod == null || breakpointMethod.isBlank()) {
+            return new TopicProgress();
+        }
+        TopicProgress progress = progressByTopic.computeIfAbsent(topicId, ignored -> new TopicProgress());
+        progress.lastBreakpointMethod = breakpointMethod;
+        progress.lastVersion = normalized(primaryVersion);
+        addDistinct(progress.verifiedBreakpointMethods, breakpointMethod);
+        if (evidenceId != null && !evidenceId.isBlank()) {
+            addDistinct(progress.verifiedEvidenceIds, evidenceId);
+        }
+        progress.updatedAt = Instant.now().toString();
+        recordRecent(topicId);
+        return progress.copy();
+    }
+
+    /**
      * 判断专题是否已被用户收藏。
      *
      * @param topicId 专题编号
@@ -275,6 +306,8 @@ public final class AtlasLearningProgressState implements PersistentStateComponen
         public String lastVersion = "";
         public List<String> visitedEntryMethods = new ArrayList<>();
         public List<String> preparedBreakpointMethods = new ArrayList<>();
+        public List<String> verifiedBreakpointMethods = new ArrayList<>();
+        public List<String> verifiedEvidenceIds = new ArrayList<>();
 
         /**
          * 创建与当前记录相同的快照。
@@ -292,6 +325,8 @@ public final class AtlasLearningProgressState implements PersistentStateComponen
             copied.lastVersion = normalized(lastVersion);
             copied.visitedEntryMethods = distinctNonBlank(visitedEntryMethods);
             copied.preparedBreakpointMethods = distinctNonBlank(preparedBreakpointMethods);
+            copied.verifiedBreakpointMethods = distinctNonBlank(verifiedBreakpointMethods);
+            copied.verifiedEvidenceIds = distinctNonBlank(verifiedEvidenceIds);
             return copied;
         }
     }

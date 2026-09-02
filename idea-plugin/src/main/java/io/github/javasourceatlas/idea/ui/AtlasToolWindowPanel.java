@@ -34,6 +34,7 @@ import io.github.javasourceatlas.idea.context.AtlasContextResolver;
 import io.github.javasourceatlas.idea.debug.AtlasBreakpointManager;
 import io.github.javasourceatlas.idea.debug.AtlasDebugGuidance;
 import io.github.javasourceatlas.idea.debug.AtlasDebugGuidanceService;
+import io.github.javasourceatlas.idea.debug.AtlasDebugSessionReport;
 import io.github.javasourceatlas.idea.debug.AtlasWatchManager;
 import io.github.javasourceatlas.idea.environment.AtlasEnvironmentChecker;
 import io.github.javasourceatlas.idea.icons.AtlasIcons;
@@ -51,6 +52,8 @@ import io.github.javasourceatlas.idea.navigation.AtlasSourceNavigator;
 import io.github.javasourceatlas.idea.settings.AtlasConfigurable;
 import io.github.javasourceatlas.idea.settings.AtlasSettingsState;
 import io.github.javasourceatlas.idea.version.AtlasVersionDetector;
+import io.github.javasourceatlas.idea.version.AtlasTopicVersion;
+import io.github.javasourceatlas.idea.version.AtlasTopicVersionResolver;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.BorderFactory;
@@ -127,6 +130,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     private final JBLabel debugGuidanceClaimLabel = new JBLabel();
     private final JBLabel debugGuidanceExpectedLabel = new JBLabel();
     private final JBLabel debugGuidanceNextLabel = new JBLabel();
+    private final JBLabel debugSessionLabel = new JBLabel();
     private final JBLabel learningStatusLabel = new JBLabel("进度：选择一个源码专题");
     private final JBLabel learningGoalLabel = new JBLabel("完成标准：等待选择专题");
     private final JBLabel evidenceLabel = new JBLabel("可执行证据：0 条");
@@ -163,7 +167,8 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     private final JButton copyWatchExpressionsButton = new ActionLink("复制变量");
     private final JButton addWatchExpressionsButton = new JButton("添加 Watches");
     private final JButton selectCurrentGuidanceButton = new ActionLink("查看当前断点");
-    private final JButton selectNextGuidanceButton = new ActionLink("选择下一断点");
+    private final JButton selectNextGuidanceButton = new JButton("添加下一断点并继续");
+    private final JButton copyDebugSummaryButton = new ActionLink("复制调试摘要");
     private final JButton favoriteTopicButton = new ActionLink("收藏当前专题");
     private final JButton clearRecentButton = new ActionLink("清空最近阅读");
     private final JButton backToNavigationButton = new ActionLink("返回专题导航");
@@ -185,6 +190,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
 
     private AtlasEmbeddedBrowser tutorialBrowser;
     private AtlasDebugGuidance currentDebugGuidance;
+    private AtlasTopicVersion selectedTopicVersion;
     private String lastContextKey = "";
     private AtlasEditorContext editorContext = new AtlasEditorContext(null, null, null, null);
     private boolean contextRefreshPending;
@@ -356,7 +362,10 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         copyWatchExpressionsButton.addActionListener(ignored -> copyObservationExpressions());
         addWatchExpressionsButton.addActionListener(ignored -> addObservationWatches());
         selectCurrentGuidanceButton.addActionListener(ignored -> selectGuidanceBreakpoint(false));
-        selectNextGuidanceButton.addActionListener(ignored -> selectGuidanceBreakpoint(true));
+        // 2026-09-02：原操作只在列表中选择下一断点，用户仍需手动添加并恢复 Debug，会中断阅读节奏。
+        // selectNextGuidanceButton.addActionListener(ignored -> selectGuidanceBreakpoint(true));
+        selectNextGuidanceButton.addActionListener(ignored -> addNextBreakpointAndResume());
+        copyDebugSummaryButton.addActionListener(ignored -> copyDebugSessionSummary());
         favoriteTopicButton.addActionListener(ignored -> toggleFavoriteTopic());
         clearRecentButton.addActionListener(ignored -> clearRecentTopics());
         backToNavigationButton.addActionListener(ignored -> tabs.setSelectedIndex(0));
@@ -402,7 +411,8 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         copyWatchExpressionsButton.setToolTipText("复制当前断点建议观察的变量表达式");
         addWatchExpressionsButton.setToolTipText("把观察变量加入当前 IDEA Debug 会话的 Watches");
         selectCurrentGuidanceButton.setToolTipText("恢复到本次暂停命中的 Atlas 推荐断点");
-        selectNextGuidanceButton.setToolTipText("选择调用链中的下一推荐断点，便于继续调试");
+        selectNextGuidanceButton.setToolTipText("创建调用链中的下一推荐断点，并立即恢复当前 Debug 会话");
+        copyDebugSummaryButton.setToolTipText("复制本次 Debug 实际经过的断点、证据和结论");
         favoriteTopicButton.setToolTipText("把当前专题加入或移出本地收藏");
         clearRecentButton.setToolTipText("清空本地最近阅读记录，不影响学习进度");
         enterNextTopicButton.setToolTipText("切换到索引推荐的下一专题");
@@ -440,7 +450,8 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         copyWatchExpressionsButton.setIcon(AllIcons.Actions.Copy);
         addWatchExpressionsButton.setIcon(AllIcons.Debugger.AddToWatch);
         selectCurrentGuidanceButton.setIcon(AllIcons.Debugger.Db_set_breakpoint);
-        selectNextGuidanceButton.setIcon(AllIcons.Actions.Forward);
+        selectNextGuidanceButton.setIcon(AllIcons.Actions.Resume);
+        copyDebugSummaryButton.setIcon(AllIcons.Actions.Copy);
         favoriteTopicButton.setIcon(AllIcons.Nodes.Favorite);
         clearRecentButton.setIcon(AllIcons.General.Remove);
         backToNavigationButton.setIcon(AllIcons.Actions.Back);
@@ -463,6 +474,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                 resumeReadingButton,
                 debugEvidenceButton,
                 addWatchExpressionsButton,
+                selectNextGuidanceButton,
                 enterNextTopicButton,
                 refreshEnvironmentButton,
                 tutorialExternalDocumentationButton
@@ -481,7 +493,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                 breakpointManagementButton,
                 copyWatchExpressionsButton,
                 selectCurrentGuidanceButton,
-                selectNextGuidanceButton,
+                copyDebugSummaryButton,
                 favoriteTopicButton,
                 clearRecentButton,
                 backToNavigationButton,
@@ -1456,10 +1468,12 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         debugGuidanceClaimLabel.setForeground(UIUtil.getLabelInfoForeground());
         debugGuidanceExpectedLabel.setForeground(UIUtil.getLabelInfoForeground());
         debugGuidanceNextLabel.setForeground(UIUtil.getLabelInfoForeground());
+        debugSessionLabel.setForeground(UIUtil.getLabelInfoForeground());
         debugGuidanceTitleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         debugGuidanceClaimLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         debugGuidanceExpectedLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         debugGuidanceNextLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        debugSessionLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         debugGuidancePanel.add(debugGuidanceTitleLabel);
         debugGuidancePanel.add(javax.swing.Box.createVerticalStrut(JBUI.scale(3)));
         debugGuidancePanel.add(debugGuidanceClaimLabel);
@@ -1467,8 +1481,14 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         debugGuidancePanel.add(debugGuidanceExpectedLabel);
         debugGuidancePanel.add(javax.swing.Box.createVerticalStrut(JBUI.scale(2)));
         debugGuidancePanel.add(debugGuidanceNextLabel);
+        debugGuidancePanel.add(javax.swing.Box.createVerticalStrut(JBUI.scale(2)));
+        debugGuidancePanel.add(debugSessionLabel);
         debugGuidancePanel.add(javax.swing.Box.createVerticalStrut(JBUI.scale(4)));
-        JComponent actions = createTabActionBar(selectCurrentGuidanceButton, selectNextGuidanceButton);
+        JComponent actions = createTabActionBar(
+                selectCurrentGuidanceButton,
+                selectNextGuidanceButton,
+                copyDebugSummaryButton
+        );
         actions.setAlignmentX(Component.LEFT_ALIGNMENT);
         debugGuidancePanel.add(actions);
         debugGuidancePanel.setVisible(false);
@@ -1534,17 +1554,31 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         String selectedType = String.valueOf(topicTypeFilter.getSelectedItem());
         // 2026-08-19：类型字段暂未独立存储在索引中，先从 primaryVersion 派生稳定分类，兼容现有索引格式。
         // 2026-08-20：收藏筛选复用本地持久化编号，不修改共享 source-index 数据结构。
+        // 2026-09-02：原逻辑把 OpenJDK 8 基线专题直接放入列表，后续动作无法感知项目 JDK。
+        // List<AtlasTopic> matches = index.search(query).stream()
+        //         .filter(topic -> "全部类型".equals(selectedType) || topicType(topic).equals(selectedType))
+        //         .filter(topic -> !favoritesOnlyCheckBox.isSelected() || learningProgress.isFavorite(topic.topicId()))
+        //         .toList();
         List<AtlasTopic> matches = index.search(query).stream()
                 .filter(topic -> "全部类型".equals(selectedType) || topicType(topic).equals(selectedType))
                 .filter(topic -> !favoritesOnlyCheckBox.isSelected() || learningProgress.isFavorite(topic.topicId()))
+                .map(this::resolveTopicVersion)
+                .map(AtlasTopicVersion::topic)
                 .toList();
         topicModel.clear();
         matches.forEach(topicModel::addElement);
 
-        AtlasTopic preferred = editorContext.topic() != null && matches.contains(editorContext.topic())
-                ? editorContext.topic()
-                : previous;
-        if (preferred != null && matches.contains(preferred)) {
+        // 2026-09-02：版本视图是基线专题的副本，不能再用 record equals 恢复列表选择。
+        // AtlasTopic preferred = editorContext.topic() != null && matches.contains(editorContext.topic())
+        //         ? editorContext.topic()
+        //         : previous;
+        AtlasTopic preferred = findTopicById(
+                matches,
+                editorContext.topic() == null
+                        ? previous == null ? null : previous.topicId()
+                        : editorContext.topic().topicId()
+        );
+        if (preferred != null) {
             topicList.setSelectedValue(preferred, true);
         } else if (!matches.isEmpty()) {
             topicList.setSelectedIndex(0);
@@ -1563,6 +1597,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         entryPointModel.clear();
         breakpointModel.clear();
         if (topic == null) {
+            selectedTopicVersion = null;
             topicTitleLabel.setText("没有匹配的源码专题");
             topicTitleLabel.setToolTipText("调整搜索条件后重新选择专题");
             contextLabel.setText("当前光标：未找到匹配专题");
@@ -1582,6 +1617,9 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
             return;
         }
 
+        selectedTopicVersion = resolveTopicVersion(topic);
+        topic = selectedTopicVersion.topic();
+
         topicTitleLabel.setText(StringUtil.shortenTextWithEllipsis(topic.title(), 58, 0));
         topicTitleLabel.setToolTipText(topic.title());
         topic.entryPoints().forEach(entryPointModel::addElement);
@@ -1593,7 +1631,12 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         actionHintLabel.setText("先选源码入口，再阅读调用链或定位实现");
         refreshLearningSection(topic);
         updateNavigationTabTitles();
-        AtlasVersionDetector.detectAsync(project, this, versionInfo -> applyVersionInfo(topic, versionInfo));
+        AtlasTopic displayedTopic = topic;
+        AtlasVersionDetector.detectAsync(
+                project,
+                this,
+                versionInfo -> applyVersionInfo(displayedTopic, versionInfo)
+        );
 
         // 2026-08-24：原逻辑没有编辑器命中入口时始终选择第一项，无法恢复上次读到的方法。
         // if (preferredEntry != null && topic.entryPoints().contains(preferredEntry)) {
@@ -1602,7 +1645,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         //     entryPointList.setSelectedIndex(0);
         // }
         AtlasEntryPoint restoredEntry = preferredEntry != null
-                ? preferredEntry
+                ? resolveVersionEntry(topic, preferredEntry)
                 : lastReadEntry(topic);
         if (restoredEntry != null && topic.entryPoints().contains(restoredEntry)) {
             entryPointList.setSelectedValue(restoredEntry, true);
@@ -1768,8 +1811,13 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
 
         if (latest.topic() != null) {
             searchField.setText("");
-            topicList.setSelectedValue(latest.topic(), true);
-            showTopic(latest.topic(), latest.entryPoint());
+            // 2026-09-02：原逻辑用基线 topic equals 选择列表，无法命中 JDK 17/21 版本视图。
+            // topicList.setSelectedValue(latest.topic(), true);
+            AtlasTopic versionTopic = topicInCurrentModel(latest.topic().topicId());
+            if (versionTopic != null) {
+                topicList.setSelectedValue(versionTopic, true);
+                showTopic(versionTopic, latest.entryPoint());
+            }
         }
     }
 
@@ -1798,8 +1846,8 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         //     AtlasTopic topic = candidates.get(selected);
         AtlasTopic topic = AtlasTopicChooser.choose(project, candidates);
         if (topic != null) {
-            topicList.setSelectedValue(topic, true);
-            showTopic(topic, null);
+            // 2026-09-02：候选选择器返回基线专题，统一通过编号切换到当前项目版本视图。
+            navigateToTopic(topic);
         }
     }
 
@@ -1810,13 +1858,16 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
      * @param versionInfo 项目版本信息
      */
     private void applyVersionInfo(AtlasTopic topic, AtlasVersionInfo versionInfo) {
-        if (!topic.equals(topicList.getSelectedValue())) {
+        if (!sameTopic(topic, topicList.getSelectedValue())) {
             return;
         }
         String jdkText = "项目 JDK：" + versionInfo.jdkVersion();
         String springText = "Spring：" + versionInfo.springVersion();
         String springBootText = "Spring Boot：" + versionInfo.springBootVersion();
-        String compatibilityText = AtlasVersionDetector.compatibilityHint(topic, versionInfo);
+        String matchText = AtlasVersionDetector.compatibilityHint(topic, versionInfo);
+        String compatibilityText = selectedTopicVersion == null
+                ? matchText
+                : selectedTopicVersion.message() + "；" + matchText;
         jdkVersionLabel.setText(jdkText);
         springVersionLabel.setText(springText);
         springBootVersionLabel.setText(springBootText);
@@ -1845,6 +1896,84 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     }
 
     /**
+     * 从稳定专题编号重新取得基线数据，再按当前项目 SDK 生成版本视图。
+     *
+     * @param topic 基线或既有版本视图
+     * @return 当前项目应使用的专题版本
+     */
+    private AtlasTopicVersion resolveTopicVersion(AtlasTopic topic) {
+        if (topic == null) {
+            return AtlasTopicVersionResolver.resolve(null, AtlasVersionDetector.projectJdkVersion(project));
+        }
+        AtlasTopic baseline = index.findById(topic.topicId()).orElse(topic);
+        return AtlasTopicVersionResolver.resolve(
+                baseline,
+                AtlasVersionDetector.projectJdkVersion(project)
+        );
+    }
+
+    /**
+     * 按稳定编号从专题集合中查找版本视图，避免 record 内容变化导致 equals 失效。
+     *
+     * @param topics  专题集合
+     * @param topicId 稳定专题编号
+     * @return 匹配专题；不存在时返回空
+     */
+    private AtlasTopic findTopicById(List<AtlasTopic> topics, String topicId) {
+        if (topicId == null || topicId.isBlank()) {
+            return null;
+        }
+        return topics.stream()
+                .filter(topic -> topicId.equals(topic.topicId()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * 从当前列表模型查找指定专题编号。
+     *
+     * @param topicId 稳定专题编号
+     * @return 当前项目版本的专题视图
+     */
+    private AtlasTopic topicInCurrentModel(String topicId) {
+        for (int index = 0; index < topicModel.size(); index++) {
+            AtlasTopic topic = topicModel.get(index);
+            if (topicId != null && topicId.equals(topic.topicId())) {
+                return topic;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 判断两个专题是否指向同一个稳定编号。
+     *
+     * @param left  左侧专题
+     * @param right 右侧专题
+     * @return 是否为同一专题
+     */
+    private boolean sameTopic(AtlasTopic left, AtlasTopic right) {
+        return left != null && right != null && left.topicId().equals(right.topicId());
+    }
+
+    /**
+     * 将编辑器基线入口映射为当前 JDK 版本入口，优先完整签名再使用简单方法名。
+     *
+     * @param topic          当前版本专题
+     * @param preferredEntry 编辑器匹配到的基线入口
+     * @return 当前版本入口；无法对应时返回原入口
+     */
+    private AtlasEntryPoint resolveVersionEntry(AtlasTopic topic, AtlasEntryPoint preferredEntry) {
+        return topic.entryPoints().stream()
+                .filter(entry -> entry.method().equals(preferredEntry.method()))
+                .findFirst()
+                .or(() -> topic.entryPoints().stream()
+                        .filter(entry -> entry.simpleMethodName().equals(preferredEntry.simpleMethodName()))
+                        .findFirst())
+                .orElse(preferredEntry);
+    }
+
+    /**
      * 根据当前选择启用或禁用命令按钮。
      */
     private void updateActionState() {
@@ -1858,7 +1987,9 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         openExternalDocumentationButton.setEnabled(topic != null && entryPoint != null);
         openVersionComparisonButton.setEnabled(topic != null && topic.versionComparison() != null);
         copyCallChainButton.setEnabled(topic != null && !topic.entryPoints().isEmpty());
-        addAllBreakpointsButton.setEnabled(topic != null && !topic.breakpoints().isEmpty());
+        boolean sourceActionsAllowed = selectedTopicVersion != null
+                && selectedTopicVersion.sourceActionsAllowed();
+        addAllBreakpointsButton.setEnabled(sourceActionsAllowed && topic != null && !topic.breakpoints().isEmpty());
         viewBreakpointExplanationButton.setEnabled(topic != null && breakpoint != null
                 && index.explanationForBreakpoint(topic, breakpoint).isPresent());
         boolean hasObservation = breakpoint != null && !breakpoint.variables().isEmpty();
@@ -1915,11 +2046,11 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         clearRecentButton.setEnabled(!learningProgress.recentTopicIds().isEmpty());
 
         AtlasLabLauncher.checkAvailability(project, this, topic, available -> {
-            if (!topic.equals(topicList.getSelectedValue())) {
+            if (!sameTopic(topic, topicList.getSelectedValue())) {
                 return;
             }
-            openLabButton.setEnabled(available);
-            debugLabButton.setEnabled(available);
+            openLabButton.setEnabled(sourceActionsAllowed && available);
+            debugLabButton.setEnabled(sourceActionsAllowed && available);
             String labHint = available
                     ? "已找到 " + topic.lab().mainClass()
                     : "当前项目未导入 " + topic.lab().module();
@@ -1928,11 +2059,11 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         });
         if (evidence != null) {
             AtlasLabLauncher.checkEvidenceAvailability(project, this, evidence, available -> {
-                if (!topic.equals(topicList.getSelectedValue())
+                if (!sameTopic(topic, topicList.getSelectedValue())
                         || !breakpoint.equals(breakpointList.getSelectedValue())) {
                     return;
                 }
-                debugEvidenceButton.setEnabled(available && !evidenceDebugPending);
+                debugEvidenceButton.setEnabled(sourceActionsAllowed && available && !evidenceDebugPending);
                 debugEvidenceButton.setToolTipText(available
                         ? evidence.testClass() + "#" + evidence.testMethod()
                         + "；将先添加当前断点；预期：" + evidence.expectedOutcome()
@@ -1941,11 +2072,11 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         }
         if (entryPoint != null) {
             AtlasSourceNavigator.checkAvailability(project, this, topic, entryPoint, available -> {
-                if (!topic.equals(topicList.getSelectedValue())
+                if (!sameTopic(topic, topicList.getSelectedValue())
                         || !entryPoint.equals(entryPointList.getSelectedValue())) {
                     return;
                 }
-                navigateSourceButton.setEnabled(available);
+                navigateSourceButton.setEnabled(sourceActionsAllowed && available);
                 navigateSourceButton.setToolTipText(available
                         ? "跳转到项目或依赖源码"
                         : "当前项目类路径中未找到该源码类");
@@ -1974,15 +2105,27 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                 + "  ·  双击定位");
         // 2026-08-24：原页签只展示断点总数，现在同时展示已经添加或准备过的断点数量。
         // navigationTabs.setTitleAt(2, "推荐断点 " + breakpointModel.size());
+        AtlasLearningProgressState.TopicProgress breakpointProgress = selectedTopic == null
+                ? new AtlasLearningProgressState.TopicProgress()
+                : learningProgress.progressFor(selectedTopic.topicId());
         long preparedBreakpoints = selectedTopic == null
                 ? 0
                 : selectedTopic.breakpoints().stream()
                 .map(AtlasBreakpoint::method)
-                .filter(learningProgress.progressFor(selectedTopic.topicId()).preparedBreakpointMethods::contains)
+                .filter(breakpointProgress.preparedBreakpointMethods::contains)
+                .count();
+        long verifiedBreakpoints = selectedTopic == null
+                ? 0
+                : selectedTopic.breakpoints().stream()
+                .map(AtlasBreakpoint::method)
+                .filter(breakpointProgress.verifiedBreakpointMethods::contains)
                 .count();
         navigationTabs.setTitleAt(2, "断点");
+        // 2026-09-02：原标题只展示准备数量，无法区分“已添加”和“运行时真正命中”。
+        // breakpointSectionLabel.setText("推荐断点  ·  已准备 " + preparedBreakpoints + "/"
+        //         + breakpointModel.size() + "  ·  双击添加");
         breakpointSectionLabel.setText("推荐断点  ·  已准备 " + preparedBreakpoints + "/"
-                + breakpointModel.size() + "  ·  双击添加");
+                + breakpointModel.size() + "  ·  已命中 " + verifiedBreakpoints + "  ·  双击添加");
         AtlasTopic topic = selectedTopic;
         AtlasLearningProgressState.TopicProgress progress = topic == null
                 ? new AtlasLearningProgressState.TopicProgress()
@@ -2034,7 +2177,11 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         );
         learningGoalLabel.setText(shortLabel("完成标准：" + readingGoal));
         learningGoalLabel.setToolTipText(readingGoal);
-        evidenceLabel.setText("可执行证据：" + topic.evidence().size() + " 条（源码入口 → 讲解 → Lab → JUnit）");
+        // 2026-09-02：原文案只显示证据总数，没有反馈 Debug 已经验证了多少条。
+        // evidenceLabel.setText("可执行证据：" + topic.evidence().size()
+        //         + " 条（源码入口 → 讲解 → Lab → JUnit）");
+        evidenceLabel.setText("可执行证据：已验证 " + progress.verifiedEvidenceIds.size() + "/"
+                + topic.evidence().size() + " 条（源码入口 → 讲解 → Lab → JUnit）");
 
         index.relatedTopics(topic).forEach(relatedTopicModel::addElement);
         index.recommendedNext(topic).ifPresentOrElse(next -> {
@@ -2090,7 +2237,12 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         topicTypeFilter.setSelectedIndex(0);
         searchField.setText("");
         rebuildTopicList("");
-        topicList.setSelectedValue(target, true);
+        // 2026-09-02：原逻辑直接选择基线对象；版本视图必须按稳定专题编号定位。
+        // topicList.setSelectedValue(target, true);
+        AtlasTopic versionTarget = topicInCurrentModel(target.topicId());
+        if (versionTarget != null) {
+            topicList.setSelectedValue(versionTarget, true);
+        }
         navigationTabs.setSelectedIndex(0);
     }
 
@@ -2188,19 +2340,37 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
      */
     private void applyDebugGuidance(Optional<AtlasDebugGuidance> guidance) {
         currentDebugGuidance = guidance.orElse(null);
-        if (currentDebugGuidance == null) {
+        AtlasDebugSessionReport report = AtlasDebugGuidanceService.getInstance(project).latestReport();
+        // 2026-09-02：原逻辑在会话恢复或结束时直接隐藏引导，导致刚形成的调用路径和摘要无法查看。
+        // if (currentDebugGuidance == null) {
+        //     debugGuidancePanel.setVisible(false);
+        //     debugGuidancePanel.revalidate();
+        //     debugGuidancePanel.repaint();
+        //     return;
+        // }
+        if (currentDebugGuidance == null && report.visits().isEmpty()) {
             debugGuidancePanel.setVisible(false);
             debugGuidancePanel.revalidate();
             debugGuidancePanel.repaint();
             return;
         }
 
-        String title = "调试引导 · 已命中 " + currentDebugGuidance.breakpointMethod();
-        String claim = "正在验证：" + currentDebugGuidance.claim();
-        String expected = "预期状态：" + currentDebugGuidance.expectedOutcome();
-        String next = currentDebugGuidance.nextBreakpointMethod().isBlank()
+        String title = currentDebugGuidance == null
+                ? report.active() ? "调试引导 · 会话运行中" : "调试引导 · 本次会话已结束"
+                : "调试引导 · 已命中 " + currentDebugGuidance.breakpointMethod();
+        String claim = currentDebugGuidance == null
+                ? "最近命中：" + report.visits().getLast().breakpointMethod()
+                : "正在验证：" + currentDebugGuidance.claim();
+        String expected = currentDebugGuidance == null
+                ? "已保存本次实际经过的源码断点路径"
+                : "预期状态：" + currentDebugGuidance.expectedOutcome();
+        String next = currentDebugGuidance == null
+                ? "下一步：可复制摘要沉淀到学习笔记"
+                : currentDebugGuidance.nextBreakpointMethod().isBlank()
                 ? "下一步：当前专题的推荐断点已经走完"
                 : "下一断点：" + currentDebugGuidance.nextBreakpointMethod();
+        String session = "会话记录：命中 " + report.visits().size()
+                + " 次，验证 " + report.verifiedEvidenceCount() + " 条证据";
         debugGuidanceTitleLabel.setText(shortLabel(title));
         debugGuidanceTitleLabel.setToolTipText(title);
         debugGuidanceClaimLabel.setText(shortLabel(claim));
@@ -2209,9 +2379,19 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         debugGuidanceExpectedLabel.setToolTipText(expected);
         debugGuidanceNextLabel.setText(shortLabel(next));
         debugGuidanceNextLabel.setToolTipText(next);
-        selectNextGuidanceButton.setVisible(!currentDebugGuidance.nextBreakpointMethod().isBlank());
+        debugSessionLabel.setText(shortLabel(session));
+        debugSessionLabel.setToolTipText(session);
+        selectCurrentGuidanceButton.setVisible(currentDebugGuidance != null);
+        selectNextGuidanceButton.setVisible(currentDebugGuidance != null
+                && !currentDebugGuidance.nextBreakpointMethod().isBlank());
+        selectNextGuidanceButton.setEnabled(selectNextGuidanceButton.isVisible());
+        selectNextGuidanceButton.setText("添加下一断点并继续");
+        copyDebugSummaryButton.setVisible(!report.visits().isEmpty());
+        copyDebugSummaryButton.setEnabled(!report.visits().isEmpty());
         debugGuidancePanel.setVisible(true);
-        selectGuidanceBreakpoint(false);
+        if (currentDebugGuidance != null) {
+            selectGuidanceBreakpoint(false);
+        }
         debugGuidancePanel.revalidate();
         debugGuidancePanel.repaint();
     }
@@ -2235,7 +2415,9 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         if (topic == null) {
             return;
         }
-        if (!topic.equals(topicList.getSelectedValue())) {
+        // 2026-09-02：原逻辑用完整 record 比较基线专题和版本专题，JDK 17/21 会被误判为不同专题。
+        // if (!topic.equals(topicList.getSelectedValue())) {
+        if (!sameTopic(topic, topicList.getSelectedValue())) {
             navigateToTopic(topic);
         }
         for (int index = 0; index < breakpointModel.size(); index++) {
@@ -2248,6 +2430,89 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         tabs.setSelectedIndex(0);
         navigationTabs.setSelectedIndex(2);
         updateActionState();
+    }
+
+    /**
+     * 解析并添加当前调用链中的下一推荐断点，成功后立即继续活动 Debug 会话。
+     */
+    private void addNextBreakpointAndResume() {
+        if (currentDebugGuidance == null || currentDebugGuidance.nextBreakpointMethod().isBlank()) {
+            return;
+        }
+        AtlasTopic baseline = index.findById(currentDebugGuidance.topicId()).orElse(null);
+        AtlasTopic topic = baseline == null
+                ? null
+                : AtlasTopicVersionResolver.resolve(
+                        baseline,
+                        AtlasVersionDetector.projectJdkVersion(project)
+                ).topic();
+        AtlasBreakpoint nextBreakpoint = topic == null
+                ? null
+                : topic.breakpoints().stream()
+                .filter(item -> currentDebugGuidance.nextBreakpointMethod().equals(item.method()))
+                .findFirst()
+                .orElse(null);
+        if (topic == null || nextBreakpoint == null) {
+            Messages.showInfoMessage(
+                    project,
+                    "当前项目版本中没有找到下一推荐断点，请打开版本对比确认方法变化。",
+                    "Java Source Atlas"
+            );
+            return;
+        }
+
+        selectNextGuidanceButton.setEnabled(false);
+        selectNextGuidanceButton.setText("准备下一断点…");
+        AtlasBreakpointManager.addBreakpointsAsync(
+                project,
+                this,
+                topic,
+                List.of(nextBreakpoint),
+                result -> {
+                    selectNextGuidanceButton.setText("添加下一断点并继续");
+                    if (result.added() + result.existing() == 0) {
+                        selectNextGuidanceButton.setEnabled(true);
+                        Messages.showInfoMessage(
+                                project,
+                                "没有解析到 " + nextBreakpoint.method()
+                                        + " 的可执行首行，请确认当前版本源码已经附加。",
+                                "Java Source Atlas"
+                        );
+                        return;
+                    }
+                    learningProgress.recordBreakpoint(
+                            topic.topicId(),
+                            nextBreakpoint.method(),
+                            topic.primaryVersion()
+                    );
+                    updateNavigationTabTitles();
+                    boolean resumed = AtlasDebugGuidanceService.getInstance(project).resumeCurrentSession();
+                    if (!resumed) {
+                        selectNextGuidanceButton.setEnabled(true);
+                        Messages.showInfoMessage(
+                                project,
+                                "下一断点已经添加，但当前 Debug 会话不再处于暂停状态。",
+                                "Java Source Atlas"
+                        );
+                    }
+                }
+        );
+    }
+
+    /**
+     * 复制当前或最近一次 Debug 会话的实际断点路径、证据与预期结果。
+     */
+    private void copyDebugSessionSummary() {
+        AtlasDebugSessionReport report = AtlasDebugGuidanceService.getInstance(project).latestReport();
+        if (report.visits().isEmpty()) {
+            return;
+        }
+        CopyPasteManager.getInstance().setContents(new StringSelection(report.toMarkdown()));
+        Messages.showInfoMessage(
+                project,
+                "已复制本次 Debug 会话的 " + report.visits().size() + " 条断点记录。",
+                "Java Source Atlas"
+        );
     }
 
     /**
@@ -2442,7 +2707,10 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         if (topic == null || topic.versionComparison() == null) {
             return;
         }
-        String path = "/jdk/version-comparison/?topic=" + topic.versionComparison().id();
+        String versionQuery = selectedTopicVersion == null || selectedTopicVersion.projectMajor() == null
+                ? ""
+                : "&version=" + selectedTopicVersion.projectMajor();
+        String path = "/jdk/version-comparison/?topic=" + topic.versionComparison().id() + versionQuery;
         BrowserUtil.browse(AtlasSettingsState.getInstance().documentationUrl(path));
     }
 

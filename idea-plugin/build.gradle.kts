@@ -1,4 +1,5 @@
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
+import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 plugins {
     java
@@ -26,10 +27,13 @@ dependencies {
         bundledPlugin("com.intellij.java")
         bundledPlugin("JUnit")
         pluginVerifier()
+        testFramework(TestFrameworkType.Platform)
     }
 
     implementation("com.google.code.gson:gson:2.11.0")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
+    testImplementation("junit:junit:4.13.2")
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.11.4")
 }
 
 java {
@@ -73,6 +77,15 @@ tasks.processResources {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+/**
+ * 复用 IntelliJ Platform 插件为标准 test 任务注入的 JVM 参数，避免自定义 Test 进程遗漏模块开放配置。
+ */
+val ideaIntegrationTest by tasks.registering {
+    description = "运行 Java Source Atlas IDEA Platform 工作流集成测试"
+    group = "verification"
+    dependsOn(tasks.test)
 }
 
 intellijPlatform {

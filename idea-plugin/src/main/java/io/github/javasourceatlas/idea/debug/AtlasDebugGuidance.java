@@ -7,6 +7,7 @@ import java.util.List;
  *
  * @param topicId             专题编号
  * @param topicTitle          专题标题
+ * @param evidenceId          当前断点绑定的证据编号；未绑定时为空
  * @param breakpointMethod    当前推荐断点方法
  * @param scenario            当前观察场景
  * @param variables           建议加入 Watches 的表达式
@@ -17,6 +18,7 @@ import java.util.List;
 public record AtlasDebugGuidance(
         String topicId,
         String topicTitle,
+        String evidenceId,
         String breakpointMethod,
         String scenario,
         List<String> variables,
@@ -29,6 +31,7 @@ public record AtlasDebugGuidance(
      * 复制观察表达式，避免索引集合被界面或调试会话意外修改。
      */
     public AtlasDebugGuidance {
+        evidenceId = evidenceId == null ? "" : evidenceId;
         variables = variables == null ? List.of() : List.copyOf(variables);
     }
 }

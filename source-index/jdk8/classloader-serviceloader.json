@@ -20,6 +20,74 @@
     ],
     "migrationHint": "排查 SPI 先确认 load 重载、uses/provides 声明以及 provider 所在模块边界。"
   },
+  "versionMethodMappings": [
+    {
+      "version": "17",
+      "sourceMethod": "ServiceLoader.LazyIterator.hasNextService()",
+      "targetMethod": "ServiceLoader.LazyClassPathLookupIterator.hasNextService()",
+      "document": "/jdk/version-comparison/?topic=classloader-service-loader&version=17",
+      "purpose": "模块查找之后继续惰性扫描 META-INF/services 类路径配置",
+      "scenario": "观察 LazyClassPathLookupIterator 推进配置 URL 和 provider 名称",
+      "variables": ["configs", "pending", "nextProvider", "nextError"]
+    },
+    {
+      "version": "21",
+      "sourceMethod": "ServiceLoader.LazyIterator.hasNextService()",
+      "targetMethod": "ServiceLoader.LazyClassPathLookupIterator.hasNextService()",
+      "document": "/jdk/version-comparison/?topic=classloader-service-loader&version=21",
+      "purpose": "模块查找之后继续惰性扫描 META-INF/services 类路径配置",
+      "scenario": "观察 LazyClassPathLookupIterator 推进配置 URL 和 provider 名称",
+      "variables": ["configs", "pending", "nextProvider", "nextError"]
+    },
+    {
+      "version": "17",
+      "sourceMethod": "ServiceLoader.parse(Class,URL)",
+      "targetMethod": "ServiceLoader.LazyClassPathLookupIterator.parseLine(URL,BufferedReader,int,Set)",
+      "document": "/jdk/version-comparison/?topic=classloader-service-loader&version=17",
+      "purpose": "在类路径查找迭代器内部逐行解析 provider 名称"
+    },
+    {
+      "version": "21",
+      "sourceMethod": "ServiceLoader.parse(Class,URL)",
+      "targetMethod": "ServiceLoader.LazyClassPathLookupIterator.parseLine(URL,BufferedReader,int,Set)",
+      "document": "/jdk/version-comparison/?topic=classloader-service-loader&version=21",
+      "purpose": "在类路径查找迭代器内部逐行解析 provider 名称"
+    },
+    {
+      "version": "17",
+      "sourceMethod": "ServiceLoader.LazyIterator.nextService()",
+      "targetMethod": "ServiceLoader.LazyClassPathLookupIterator.nextService()",
+      "document": "/jdk/version-comparison/?topic=classloader-service-loader&version=17",
+      "purpose": "把类路径 provider 名称解析为 ProviderImpl，并延迟到调用方请求时实例化",
+      "scenario": "观察 ProviderImpl 创建、类型检查与惰性实例化边界",
+      "variables": ["nextProvider", "nextError", "service", "loader"]
+    },
+    {
+      "version": "21",
+      "sourceMethod": "ServiceLoader.LazyIterator.nextService()",
+      "targetMethod": "ServiceLoader.LazyClassPathLookupIterator.nextService()",
+      "document": "/jdk/version-comparison/?topic=classloader-service-loader&version=21",
+      "purpose": "把类路径 provider 名称解析为 ProviderImpl，并延迟到调用方请求时实例化",
+      "scenario": "观察 ProviderImpl 创建、类型检查与惰性实例化边界",
+      "variables": ["nextProvider", "nextError", "service", "loader"]
+    },
+    {
+      "version": "17",
+      "sourceMethod": "ServiceLoader.parseLine(Class<?>,URL,BufferedReader,int,List<String>)",
+      "targetMethod": "ServiceLoader.LazyClassPathLookupIterator.parseLine(URL,BufferedReader,int,Set)",
+      "document": "/jdk/version-comparison/?topic=classloader-service-loader&version=17",
+      "scenario": "解析注释、重复 provider 和非法类名",
+      "variables": ["u", "r", "lc", "names", "ln"]
+    },
+    {
+      "version": "21",
+      "sourceMethod": "ServiceLoader.parseLine(Class<?>,URL,BufferedReader,int,List<String>)",
+      "targetMethod": "ServiceLoader.LazyClassPathLookupIterator.parseLine(URL,BufferedReader,int,Set)",
+      "document": "/jdk/version-comparison/?topic=classloader-service-loader&version=21",
+      "scenario": "解析注释、重复 provider 和非法类名",
+      "variables": ["u", "r", "lc", "names", "ln"]
+    }
+  ],
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.runtime.ClassLoaderServiceLoaderDebugLab",

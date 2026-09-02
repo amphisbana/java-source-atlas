@@ -26,6 +26,18 @@ public final class AtlasVersionMatcher {
     }
 
     /**
+     * 从任意受支持的版本文本中提取主版本，供专题版本视图复用统一解析规则。
+     *
+     * @param kind 版本体系
+     * @param text 原始版本文本
+     * @return 主版本；无法识别时返回空
+     */
+    public static Integer majorVersion(VersionKind kind, String text) {
+        ParsedVersion parsed = parse(kind, text);
+        return parsed == null ? null : parsed.major();
+    }
+
+    /**
      * 比较教程基线、兼容范围和项目实际版本。
      *
      * @param kind               版本体系

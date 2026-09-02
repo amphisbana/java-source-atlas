@@ -30,6 +30,31 @@
         "migrationHint": { "type": "string", "minLength": 1 }
       }
     },
+    "versionMethodMappings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["version", "sourceMethod", "targetMethod"],
+        "properties": {
+          "version": {
+            "type": "string",
+            "enum": ["17", "21"]
+          },
+          "sourceMethod": { "type": "string", "minLength": 1 },
+          "targetMethod": { "type": ["string", "null"], "minLength": 1 },
+          "document": { "type": "string", "minLength": 1 },
+          "purpose": { "type": "string", "minLength": 1 },
+          "scenario": { "type": "string", "minLength": 1 },
+          "variables": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
     "compatibleVersions": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 },

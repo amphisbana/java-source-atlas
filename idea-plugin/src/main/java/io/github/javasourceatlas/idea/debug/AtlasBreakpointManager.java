@@ -77,7 +77,7 @@ public final class AtlasBreakpointManager {
      * @param breakpoints 推荐断点
      * @return 已解析位置和未解析签名
      */
-    private static Resolution resolveLocations(
+    static Resolution resolveLocations(
             Project project,
             AtlasTopic topic,
             List<AtlasBreakpoint> breakpoints
@@ -172,7 +172,7 @@ public final class AtlasBreakpointManager {
      * @param resolution 后台解析结果
      * @param consumer   结果回调
      */
-    private static void addResolved(Project project, Resolution resolution, Consumer<AddResult> consumer) {
+    static void addResolved(Project project, Resolution resolution, Consumer<AddResult> consumer) {
         XBreakpointManager manager = XDebuggerManager.getInstance(project).getBreakpointManager();
         JavaLineBreakpointType breakpointType = com.intellij.xdebugger.XDebuggerUtil.getInstance()
                 .findBreakpointType(JavaLineBreakpointType.class);
@@ -193,6 +193,14 @@ public final class AtlasBreakpointManager {
         for (BreakpointLocation location : resolution.locations()) {
             if (containsLineBreakpoint(manager, location.file().getUrl(), location.line())) {
                 existing++;
+                // 2026-09-02：原逻辑只计数后跳过，用户已有断点命中时无法进入 Atlas 调试引导。
+                // continue;
+                state.registerReference(
+                        resolution.topicId(),
+                        location.file().getUrl(),
+                        location.line(),
+                        location.signature()
+                );
                 continue;
             }
             // 2026-08-24：原逻辑只创建断点，不记录归属，插件之后无法只清理自己创建的断点。
@@ -293,6 +301,9 @@ public final class AtlasBreakpointManager {
                 stale++;
                 continue;
             }
+            if (!location.owned) {
+                continue;
+            }
             breakpoint.setEnabled(enabled);
             affected++;
         }
@@ -318,7 +329,9 @@ public final class AtlasBreakpointManager {
             XLineBreakpoint<?> breakpoint = findLineBreakpoint(manager, location.fileUrl, location.line);
             if (breakpoint == null) {
                 stale++;
-            } else {
+            // 2026-09-02：原逻辑会删除所有已登记位置，复用用户断点后必须只移除 Atlas 自己创建的断点。
+            // } else {
+            } else if (location.owned) {
                 manager.removeBreakpoint(breakpoint);
                 removed++;
             }
@@ -407,7 +420,7 @@ public final class AtlasBreakpointManager {
      * @param line      零基行号
      * @param signature 原始签名
      */
-    private record BreakpointLocation(VirtualFile file, int line, String signature) {
+    record BreakpointLocation(VirtualFile file, int line, String signature) {
     }
 
     /**
@@ -416,6 +429,6 @@ public final class AtlasBreakpointManager {
      * @param locations 已解析位置
      * @param unresolved 未解析签名
      */
-    private record Resolution(String topicId, List<BreakpointLocation> locations, List<String> unresolved) {
+    record Resolution(String topicId, List<BreakpointLocation> locations, List<String> unresolved) {
     }
 }

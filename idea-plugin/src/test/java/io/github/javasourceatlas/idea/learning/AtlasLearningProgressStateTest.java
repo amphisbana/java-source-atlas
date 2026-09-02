@@ -141,4 +141,25 @@ class AtlasLearningProgressStateTest {
         assertEquals("resize()", progress.lastEntryMethod);
         assertEquals(java.util.List.of("resize()"), progress.visitedEntryMethods);
     }
+
+    /**
+     * 验证真实命中的断点和证据会去重保存，并且不会被误记为仅准备过的断点。
+     */
+    @Test
+    void shouldRecordVerifiedEvidenceSeparately() {
+        AtlasLearningProgressState state = new AtlasLearningProgressState();
+
+        state.recordVerifiedEvidence("hashmap", "resize-boundary", "resize()", "OpenJDK 21");
+        state.recordVerifiedEvidence("hashmap", "resize-boundary", "resize()", "OpenJDK 21");
+        state.recordVerifiedEvidence("hashmap", "", "treeifyBin(Node[],int)", "OpenJDK 21");
+
+        AtlasLearningProgressState.TopicProgress progress = state.progressFor("hashmap");
+        assertEquals(java.util.List.of("resize-boundary"), progress.verifiedEvidenceIds);
+        assertEquals(
+                java.util.List.of("resize()", "treeifyBin(Node[],int)"),
+                progress.verifiedBreakpointMethods
+        );
+        assertTrue(progress.preparedBreakpointMethods.isEmpty());
+        assertEquals("OpenJDK 21", progress.lastVersion);
+    }
 }

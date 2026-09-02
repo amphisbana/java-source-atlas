@@ -18,7 +18,7 @@ public final class AtlasNextEntryAction extends AtlasEditorContextAction {
      */
     @Override
     protected boolean isAvailable(ActionContext context) {
-        return nextEntry(context) != null;
+        return context.sourceActionsAllowed() && nextEntry(context) != null;
     }
 
     /**

@@ -56,11 +56,14 @@ public final class AtlasBreakpointState implements PersistentStateComponent<Atla
         }
         for (ManagedBreakpoint breakpoint : state.managedBreakpoints) {
             if (breakpoint != null && breakpoint.fileUrl != null && !breakpoint.fileUrl.isBlank()) {
+                // 2026-09-02：原恢复逻辑没有所有权字段，无法区分插件断点与复用的用户断点。
+                // register(breakpoint.topicId, breakpoint.fileUrl, breakpoint.line, breakpoint.signature);
                 register(
                         breakpoint.topicId,
                         breakpoint.fileUrl,
                         breakpoint.line,
-                        breakpoint.signature
+                        breakpoint.signature,
+                        breakpoint.owned
                 );
             }
         }
@@ -75,15 +78,43 @@ public final class AtlasBreakpointState implements PersistentStateComponent<Atla
      * @param signature 方法签名
      */
     public void register(String topicId, String fileUrl, int line, String signature) {
+        register(topicId, fileUrl, line, signature, true);
+    }
+
+    /**
+     * 登记插件复用的现有用户断点，使其可参与调试引导但不会被 Atlas 启停或删除。
+     *
+     * @param topicId  专题编号
+     * @param fileUrl  源文件 URL
+     * @param line     零基行号
+     * @param signature 方法签名
+     */
+    public void registerReference(String topicId, String fileUrl, int line, String signature) {
+        register(topicId, fileUrl, line, signature, false);
+    }
+
+    /**
+     * 按所有权登记断点位置；重复登记时保留已经存在的插件所有权。
+     *
+     * @param topicId  专题编号
+     * @param fileUrl  源文件 URL
+     * @param line     零基行号
+     * @param signature 方法签名
+     * @param owned    是否由 Atlas 实际创建
+     */
+    private void register(String topicId, String fileUrl, int line, String signature, boolean owned) {
         if (fileUrl == null || fileUrl.isBlank() || line < 0) {
             return;
         }
+        boolean effectiveOwnership = owned || managedBreakpoints.stream()
+                .anyMatch(item -> item.line == line && fileUrl.equals(item.fileUrl) && item.owned);
         removeLocation(fileUrl, line);
         ManagedBreakpoint breakpoint = new ManagedBreakpoint();
         breakpoint.topicId = normalized(topicId);
         breakpoint.fileUrl = fileUrl;
         breakpoint.line = line;
         breakpoint.signature = normalized(signature);
+        breakpoint.owned = effectiveOwnership;
         managedBreakpoints.add(breakpoint);
     }
 
@@ -138,6 +169,7 @@ public final class AtlasBreakpointState implements PersistentStateComponent<Atla
         public String fileUrl = "";
         public int line;
         public String signature = "";
+        public boolean owned = true;
 
         /**
          * 创建与持久化对象隔离的断点位置副本。
@@ -150,6 +182,7 @@ public final class AtlasBreakpointState implements PersistentStateComponent<Atla
             copied.fileUrl = normalized(fileUrl);
             copied.line = line;
             copied.signature = normalized(signature);
+            copied.owned = owned;
             return copied;
         }
     }

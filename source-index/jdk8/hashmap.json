@@ -20,6 +20,22 @@
     ],
     "migrationHint": "跨版本断点先确认 getNode、readObject 和 newHashMap 的实际入口。"
   },
+  "versionMethodMappings": [
+    {
+      "version": "17",
+      "sourceMethod": "getNode(int,Object)",
+      "targetMethod": "getNode(Object)",
+      "document": "/jdk/version-comparison/?topic=hashmap&version=17",
+      "purpose": "查询入口在方法内部统一计算 hash，避免调用方重复传入哈希值"
+    },
+    {
+      "version": "21",
+      "sourceMethod": "getNode(int,Object)",
+      "targetMethod": "getNode(Object)",
+      "document": "/jdk/version-comparison/?topic=hashmap&version=21",
+      "purpose": "延续 JDK 17 的单参数查询入口，并在方法内部完成哈希扰动"
+    }
+  ],
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.collection.HashMapDebugLab",

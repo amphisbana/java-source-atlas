@@ -17,6 +17,8 @@ import io.github.javasourceatlas.idea.model.AtlasEntryPoint;
 import io.github.javasourceatlas.idea.model.AtlasTopic;
 import io.github.javasourceatlas.idea.settings.AtlasSettingsState;
 import io.github.javasourceatlas.idea.ui.AtlasTopicChooser;
+import io.github.javasourceatlas.idea.version.AtlasTopicVersionResolver;
+import io.github.javasourceatlas.idea.version.AtlasVersionDetector;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -87,10 +89,16 @@ public final class AtlasOpenDocumentationAction extends DumbAwareAction {
             Messages.showInfoMessage(project, "当前 Java 类尚未收录到 Source Atlas。", "Java Source Atlas");
             return;
         }
-        AtlasTopic topic = AtlasTopicChooser.choose(project, candidates);
-        if (topic == null) {
+        AtlasTopic selectedTopic = AtlasTopicChooser.choose(project, candidates);
+        if (selectedTopic == null) {
             return;
         }
+        // 2026-09-02：原逻辑始终打开基线入口；文档动作现在也按项目 JDK 恢复目标版本签名和差异页。
+        // AtlasTopic topic = selectedTopic;
+        AtlasTopic topic = AtlasTopicVersionResolver.resolve(
+                selectedTopic,
+                AtlasVersionDetector.projectJdkVersion(project)
+        ).topic();
         // 2026-08-24：原逻辑在光标只命中类时固定打开第一个入口，和阅读会话的恢复语义不一致。
         // AtlasEntryPoint entryPoint = context.entryPoint() == null
         //         ? context.topic().entryPoints().get(0)

@@ -71,6 +71,9 @@ class AtlasIndexServiceTest {
             assertEquals("shouldReplaceValueWithoutIncreasingSize", hashMap.evidence().getFirst().testMethod());
             assertEquals("put-main", hashMap.evidence().getFirst().id());
             assertEquals("openjdk8-java-util-linkedhashmap", hashMap.recommendedNextTopicId());
+            assertTrue(hashMap.versionMethodMappings().stream()
+                    .anyMatch(mapping -> "17".equals(mapping.version())
+                            && "getNode(Object)".equals(mapping.targetMethod())));
 
             AtlasTopic springIoc = findTopic(topics, "spring-framework-5-3-ioc");
             assertTrue(springIoc.containsSourceClass(

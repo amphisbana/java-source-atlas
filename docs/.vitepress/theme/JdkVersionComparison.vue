@@ -274,12 +274,18 @@ function resetInteractiveState(): void {
 
 watch([selectedTopicId, leftVersion, rightVersion], resetInteractiveState)
 /**
- * 支持从源码索引或 IDEA 插件通过 ?topic=... 直接打开对应版本对比专题。
+ * 支持从源码索引或 IDEA 插件通过 ?topic=...&version=... 直接打开对应版本对比专题和目标版本。
  */
 onMounted(() => {
-  const requestedTopicId = new URLSearchParams(window.location.search).get('topic')
+  const parameters = new URLSearchParams(window.location.search)
+  const requestedTopicId = parameters.get('topic')
   if (requestedTopicId !== null && jdkComparisonTopics.some((topic) => topic.id === requestedTopicId)) {
     selectedTopicId.value = requestedTopicId
+  }
+  const requestedVersion = parameters.get('version')
+  if (requestedVersion !== null && jdkComparisonVersions.includes(requestedVersion as JdkComparisonVersion)) {
+    rightVersion.value = requestedVersion as JdkComparisonVersion
+    leftVersion.value = requestedVersion === '8' ? '17' : '8'
   }
 })
 onBeforeUnmount(stopDemo)

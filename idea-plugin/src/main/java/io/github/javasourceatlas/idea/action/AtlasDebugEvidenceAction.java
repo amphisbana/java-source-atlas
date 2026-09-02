@@ -21,7 +21,10 @@ public final class AtlasDebugEvidenceAction extends AtlasEditorContextAction {
      */
     @Override
     protected boolean isAvailable(ActionContext context) {
-        return context.topic() != null && context.breakpoint() != null && context.evidence() != null;
+        return context.sourceActionsAllowed()
+                && context.topic() != null
+                && context.breakpoint() != null
+                && context.evidence() != null;
     }
 
     /**

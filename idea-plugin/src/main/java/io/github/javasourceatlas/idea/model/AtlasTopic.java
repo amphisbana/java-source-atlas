@@ -26,6 +26,7 @@ import java.util.stream.Stream;
  * @param source             专题主源码类
  * @param relatedSources     关联源码类
  * @param versionComparison  可选的 JDK 版本对比入口
+ * @param versionMethodMappings JDK 目标版本的方法签名和观察项变化
  * @param entryPoints        关键方法入口
  * @param evidence           可执行证据链
  * @param breakpoints        推荐断点
@@ -45,6 +46,7 @@ public record AtlasTopic(
         AtlasSource source,
         List<AtlasSource> relatedSources,
         AtlasVersionComparison versionComparison,
+        List<AtlasVersionMethodMapping> versionMethodMappings,
         List<AtlasEntryPoint> entryPoints,
         List<AtlasEvidence> evidence,
         List<AtlasBreakpoint> breakpoints
@@ -56,9 +58,72 @@ public record AtlasTopic(
     public AtlasTopic {
         compatibleVersions = immutableOrEmpty(compatibleVersions);
         relatedSources = immutableOrEmpty(relatedSources);
+        versionMethodMappings = immutableOrEmpty(versionMethodMappings);
         entryPoints = immutableOrEmpty(entryPoints);
         evidence = immutableOrEmpty(evidence);
         breakpoints = immutableOrEmpty(breakpoints);
+    }
+
+    /**
+     * 保留未声明版本方法映射的旧构造方式，旧调用方默认使用空映射。
+     *
+     * @param topicId            稳定专题编号
+     * @param title              专题标题
+     * @param primaryVersion     主要讲解版本
+     * @param sourceRef          固定源码 Tag
+     * @param designInsight      源码设计亮点
+     * @param focusQuestion      核心问题
+     * @param readingGoal        阅读目标
+     * @param recommendedNextTopicId 下一专题编号
+     * @param recommendedNextReason  下一专题推荐理由
+     * @param compatibleVersions 兼容版本
+     * @param lab                调试实验
+     * @param source             主源码
+     * @param relatedSources     关联源码
+     * @param versionComparison  版本对比入口
+     * @param entryPoints        源码入口
+     * @param evidence           可执行证据
+     * @param breakpoints        推荐断点
+     */
+    public AtlasTopic(
+            String topicId,
+            String title,
+            String primaryVersion,
+            String sourceRef,
+            String designInsight,
+            String focusQuestion,
+            String readingGoal,
+            String recommendedNextTopicId,
+            String recommendedNextReason,
+            List<String> compatibleVersions,
+            AtlasLab lab,
+            AtlasSource source,
+            List<AtlasSource> relatedSources,
+            AtlasVersionComparison versionComparison,
+            List<AtlasEntryPoint> entryPoints,
+            List<AtlasEvidence> evidence,
+            List<AtlasBreakpoint> breakpoints
+    ) {
+        this(
+                topicId,
+                title,
+                primaryVersion,
+                sourceRef,
+                designInsight,
+                focusQuestion,
+                readingGoal,
+                recommendedNextTopicId,
+                recommendedNextReason,
+                compatibleVersions,
+                lab,
+                source,
+                relatedSources,
+                versionComparison,
+                List.of(),
+                entryPoints,
+                evidence,
+                breakpoints
+        );
     }
 
     /**

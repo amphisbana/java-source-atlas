@@ -3,6 +3,8 @@ package io.github.javasourceatlas.idea.debug;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 验证 Atlas 断点归属记录的去重、专题清理和状态恢复。
@@ -56,5 +58,19 @@ class AtlasBreakpointStateTest {
 
         assertEquals(1, restored.locations().size());
         assertEquals("hashmap", restored.locations().getFirst().topicId);
+    }
+
+    /**
+     * 验证复用用户断点时保存非所有者标记，后续 Atlas 创建同位置断点时可以升级为所有者。
+     */
+    @Test
+    void shouldTrackReferencedBreakpointOwnership() {
+        AtlasBreakpointState state = new AtlasBreakpointState();
+
+        state.registerReference("hashmap", "file:///HashMap.java", 100, "resize()");
+        assertFalse(state.locations().getFirst().owned);
+
+        state.register("hashmap", "file:///HashMap.java", 100, "resize()");
+        assertTrue(state.locations().getFirst().owned);
     }
 }

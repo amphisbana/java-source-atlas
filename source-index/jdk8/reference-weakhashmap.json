@@ -20,6 +20,26 @@
     ],
     "migrationHint": "不要把 System.gc、isEnqueued 或一次 size 变化当完成信号；按版本定位 clear0、processPendingReferences、refersTo、ReferenceQueue 锁与 newWeakHashMap。"
   },
+  "versionMethodMappings": [
+    {
+      "version": "17",
+      "sourceMethod": "Reference.tryHandlePending(boolean)",
+      "targetMethod": "Reference.processPendingReferences()",
+      "document": "/jdk/version-comparison/?topic=reference-weakhashmap&version=17",
+      "purpose": "从 VM 批量取得 pending-list，再逐项执行 Cleaner 或入队处理",
+      "scenario": "观察 VM pending-list 批量交接和逐项入队",
+      "variables": ["pendingList", "processPendingActive", "ref", "next"]
+    },
+    {
+      "version": "21",
+      "sourceMethod": "Reference.tryHandlePending(boolean)",
+      "targetMethod": "Reference.processPendingReferences()",
+      "document": "/jdk/version-comparison/?topic=reference-weakhashmap&version=21",
+      "purpose": "从 VM 批量取得 pending-list，再逐项执行 Cleaner 或入队处理",
+      "scenario": "观察 VM pending-list 批量交接和逐项入队",
+      "variables": ["pendingList", "processPendingActive", "ref", "next"]
+    }
+  ],
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.reference.ReferenceWeakHashMapDebugLab",

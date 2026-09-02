@@ -20,6 +20,40 @@
     ],
     "migrationHint": "先守住 flip、半包、selectedKeys 消费和 wakeup 不变量；再按最低 JDK 版本选择 slice(index,length)、Consumer select、interestOpsOr/And 与预览 Foreign Memory API。"
   },
+  "versionMethodMappings": [
+    {
+      "version": "17",
+      "sourceMethod": "SelectorImpl.lockAndDoSelect(long)",
+      "targetMethod": "SelectorImpl.lockAndDoSelect(Consumer,long)",
+      "document": "/jdk/version-comparison/?topic=bytebuffer-selector&version=17",
+      "scenario": "观察传统 selected-key set 与 Consumer 选择共用的加锁选择入口",
+      "variables": ["action", "timeout", "publicSelectedKeys", "cancelledKeys"]
+    },
+    {
+      "version": "21",
+      "sourceMethod": "SelectorImpl.lockAndDoSelect(long)",
+      "targetMethod": "SelectorImpl.lockAndDoSelect(Consumer,long)",
+      "document": "/jdk/version-comparison/?topic=bytebuffer-selector&version=21",
+      "scenario": "观察传统 selected-key set 与 Consumer 选择共用的加锁选择入口",
+      "variables": ["action", "timeout", "publicSelectedKeys", "cancelledKeys"]
+    },
+    {
+      "version": "17",
+      "sourceMethod": "EPollSelectorImpl.doSelect(long)",
+      "targetMethod": "EPollSelectorImpl.doSelect(Consumer,long)",
+      "document": "/jdk/version-comparison/?topic=bytebuffer-selector&version=17",
+      "scenario": "观察 Linux epoll 结果如何进入 Consumer 或 selected-key set",
+      "variables": ["action", "timeout", "numEntries", "updateKeys"]
+    },
+    {
+      "version": "21",
+      "sourceMethod": "EPollSelectorImpl.doSelect(long)",
+      "targetMethod": "EPollSelectorImpl.doSelect(Consumer,long)",
+      "document": "/jdk/version-comparison/?topic=bytebuffer-selector&version=21",
+      "scenario": "观察 Linux epoll 结果如何进入 Consumer 或 selected-key set",
+      "variables": ["action", "timeout", "numEntries", "updateKeys"]
+    }
+  ],
   "lab": {
     "module": "labs/jdk-labs",
     "mainClass": "io.github.javasourceatlas.jdk.nio.NioBufferSelectorDebugLab",

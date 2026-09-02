@@ -201,7 +201,7 @@ jobs:
 
       - name: Test and package IDEA plugin
         working-directory: idea-plugin
-        run: ./gradlew test verifyPlugin buildPlugin --no-daemon
+        run: ./gradlew test ideaIntegrationTest verifyPlugin buildPlugin --no-daemon
 
   docs-ui:
     name: Documentation UI interactions

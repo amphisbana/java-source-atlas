@@ -16,6 +16,9 @@ import io.github.javasourceatlas.idea.model.AtlasEntryPoint;
 import io.github.javasourceatlas.idea.model.AtlasEvidence;
 import io.github.javasourceatlas.idea.model.AtlasTopic;
 import io.github.javasourceatlas.idea.ui.AtlasTopicChooser;
+import io.github.javasourceatlas.idea.version.AtlasTopicVersion;
+import io.github.javasourceatlas.idea.version.AtlasTopicVersionResolver;
+import io.github.javasourceatlas.idea.version.AtlasVersionDetector;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -114,25 +117,32 @@ abstract class AtlasEditorContextAction extends DumbAwareAction {
         // AtlasEvidence evidence = index.evidenceForBreakpoint(topic, breakpoint).orElse(null);
         // return new ActionContext(index, editorContext, topic, entryPoint, breakpoint, evidence);
         return AtlasEditorContextSupport.availableTopics(editorContext).stream()
-                .map(topic -> createActionContext(index, editorContext, topic))
+                .map(topic -> createActionContext(project, index, editorContext, topic))
                 .toList();
     }
 
     /**
      * 为一个候选专题补齐入口、推荐断点和证据场景。
      *
+     * @param project       当前项目
      * @param index         专题索引
      * @param editorContext 当前编辑器上下文
      * @param topic         当前候选专题
      * @return 完整动作上下文
      */
     private ActionContext createActionContext(
+            Project project,
             AtlasIndexService index,
             AtlasEditorContext editorContext,
             AtlasTopic topic
     ) {
+        AtlasTopicVersion version = AtlasTopicVersionResolver.resolve(
+                topic,
+                AtlasVersionDetector.projectJdkVersion(project)
+        );
+        AtlasTopic resolvedTopic = version.topic();
         String lastMethod = AtlasLearningProgressState.getInstance()
-                .progressFor(topic.topicId())
+                .progressFor(resolvedTopic.topicId())
                 .lastEntryMethod;
         // 2026-08-27：原逻辑只接收唯一专题的 editorEntry，无法为用户选中的歧义专题恢复当前重载入口。
         // AtlasEntryPoint entryPoint = editorEntry != null
@@ -141,10 +151,25 @@ abstract class AtlasEditorContextAction extends DumbAwareAction {
         //         .filter(candidate -> candidate.method().equals(lastMethod))
         //         .findFirst()
         //         .orElse(topic.entryPoints().get(0));
-        AtlasEntryPoint entryPoint = AtlasEditorContextSupport.resolveEntryPoint(topic, editorContext, lastMethod);
-        AtlasBreakpoint breakpoint = index.breakpointForEntryPoint(topic, entryPoint).orElse(null);
-        AtlasEvidence evidence = index.evidenceForBreakpoint(topic, breakpoint).orElse(null);
-        return new ActionContext(index, editorContext, topic, entryPoint, breakpoint, evidence);
+        // 2026-09-02：原逻辑直接使用 OpenJDK 8 基线专题，项目 JDK 17/21 的私有方法变化会生成错误动作。
+        // AtlasEntryPoint entryPoint = AtlasEditorContextSupport.resolveEntryPoint(topic, editorContext, lastMethod);
+        AtlasEntryPoint entryPoint = AtlasEditorContextSupport.resolveEntryPoint(
+                resolvedTopic,
+                editorContext,
+                lastMethod
+        );
+        AtlasBreakpoint breakpoint = index.breakpointForEntryPoint(resolvedTopic, entryPoint).orElse(null);
+        AtlasEvidence evidence = index.evidenceForBreakpoint(resolvedTopic, breakpoint).orElse(null);
+        return new ActionContext(
+                index,
+                editorContext,
+                resolvedTopic,
+                entryPoint,
+                breakpoint,
+                evidence,
+                version.sourceActionsAllowed(),
+                version.message()
+        );
     }
 
     /**
@@ -180,6 +205,8 @@ abstract class AtlasEditorContextAction extends DumbAwareAction {
      * @param entryPoint    当前或恢复的入口
      * @param breakpoint    对应推荐断点
      * @param evidence      对应可执行证据
+     * @param sourceActionsAllowed 当前项目版本是否允许执行源码与断点动作
+     * @param versionMessage 当前项目版本解析说明
      */
     protected record ActionContext(
             AtlasIndexService index,
@@ -187,7 +214,9 @@ abstract class AtlasEditorContextAction extends DumbAwareAction {
             AtlasTopic topic,
             AtlasEntryPoint entryPoint,
             AtlasBreakpoint breakpoint,
-            AtlasEvidence evidence
+            AtlasEvidence evidence,
+            boolean sourceActionsAllowed,
+            String versionMessage
     ) {
     }
 }

@@ -18,7 +18,7 @@ public final class AtlasNavigateSourceAction extends AtlasEditorContextAction {
      */
     @Override
     protected boolean isAvailable(ActionContext context) {
-        return context.topic() != null && context.entryPoint() != null;
+        return context.sourceActionsAllowed() && context.topic() != null && context.entryPoint() != null;
     }
 
     /**
