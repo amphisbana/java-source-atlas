@@ -12,7 +12,7 @@ val minimumIdeaVersion = "2024.2.5"
 val maximumIdeaVersion = "2026.2"
 
 group = "io.github.java-source-atlas"
-version = "0.2.10"
+version = "0.2.11"
 
 repositories {
     mavenCentral()
@@ -111,13 +111,12 @@ intellijPlatform {
 
         changeNotes = """
             <ul>
-              <li>工具窗口、gutter、右键菜单和快捷键统一使用专题选择器，完整支持共享源码类的歧义候选。</li>
-              <li>用户选择专题后按完整方法签名恢复重载入口，并兼容最近阅读进度。</li>
-              <li>教程设置新增地址格式校验、异步连接测试和恢复默认地址操作。</li>
-              <li>教程根地址拒绝账号、查询参数和锚点，避免拼接专题路由后产生无效链接。</li>
-              <li>IDE 内嵌教程在页面加载、同页锚点切换和重复打开时显式恢复目标标题位置。</li>
-              <li>文档站右侧目录限定当前正文并按锚点去重，修复路由更新后的重复目录。</li>
-              <li>文档站侧栏增加响应式布局兜底，避免临界宽度或路由切换时遮挡正文。</li>
+              <li>JDK 专题根据项目 JDK 8、17 或 21 自动切换固定源码 Tag、模块路径、入口签名和推荐断点。</li>
+              <li>命中 Atlas 断点后自动定位源码，记录已验证证据和实际调用路径。</li>
+              <li>新增“添加下一断点并继续”，可连续完成引导式源码调试。</li>
+              <li>Debug 结束后可复制包含断点、证据、结论和源码位置的 Markdown 摘要。</li>
+              <li>复用用户已有断点时保留调试引导，并确保 Atlas 清理操作不会删除用户断点。</li>
+              <li>新增真实 IDEA Project、Java PSI 与 XDebugger 端到端测试，并覆盖全部 JDK 专题版本矩阵。</li>
             </ul>
         """.trimIndent()
     }
