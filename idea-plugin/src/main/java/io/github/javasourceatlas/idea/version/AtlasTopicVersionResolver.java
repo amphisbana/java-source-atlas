@@ -3,6 +3,7 @@ package io.github.javasourceatlas.idea.version;
 import io.github.javasourceatlas.idea.model.AtlasBreakpoint;
 import io.github.javasourceatlas.idea.model.AtlasEntryPoint;
 import io.github.javasourceatlas.idea.model.AtlasEvidence;
+import io.github.javasourceatlas.idea.model.AtlasMethodRelation;
 import io.github.javasourceatlas.idea.model.AtlasSource;
 import io.github.javasourceatlas.idea.model.AtlasTopic;
 import io.github.javasourceatlas.idea.model.AtlasVersionMethodMapping;
@@ -186,16 +187,40 @@ public final class AtlasTopicVersionResolver {
     ) {
         AtlasVersionMethodMapping mapping = mappingFor(topic, entryPoint.method(), projectMajor);
         if (mapping == null) {
-            return entryPoint;
+            // 2026-09-03：原逻辑直接复用入口，新增关联阅读后需要同步适配其中的方法签名。
+            // return entryPoint;
+            return new AtlasEntryPoint(
+                    entryPoint.method(),
+                    entryPoint.document(),
+                    entryPoint.purpose(),
+                    entryPoint.sourceClass(),
+                    entryPoint.summary(),
+                    entryPoint.process(),
+                    entryPoint.designInsights(),
+                    entryPoint.pitfalls(),
+                    adaptRelations(topic, entryPoint.relatedMethods(), projectMajor)
+            );
         }
         if (blank(mapping.targetMethod())) {
             return null;
         }
+        // 2026-09-03：原四参数构造只适配入口本身，无法保留方法讲解和关联阅读数据。
+        // return new AtlasEntryPoint(
+        //         mapping.targetMethod(),
+        //         fallback(mapping.document(), entryPoint.document()),
+        //         fallback(mapping.purpose(), entryPoint.purpose()),
+        //         entryPoint.sourceClass()
+        // );
         return new AtlasEntryPoint(
                 mapping.targetMethod(),
                 fallback(mapping.document(), entryPoint.document()),
                 fallback(mapping.purpose(), entryPoint.purpose()),
-                entryPoint.sourceClass()
+                entryPoint.sourceClass(),
+                entryPoint.summary(),
+                entryPoint.process(),
+                entryPoint.designInsights(),
+                entryPoint.pitfalls(),
+                adaptRelations(topic, entryPoint.relatedMethods(), projectMajor)
         );
     }
 
@@ -269,14 +294,73 @@ public final class AtlasTopicVersionResolver {
                 merged.put(key, entryPoint);
                 continue;
             }
+            // 2026-09-03：原四参数构造只合并入口用途，新增结构化讲解后需要同步合并各讲解字段。
+            // merged.put(key, new AtlasEntryPoint(
+            //         existing.method(),
+            //         fallback(existing.document(), entryPoint.document()),
+            //         mergeText(existing.purpose(), entryPoint.purpose()),
+            //         existing.sourceClass()
+            // ));
             merged.put(key, new AtlasEntryPoint(
                     existing.method(),
                     fallback(existing.document(), entryPoint.document()),
                     mergeText(existing.purpose(), entryPoint.purpose()),
-                    existing.sourceClass()
+                    existing.sourceClass(),
+                    mergeText(existing.summary(), entryPoint.summary()),
+                    mergeValues(existing.process(), entryPoint.process()),
+                    mergeValues(existing.designInsights(), entryPoint.designInsights()),
+                    mergeValues(existing.pitfalls(), entryPoint.pitfalls()),
+                    mergeRelations(existing.relatedMethods(), entryPoint.relatedMethods())
             ));
         }
         return List.copyOf(merged.values());
+    }
+
+    /**
+     * 把关联方法同步映射到目标 JDK 版本，已移除的方法不再展示为可导航入口。
+     *
+     * @param topic        当前专题
+     * @param relations    基线关联方法
+     * @param projectMajor 目标 JDK 主版本
+     * @return 目标版本关联方法
+     */
+    private static List<AtlasMethodRelation> adaptRelations(
+            AtlasTopic topic,
+            List<AtlasMethodRelation> relations,
+            int projectMajor
+    ) {
+        return relations.stream()
+                .map(relation -> adaptRelation(topic, relation, projectMajor))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    /**
+     * 应用单个关联方法的版本映射。
+     *
+     * @param topic        当前专题
+     * @param relation     基线关联方法
+     * @param projectMajor 目标 JDK 主版本
+     * @return 目标版本关系；目标方法已移除时返回 null
+     */
+    private static AtlasMethodRelation adaptRelation(
+            AtlasTopic topic,
+            AtlasMethodRelation relation,
+            int projectMajor
+    ) {
+        AtlasVersionMethodMapping mapping = mappingFor(topic, relation.method(), projectMajor);
+        if (mapping == null) {
+            return relation;
+        }
+        if (blank(mapping.targetMethod())) {
+            return null;
+        }
+        return new AtlasMethodRelation(
+                mapping.targetMethod(),
+                relation.relation(),
+                relation.reason(),
+                relation.sourceClass()
+        );
     }
 
     /**
@@ -336,6 +420,28 @@ public final class AtlasTopicVersionResolver {
                 .filter(value -> !values.contains(value))
                 .forEach(values::add);
         return List.copyOf(values);
+    }
+
+    /**
+     * 合并方法关联关系，避免版本入口合并后出现重复导航项。
+     *
+     * @param first  首个入口的关联方法
+     * @param second 后续入口的关联方法
+     * @return 稳定去重后的关联关系
+     */
+    private static List<AtlasMethodRelation> mergeRelations(
+            List<AtlasMethodRelation> first,
+            List<AtlasMethodRelation> second
+    ) {
+        Map<String, AtlasMethodRelation> relations = new LinkedHashMap<>();
+        java.util.stream.Stream.concat(first.stream(), second.stream())
+                .filter(Objects::nonNull)
+                .filter(relation -> !relation.method().isBlank())
+                .forEach(relation -> relations.putIfAbsent(
+                        relation.relation() + "|" + relation.method(),
+                        relation
+                ));
+        return List.copyOf(relations.values());
     }
 
     /**

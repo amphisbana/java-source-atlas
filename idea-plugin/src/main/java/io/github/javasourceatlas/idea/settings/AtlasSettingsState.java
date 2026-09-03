@@ -21,6 +21,8 @@ public final class AtlasSettingsState implements PersistentStateComponent<AtlasS
 
     public String docsBaseUrl = DEFAULT_DOCS_BASE_URL;
     public boolean environmentGuideSeen;
+    public boolean followEditorForReading = true;
+    public boolean translateAfterSourceNavigation;
 
     /**
      * 取得应用级设置实例。

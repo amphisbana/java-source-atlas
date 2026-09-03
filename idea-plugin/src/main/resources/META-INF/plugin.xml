@@ -58,6 +58,12 @@
                 description="添加当前源码入口对应的 Source Atlas 推荐断点"
                 icon="/icons/atlas.svg"/>
         <action
+                id="JavaSourceAtlas.TranslateComment"
+                class="io.github.javasourceatlas.idea.action.AtlasTranslateCommentAction"
+                text="翻译当前源码注释"
+                description="使用 Translation 插件翻译当前注释；未安装时显示安装引导"
+                icon="/icons/atlas.svg"/>
+        <action
                 id="JavaSourceAtlas.DebugEvidence"
                 class="io.github.javasourceatlas.idea.action.AtlasDebugEvidenceAction"
                 text="Debug 当前证据场景"
@@ -85,6 +91,7 @@
             <add-to-group group-id="ToolsMenu" anchor="last"/>
             <reference ref="JavaSourceAtlas.OpenDocumentation"/>
             <reference ref="JavaSourceAtlas.NavigateSource"/>
+            <reference ref="JavaSourceAtlas.TranslateComment"/>
             <separator/>
             <reference ref="JavaSourceAtlas.AddRecommendedBreakpoint"/>
             <reference ref="JavaSourceAtlas.DebugEvidence"/>

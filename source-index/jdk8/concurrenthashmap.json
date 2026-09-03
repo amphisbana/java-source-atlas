@@ -39,31 +39,178 @@
       "method": "ConcurrentHashMap.get(Object)",
       "document": "/jdk/concurrent/concurrenthashmap/#get-为什么不锁桶",
       "purpose": "无桶首监视器读取和特殊节点查找",
-      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap",
+      "summary": "在不获取桶首监视器的前提下完成查询；普通节点依赖 volatile 可见性，负 hash 特殊节点则把查找委派给各自的 find 协议。",
+      "process": [
+        "对 key 做 spread 扰动并定位 table 桶首。",
+        "桶首 hash 与 key 直接命中时立即返回 value。",
+        "桶首 hash 为负数时调用 ForwardingNode、TreeBin 等特殊节点的 find。",
+        "普通链表沿 next 逐个比较 hash 与 equals。"
+      ],
+      "designInsights": [
+        "读取路径不锁桶，而是依靠 volatile table、Node.val 和 Node.next 建立可见性；特殊状态统一隐藏在 Node.find 多态协议后。"
+      ],
+      "pitfalls": [
+        "无锁读取不等于没有同步语义，字段的 volatile 发布和迁移节点协议共同保证读线程能看到有效结构。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "ConcurrentHashMap.ForwardingNode.find(int,Object)",
+          "relation": "扩容读路径",
+          "reason": "读取遇到 MOVED 桶首后必须沿转发节点切换到新表。",
+          "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+        },
+        {
+          "method": "ConcurrentHashMap.TreeBin.find(int,Object)",
+          "relation": "树桶读路径",
+          "reason": "树桶写锁竞争时可能退回链表扫描，而不是始终执行红黑树查找。",
+          "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+        }
+      ]
     },
     {
       "method": "ConcurrentHashMap.putVal(K,V,boolean)",
       "document": "/jdk/concurrent/concurrenthashmap/put-resize#putval-主循环",
       "purpose": "CAS 空桶、桶首同步、MOVED 分流和树写入",
-      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap",
+      "summary": "ConcurrentHashMap 写入主循环：空桶使用 CAS，已有桶只锁桶首，遇到 MOVED 则帮助迁移，最终用分散计数触发扩容检查。",
+      "process": [
+        "table 尚未初始化时调用 initTable，并重新进入循环。",
+        "空桶通过 casTabAt 竞争发布首节点，成功后无需加锁。",
+        "桶首为 MOVED 时调用 helpTransfer，先协助本轮扩容再重试。",
+        "普通桶在 synchronized(f) 内二次确认桶首未变化，然后处理链表或 TreeBin。",
+        "新增成功后根据 binCount 判断树化，并调用 addCount 更新规模与检查扩容。"
+      ],
+      "designInsights": [
+        "把竞争按桶拆分：空桶走 CAS，冲突桶只锁首节点，扩容冲突转换为协作迁移。",
+        "锁内再次检查 tabAt(tab,i)==f，防止等待监视器期间桶已经被迁移或替换。"
+      ],
+      "pitfalls": [
+        "synchronized 锁的是当时的桶首节点，不是整个 ConcurrentHashMap。",
+        "返回 oldVal 非空表示覆盖已有 key，此时不会调用 addCount 增加元素数量。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "ConcurrentHashMap.initTable()",
+          "relation": "初始化分支",
+          "reason": "多个首次写线程通过 sizeCtl 竞争唯一的 table 初始化权。",
+          "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+        },
+        {
+          "method": "ConcurrentHashMap.helpTransfer(Node[],Node)",
+          "relation": "扩容协作",
+          "reason": "写线程遇到 ForwardingNode 后不等待，而是加入当前迁移任务。",
+          "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+        },
+        {
+          "method": "ConcurrentHashMap.addCount(long,int)",
+          "relation": "规模维护",
+          "reason": "新增完成后通过分散计数判断是否达到扩容阈值。",
+          "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+        }
+      ]
     },
     {
       "method": "ConcurrentHashMap.initTable()",
       "document": "/jdk/concurrent/concurrenthashmap/put-resize#inittable-如何避免重复初始化",
       "purpose": "通过 sizeCtl 协调延迟初始化",
-      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap",
+      "summary": "使用 sizeCtl 的负值作为轻量初始化互斥状态，只允许一个线程创建 table，其余线程让出 CPU 后重试。",
+      "process": [
+        "循环检查 table 是否仍为空，避免重复初始化。",
+        "sizeCtl<0 表示已有线程初始化，当前线程调用 Thread.yield 后重试。",
+        "通过 CAS 把 sizeCtl 从期望值改为 -1，获得初始化资格。",
+        "再次确认 table 为空后创建数组，并把下一次扩容阈值写回 sizeCtl。"
+      ],
+      "designInsights": [
+        "复用 sizeCtl 同时表达初始容量、扩容阈值、初始化锁和扩容协作者数量，减少额外协调对象。"
+      ],
+      "pitfalls": [
+        "-1 只表示初始化进行中；扩容阶段的 sizeCtl 也是负数，但编码了 resizeStamp 和工作线程数。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "ConcurrentHashMap.putVal(K,V,boolean)",
+          "relation": "调用者",
+          "reason": "首次写入发现 table 为空时进入初始化，再回到写入循环。",
+          "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+        },
+        {
+          "method": "ConcurrentHashMap.transfer(Node[],Node[])",
+          "relation": "状态对照",
+          "reason": "对比 sizeCtl 在初始化和多线程扩容阶段承担的不同协议。",
+          "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+        }
+      ]
     },
     {
       "method": "ConcurrentHashMap.transfer(Node[],Node[])",
       "document": "/jdk/concurrent/concurrenthashmap/put-resize#transfer-的协作迁移",
       "purpose": "分段领取、迁移旧桶并由末位线程发布新表",
-      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap",
+      "summary": "把旧 table 的桶区间分段交给多个线程并行迁移；每个完成桶用 ForwardingNode 封口，最后一个协作者负责发布新表和新阈值。",
+      "process": [
+        "根据 CPU 数量和 table 长度计算 stride，协作者通过 transferIndex CAS 领取不重叠区间。",
+        "空桶 CAS 写入 ForwardingNode；已迁移桶直接跳过。",
+        "普通链表依据 hash & oldCap 拆成低位链和高位链，树桶执行 split。",
+        "在锁内把两个新桶写入 nextTable，再把旧桶替换为 ForwardingNode。",
+        "协作者完成区间后递减 sizeCtl；最后一个线程复查全表并发布 nextTable。"
+      ],
+      "designInsights": [
+        "ForwardingNode 既是桶迁移完成标记，也是并发读写切换新表的路由节点。",
+        "transferIndex 把全表任务动态切块，避免为每个桶创建任务对象，也让后加入线程立即领取剩余工作。"
+      ],
+      "pitfalls": [
+        "迁移期间 table 和 nextTable 会同时存在，看到 ForwardingNode 不能当作数据丢失。",
+        "只有最后退出的迁移线程才把 nextTable 发布为 table，普通协作者只负责自己领取的区间。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "ConcurrentHashMap.helpTransfer(Node[],Node)",
+          "relation": "协作者入口",
+          "reason": "读写线程通过 MOVED 桶首识别同一轮扩容并加入 transfer。",
+          "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+        },
+        {
+          "method": "ConcurrentHashMap.ForwardingNode.find(int,Object)",
+          "relation": "迁移期读取",
+          "reason": "已迁移桶的读取通过 ForwardingNode 连续转发到新表。",
+          "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+        }
+      ]
     },
     {
       "method": "ConcurrentHashMap.helpTransfer(Node[],Node)",
       "document": "/jdk/concurrent/concurrenthashmap/put-resize#helptransfer-如何决定是否加入迁移",
       "purpose": "校验同一轮扩容并登记协作者",
-      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap",
+      "summary": "从 ForwardingNode 取得 nextTable，校验当前 sizeCtl 的扩容戳与协作者边界，再通过 CAS 登记自己并进入 transfer。",
+      "process": [
+        "确认桶首是 ForwardingNode 且 nextTable 存在。",
+        "计算当前 table 的 resizeStamp，并循环读取 sizeCtl。",
+        "排除扩容轮次变化、协作者已达上限、迁移已收口或没有剩余区间等情况。",
+        "CAS 增加 sizeCtl 中的协作者计数，成功后调用 transfer。"
+      ],
+      "designInsights": [
+        "扩容不是写线程必须等待的全局停顿；遇到迁移标记的线程可以把冲突转化为推进全局完成的工作。"
+      ],
+      "pitfalls": [
+        "加入前必须同时校验 table、nextTable、resizeStamp 和 transferIndex，只看 sizeCtl<0 不足以证明属于同一轮扩容。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "ConcurrentHashMap.transfer(Node[],Node[])",
+          "relation": "委派迁移",
+          "reason": "登记成功后进入真正的分段领取和桶迁移循环。",
+          "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+        },
+        {
+          "method": "ConcurrentHashMap.putVal(K,V,boolean)",
+          "relation": "常见触发者",
+          "reason": "写入遇到 hash=MOVED 的桶首时调用 helpTransfer。",
+          "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+        }
+      ]
     },
     {
       "method": "ConcurrentHashMap.ForwardingNode.find(int,Object)",
@@ -93,7 +240,34 @@
       "method": "ConcurrentHashMap.addCount(long,int)",
       "document": "/jdk/concurrent/concurrenthashmap/count-compute#为什么不用一个-atomiclong-记录-size",
       "purpose": "分散计数并检查扩容",
-      "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+      "sourceClass": "java.util.concurrent.ConcurrentHashMap",
+      "summary": "先尝试更新 baseCount，竞争时退化到 CounterCell 分片；需要检查容量时汇总近似规模，并发起或协助扩容。",
+      "process": [
+        "低竞争时 CAS 更新 baseCount。",
+        "CAS 失败或 CounterCell 已存在时调用 fullAddCount，把写竞争分散到不同槽位。",
+        "check 非负时计算 sumCount，并与 sizeCtl 阈值比较。",
+        "达到阈值后根据 sizeCtl 状态发起 transfer，或登记为已有扩容的协作者。"
+      ],
+      "designInsights": [
+        "计数精度与写吞吐做了明确取舍：通过类似 LongAdder 的分片降低热点，再在容量决策时汇总。"
+      ],
+      "pitfalls": [
+        "并发更新期间 size() 只是瞬时估计，不应拿它承担跨线程业务一致性判断。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "ConcurrentHashMap.putVal(K,V,boolean)",
+          "relation": "新增调用者",
+          "reason": "只有真正新增映射后才调用 addCount 增加规模。",
+          "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+        },
+        {
+          "method": "ConcurrentHashMap.transfer(Node[],Node[])",
+          "relation": "扩容后续",
+          "reason": "汇总计数超过 sizeCtl 后启动或协助 table 迁移。",
+          "sourceClass": "java.util.concurrent.ConcurrentHashMap"
+        }
+      ]
     },
     {
       "method": "ConcurrentHashMap.computeIfAbsent(K,Function)",

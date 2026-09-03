@@ -72,4 +72,20 @@ class AtlasSettingsStateTest {
         restored.loadState(currentState);
         assertFalse(restored.shouldShowEnvironmentGuide());
     }
+
+    /**
+     * 验证当前方法跟随和定位后翻译偏好可以随 IDEA 设置恢复。
+     */
+    @Test
+    void shouldRememberMethodReadingOptions() {
+        AtlasSettingsState saved = new AtlasSettingsState();
+        saved.followEditorForReading = false;
+        saved.translateAfterSourceNavigation = true;
+        AtlasSettingsState restored = new AtlasSettingsState();
+
+        restored.loadState(saved);
+
+        assertFalse(restored.followEditorForReading);
+        assertTrue(restored.translateAfterSourceNavigation);
+    }
 }

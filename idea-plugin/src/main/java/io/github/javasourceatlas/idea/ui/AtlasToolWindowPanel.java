@@ -7,6 +7,11 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionPlaces;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.editor.EditorFactory;
+import com.intellij.openapi.editor.event.CaretEvent;
+import com.intellij.openapi.editor.event.CaretListener;
+import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
+import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.projectRoots.Sdk;
 import com.intellij.openapi.roots.ProjectRootManager;
@@ -26,11 +31,13 @@ import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.ui.components.JBCheckBox;
+import com.intellij.ui.components.JBTextArea;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
 import io.github.javasourceatlas.idea.browser.AtlasEmbeddedBrowser;
 import io.github.javasourceatlas.idea.browser.AtlasEmbeddedBrowserFactory;
 import io.github.javasourceatlas.idea.context.AtlasContextResolver;
+import io.github.javasourceatlas.idea.context.AtlasEditorContextSupport;
 import io.github.javasourceatlas.idea.debug.AtlasBreakpointManager;
 import io.github.javasourceatlas.idea.debug.AtlasDebugGuidance;
 import io.github.javasourceatlas.idea.debug.AtlasDebugGuidanceService;
@@ -41,16 +48,21 @@ import io.github.javasourceatlas.idea.icons.AtlasIcons;
 import io.github.javasourceatlas.idea.index.AtlasIndexService;
 import io.github.javasourceatlas.idea.lab.AtlasLabLauncher;
 import io.github.javasourceatlas.idea.learning.AtlasLearningProgressState;
+import io.github.javasourceatlas.idea.match.AtlasMethodMatcher;
 import io.github.javasourceatlas.idea.model.AtlasBreakpoint;
 import io.github.javasourceatlas.idea.model.AtlasEditorContext;
 import io.github.javasourceatlas.idea.model.AtlasEntryPoint;
 import io.github.javasourceatlas.idea.model.AtlasEvidence;
+import io.github.javasourceatlas.idea.model.AtlasMethodRelation;
 import io.github.javasourceatlas.idea.model.AtlasTopic;
 import io.github.javasourceatlas.idea.model.AtlasTopicRelation;
 import io.github.javasourceatlas.idea.model.AtlasVersionInfo;
 import io.github.javasourceatlas.idea.navigation.AtlasSourceNavigator;
+import io.github.javasourceatlas.idea.reading.AtlasMethodReading;
+import io.github.javasourceatlas.idea.reading.AtlasMethodReadingResolver;
 import io.github.javasourceatlas.idea.settings.AtlasConfigurable;
 import io.github.javasourceatlas.idea.settings.AtlasSettingsState;
+import io.github.javasourceatlas.idea.translation.AtlasTranslationSupport;
 import io.github.javasourceatlas.idea.version.AtlasVersionDetector;
 import io.github.javasourceatlas.idea.version.AtlasTopicVersion;
 import io.github.javasourceatlas.idea.version.AtlasTopicVersionResolver;
@@ -105,12 +117,14 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     private final DefaultListModel<String> observationModel = new DefaultListModel<>();
     private final DefaultListModel<AtlasTopicRelation> relatedTopicModel = new DefaultListModel<>();
     private final DefaultListModel<AtlasTopic> recentTopicModel = new DefaultListModel<>();
+    private final DefaultListModel<AtlasMethodRelation> relatedMethodModel = new DefaultListModel<>();
     private final JBList<AtlasTopic> topicList = new JBList<>(topicModel);
     private final JBList<AtlasEntryPoint> entryPointList = new JBList<>(entryPointModel);
     private final JBList<AtlasBreakpoint> breakpointList = new JBList<>(breakpointModel);
     private final JBList<String> observationList = new JBList<>(observationModel);
     private final JBList<AtlasTopicRelation> relatedTopicList = new JBList<>(relatedTopicModel);
     private final JBList<AtlasTopic> recentTopicList = new JBList<>(recentTopicModel);
+    private final JBList<AtlasMethodRelation> relatedMethodList = new JBList<>(relatedMethodModel);
     private final JBLabel contextLabel = new JBLabel("当前光标：等待 Java 编辑器");
     private final JBLabel topicTitleLabel = new JBLabel("选择一个源码专题");
     private final JBLabel jdkVersionLabel = new JBLabel();
@@ -123,6 +137,13 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     private final JBLabel entrySectionLabel = new JBLabel("源码入口");
     private final JBLabel breakpointSectionLabel = new JBLabel("推荐断点");
     private final JBLabel readingSessionLabel = new JBLabel("阅读会话：选择专题后开始");
+    private final JBLabel currentMethodTitleLabel = new JBLabel("当前方法：等待选择源码入口");
+    private final JBLabel currentMethodLocationLabel = new JBLabel("来源：入口列表");
+    private final JBLabel translationStatusLabel = new JBLabel();
+    private final JBTextArea methodSummaryArea = createReadingTextArea(2);
+    private final JBTextArea methodProcessArea = createReadingTextArea(4);
+    private final JBTextArea methodInsightArea = createReadingTextArea(3);
+    private final JBTextArea methodPitfallArea = createReadingTextArea(2);
     private final JBLabel breakpointScenarioLabel = new JBLabel("观察场景：选择一个推荐断点");
     private final JBLabel breakpointExpectedLabel = new JBLabel("预期结果：等待选择证据场景");
     private final JPanel debugGuidancePanel = new JPanel();
@@ -147,14 +168,20 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     private final JBCheckBox readMainCheckBox = new JBCheckBox("我已完成主线阅读");
     private final JBCheckBox ranLabCheckBox = new JBCheckBox("我已运行并理解 Lab");
     private final JBCheckBox favoritesOnlyCheckBox = new JBCheckBox("只看收藏");
+    private final JBCheckBox followEditorCheckBox = new JBCheckBox("跟随编辑器");
+    private final JBCheckBox translateAfterNavigationCheckBox = new JBCheckBox("定位后翻译");
     private final JBTabbedPane tabs = new JBTabbedPane();
     private final JBTabbedPane navigationTabs = new JBTabbedPane();
     private final JBTabbedPane learningTabs = new JBTabbedPane();
+    private final JBTabbedPane entryContentTabs = new JBTabbedPane();
     private final JButton openDocumentationButton = new JButton("IDE 内阅读", AtlasIcons.DOCUMENTATION);
     private final JButton openExternalDocumentationButton = new ActionLink("浏览器打开");
     private final JButton openVersionComparisonButton = new ActionLink("版本对比");
     private final JButton copyCallChainButton = new ActionLink("复制调用链");
     private final JButton navigateSourceButton = new ActionLink("定位源码");
+    private final JButton syncCurrentMethodButton = new ActionLink("同步当前方法");
+    private final JButton translateCommentButton = new ActionLink("翻译注释");
+    private final JButton translationSettingsButton = new ActionLink("翻译设置");
     private final JButton resumeReadingButton = new JButton("继续阅读");
     private final JButton previousEntryButton = new ActionLink("上一个");
     private final JButton nextEntryButton = new ActionLink("下一个");
@@ -185,15 +212,20 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     private final JButton fixLabButton = new JButton("刷新 Maven");
     private final JButton fixEvidenceButton = new JButton("选择断点");
     private final JButton fixBrowserButton = new JButton("浏览器打开");
+    private final Timer methodContextTimer = new Timer(350, ignored -> refreshMethodAssistantFromEditor(false));
+    private final Timer translationAfterNavigationTimer;
     // 2026-08-26：取消编辑器光标的持续跟随，原上下文计时器字段不再需要。
     // private final Timer contextTimer;
 
     private AtlasEmbeddedBrowser tutorialBrowser;
+    private final AtlasSettingsState settings;
     private AtlasDebugGuidance currentDebugGuidance;
     private AtlasTopicVersion selectedTopicVersion;
+    private AtlasTopic methodAssistantTopic;
     private String lastContextKey = "";
     private AtlasEditorContext editorContext = new AtlasEditorContext(null, null, null, null);
     private boolean contextRefreshPending;
+    private int methodContextRefreshGeneration;
     private boolean updatingProgressControls;
     private boolean evidenceDebugPending;
     private boolean documentationCheckPending;
@@ -219,10 +251,24 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         this.project = project;
         this.index = ApplicationManager.getApplication().getService(AtlasIndexService.class);
         this.learningProgress = ApplicationManager.getApplication().getService(AtlasLearningProgressState.class);
+        this.settings = AtlasSettingsState.getInstance();
+        followEditorCheckBox.setSelected(settings.followEditorForReading);
+        translateAfterNavigationCheckBox.setSelected(settings.translateAfterSourceNavigation);
+        translateAfterNavigationCheckBox.setEnabled(AtlasTranslationSupport.isAvailable());
+        methodContextTimer.setRepeats(false);
+        translationAfterNavigationTimer = new Timer(450, ignored -> {
+            if (!project.isDisposed()
+                    && translateAfterNavigationCheckBox.isSelected()
+                    && AtlasTranslationSupport.isAvailable()) {
+                AtlasTranslationSupport.translateCurrentComment(project, false);
+            }
+        });
+        translationAfterNavigationTimer.setRepeats(false);
 
         configureLists();
         configureActions();
         setContent(createMainContent());
+        configureEditorTracking();
         rebuildTopicList("");
         refreshFromEditor(true);
         showEnvironmentGuideOnFirstUse();
@@ -242,12 +288,14 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         entryPointList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         breakpointList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         relatedTopicList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        relatedMethodList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
         topicList.setCellRenderer(new TopicRenderer());
         entryPointList.setCellRenderer(new EntryPointRenderer());
         breakpointList.setCellRenderer(new BreakpointRenderer());
         relatedTopicList.setCellRenderer(new RelatedTopicRenderer());
         recentTopicList.setCellRenderer(new RecentTopicRenderer());
+        relatedMethodList.setCellRenderer(new RelatedMethodRenderer());
 
         topicList.addListSelectionListener(event -> {
             if (!event.getValueIsAdjusting()) {
@@ -257,6 +305,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         entryPointList.addListSelectionListener(event -> {
             if (!event.getValueIsAdjusting()) {
                 refreshReadingSession(topicList.getSelectedValue());
+                showMethodAssistant(topicList.getSelectedValue(), entryPointList.getSelectedValue(), false);
                 updateActionState();
             }
         });
@@ -324,6 +373,19 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                 }
             }
         });
+        relatedMethodList.addMouseListener(new MouseAdapter() {
+            /**
+             * 双击关联方法时切换入口并直接定位源码。
+             *
+             * @param event 鼠标事件
+             */
+            @Override
+            public void mouseClicked(MouseEvent event) {
+                if (event.getClickCount() == 2 && event.getButton() == MouseEvent.BUTTON1) {
+                    navigateToRelatedMethod();
+                }
+            }
+        });
     }
 
     /**
@@ -348,6 +410,23 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         openVersionComparisonButton.addActionListener(ignored -> openVersionComparison());
         copyCallChainButton.addActionListener(ignored -> copyCallChain());
         navigateSourceButton.addActionListener(ignored -> navigateToSource());
+        syncCurrentMethodButton.addActionListener(ignored -> refreshMethodAssistantFromEditor(true));
+        translateCommentButton.addActionListener(
+                ignored -> AtlasTranslationSupport.translateCurrentComment(project, true)
+        );
+        translationSettingsButton.addActionListener(
+                ignored -> AtlasTranslationSupport.openTranslationSettings(project)
+        );
+        followEditorCheckBox.addActionListener(ignored -> {
+            settings.followEditorForReading = followEditorCheckBox.isSelected();
+            if (followEditorCheckBox.isSelected()) {
+                scheduleMethodContextRefresh();
+            } else {
+                showMethodAssistant(topicList.getSelectedValue(), entryPointList.getSelectedValue(), false);
+            }
+        });
+        translateAfterNavigationCheckBox.addActionListener(ignored ->
+                settings.translateAfterSourceNavigation = translateAfterNavigationCheckBox.isSelected());
         resumeReadingButton.addActionListener(ignored -> continueReadingSession());
         previousEntryButton.addActionListener(ignored -> navigateToAdjacentEntry(-1));
         nextEntryButton.addActionListener(ignored -> navigateToAdjacentEntry(1));
@@ -399,6 +478,14 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         openVersionComparisonButton.setToolTipText("打开当前专题的 JDK 8 / 17 / 21 版本差异");
         copyCallChainButton.setToolTipText("复制当前专题按阅读顺序整理的源码调用链");
         navigateSourceButton.setToolTipText("跳转到项目或依赖中的源码类和方法");
+        syncCurrentMethodButton.setToolTipText("读取当前编辑器光标所在方法，但不切换手动选择的专题");
+        translateCommentButton.setToolTipText("翻译光标所在注释；不在注释中时翻译当前方法 Javadoc");
+        translationSettingsButton.setToolTipText("打开 Translation 插件的翻译引擎与目标语言设置");
+        translationStatusLabel.setToolTipText("翻译引擎和目标语言沿用 Translation 插件设置");
+        followEditorCheckBox.setToolTipText("光标切换方法时刷新当前方法讲解，不覆盖手动选择的专题");
+        translateAfterNavigationCheckBox.setToolTipText(AtlasTranslationSupport.isAvailable()
+                ? "Source Atlas 定位源码后自动翻译当前方法 Javadoc"
+                : "安装并启用 Translation 后可使用定位后自动翻译");
         resumeReadingButton.setToolTipText("恢复上次阅读的方法；首次阅读时从第一个入口开始");
         previousEntryButton.setToolTipText("定位调用链中的上一个源码入口");
         nextEntryButton.setToolTipText("定位调用链中的下一个源码入口");
@@ -438,6 +525,9 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         openVersionComparisonButton.setIcon(AllIcons.Actions.Diff);
         copyCallChainButton.setIcon(AllIcons.Actions.Copy);
         navigateSourceButton.setIcon(AtlasIcons.SOURCE);
+        syncCurrentMethodButton.setIcon(AllIcons.Actions.Refresh);
+        translateCommentButton.setIcon(AtlasIcons.DOCUMENTATION);
+        translationSettingsButton.setIcon(AllIcons.General.Settings);
         resumeReadingButton.setIcon(AllIcons.Actions.Resume);
         previousEntryButton.setIcon(AllIcons.Actions.Back);
         nextEntryButton.setIcon(AllIcons.Actions.Forward);
@@ -484,6 +574,9 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                 openVersionComparisonButton,
                 copyCallChainButton,
                 navigateSourceButton,
+                syncCurrentMethodButton,
+                translateCommentButton,
+                translationSettingsButton,
                 previousEntryButton,
                 nextEntryButton,
                 addAllBreakpointsButton,
@@ -1305,6 +1398,24 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     }
 
     /**
+     * 创建适合窄工具窗口的只读换行文本区。
+     *
+     * @param rows 建议展示行数
+     * @return 使用 IDEA 主题颜色的文本区
+     */
+    private static JBTextArea createReadingTextArea(int rows) {
+        JBTextArea area = new JBTextArea(rows, 1);
+        area.setEditable(false);
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        area.setOpaque(false);
+        area.setBorder(JBUI.Borders.empty(2, 0, 4, 0));
+        area.setFont(area.getFont().deriveFont(Font.PLAIN, 12f));
+        area.setForeground(UIUtil.getLabelForeground());
+        return area;
+    }
+
+    /**
      * 统一工作页中的区块标题字重与颜色，数量和进度会直接写入同一标签。
      *
      * @param label 区块标题
@@ -1356,9 +1467,21 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
      */
     private JComponent createEntryPointSection() {
         JPanel section = new JPanel(new BorderLayout(0, JBUI.scale(5)));
-        JPanel sectionHeader = new JPanel();
-        sectionHeader.setLayout(new javax.swing.BoxLayout(sectionHeader, javax.swing.BoxLayout.Y_AXIS));
-
+        // 2026-09-03：原逻辑把入口操作、方法操作和翻译选项全部放在共享页头，窄窗口下信息过密。
+        // JPanel sectionHeader = new JPanel();
+        // sectionHeader.setLayout(new javax.swing.BoxLayout(sectionHeader, javax.swing.BoxLayout.Y_AXIS));
+        // sectionHeader.add(createTabActionBar(resumeReadingButton, navigateSourceButton,
+        //         previousEntryButton, nextEntryButton, copyCallChainButton));
+        // sectionHeader.add(createTabActionBar(syncCurrentMethodButton, translateCommentButton,
+        //         translationSettingsButton));
+        // sectionHeader.add(followEditorCheckBox);
+        // sectionHeader.add(translateAfterNavigationCheckBox);
+        // sectionHeader.add(translationStatusLabel);
+        // section.add(sectionHeader, BorderLayout.NORTH);
+        entryPointList.getEmptyText().setText(emptyTextFor("关键源码入口"));
+        JPanel entryListPanel = new JPanel(new BorderLayout(0, JBUI.scale(4)));
+        JPanel entryHeader = new JPanel();
+        entryHeader.setLayout(new javax.swing.BoxLayout(entryHeader, javax.swing.BoxLayout.Y_AXIS));
         JComponent actionBar = createTabActionBar(
                 resumeReadingButton,
                 navigateSourceButton,
@@ -1367,20 +1490,116 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
                 copyCallChainButton
         );
         actionBar.setAlignmentX(Component.LEFT_ALIGNMENT);
-        sectionHeader.add(actionBar);
-        sectionHeader.add(javax.swing.Box.createVerticalStrut(JBUI.scale(6)));
+        entryHeader.add(actionBar);
+        entryHeader.add(javax.swing.Box.createVerticalStrut(JBUI.scale(4)));
         readingSessionLabel.setFont(readingSessionLabel.getFont().deriveFont(Font.BOLD, 13f));
         readingSessionLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        sectionHeader.add(readingSessionLabel);
-        sectionHeader.add(javax.swing.Box.createVerticalStrut(JBUI.scale(5)));
-
+        entryHeader.add(readingSessionLabel);
+        entryHeader.add(javax.swing.Box.createVerticalStrut(JBUI.scale(5)));
         configureSectionLabel(entrySectionLabel);
         entrySectionLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        sectionHeader.add(entrySectionLabel);
-        section.add(sectionHeader, BorderLayout.NORTH);
-        entryPointList.getEmptyText().setText(emptyTextFor("关键源码入口"));
-        section.add(new JBScrollPane(entryPointList), BorderLayout.CENTER);
+        entryHeader.add(entrySectionLabel);
+        entryListPanel.add(entryHeader, BorderLayout.NORTH);
+        entryListPanel.add(new JBScrollPane(entryPointList), BorderLayout.CENTER);
+
+        entryContentTabs.addTab("入口列表", entryListPanel);
+        entryContentTabs.addTab("当前方法", createMethodAssistantPanel());
+        entryContentTabs.setToolTipTextAt(0, "按调用链顺序选择关键源码入口");
+        entryContentTabs.setToolTipTextAt(1, "查看当前方法职责、执行过程、设计亮点和关联方法");
+        section.add(entryContentTabs, BorderLayout.CENTER);
         return section;
+    }
+
+    /**
+     * 创建当前方法的结构化讲解区域。
+     *
+     * @return 方法职责、过程、设计亮点、易错点和关联阅读列表
+     */
+    private JComponent createMethodAssistantPanel() {
+        JPanel page = new JPanel(new BorderLayout(0, JBUI.scale(6)));
+        JPanel assistantHeader = new JPanel();
+        assistantHeader.setLayout(new javax.swing.BoxLayout(assistantHeader, javax.swing.BoxLayout.Y_AXIS));
+        JComponent assistantActions = createTabActionBar(
+                syncCurrentMethodButton,
+                translateCommentButton,
+                translationSettingsButton
+        );
+        assistantActions.setAlignmentX(Component.LEFT_ALIGNMENT);
+        assistantHeader.add(assistantActions);
+
+        JPanel assistantOptions = new JPanel(new FlowLayout(FlowLayout.LEFT, JBUI.scale(6), 0));
+        assistantOptions.setAlignmentX(Component.LEFT_ALIGNMENT);
+        assistantOptions.add(followEditorCheckBox);
+        assistantOptions.add(translateAfterNavigationCheckBox);
+        assistantHeader.add(assistantOptions);
+        translationStatusLabel.setForeground(UIUtil.getLabelInfoForeground());
+        translationStatusLabel.setFont(translationStatusLabel.getFont().deriveFont(Font.PLAIN, 12f));
+        translationStatusLabel.setText(AtlasTranslationSupport.statusText());
+        translationStatusLabel.setBorder(JBUI.Borders.empty(1, 5, 2, 5));
+        translationStatusLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        assistantHeader.add(translationStatusLabel);
+        page.add(assistantHeader, BorderLayout.NORTH);
+
+        JPanel content = new JPanel();
+        content.setLayout(new javax.swing.BoxLayout(content, javax.swing.BoxLayout.Y_AXIS));
+        content.setBorder(JBUI.Borders.empty(8, 6, 10, 8));
+
+        currentMethodTitleLabel.setFont(currentMethodTitleLabel.getFont().deriveFont(Font.BOLD, 14f));
+        currentMethodTitleLabel.setIcon(AtlasIcons.SOURCE);
+        currentMethodTitleLabel.setIconTextGap(JBUI.scale(6));
+        currentMethodTitleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        content.add(currentMethodTitleLabel);
+        content.add(javax.swing.Box.createVerticalStrut(JBUI.scale(3)));
+
+        currentMethodLocationLabel.setForeground(UIUtil.getLabelInfoForeground());
+        currentMethodLocationLabel.setFont(currentMethodLocationLabel.getFont().deriveFont(Font.PLAIN, 12f));
+        currentMethodLocationLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        content.add(currentMethodLocationLabel);
+        content.add(javax.swing.Box.createVerticalStrut(JBUI.scale(10)));
+
+        content.add(createMethodExplanationBlock("方法职责", methodSummaryArea));
+        content.add(createMethodExplanationBlock("执行过程", methodProcessArea));
+        content.add(createMethodExplanationBlock("设计精妙", methodInsightArea));
+        content.add(createMethodExplanationBlock("容易误解", methodPitfallArea));
+
+        JBLabel relatedLabel = new JBLabel("关联阅读 · 双击定位");
+        relatedLabel.setFont(relatedLabel.getFont().deriveFont(Font.BOLD, 13f));
+        relatedLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        content.add(relatedLabel);
+        content.add(javax.swing.Box.createVerticalStrut(JBUI.scale(4)));
+        relatedMethodList.setVisibleRowCount(4);
+        relatedMethodList.getEmptyText().setText("当前方法暂未配置关联入口");
+        JBScrollPane relatedScrollPane = new JBScrollPane(relatedMethodList);
+        relatedScrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
+        relatedScrollPane.setPreferredSize(new Dimension(JBUI.scale(280), JBUI.scale(126)));
+        relatedScrollPane.setMaximumSize(new Dimension(Integer.MAX_VALUE, JBUI.scale(150)));
+        content.add(relatedScrollPane);
+
+        JBScrollPane scrollPane = new JBScrollPane(content);
+        scrollPane.setBorder(JBUI.Borders.empty());
+        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(JBUI.scale(12));
+        page.add(scrollPane, BorderLayout.CENTER);
+        return page;
+    }
+
+    /**
+     * 创建当前方法讲解中的一个无边框文字区块。
+     *
+     * @param title 区块标题
+     * @param area  可换行说明文本
+     * @return 可加入纵向布局的区块
+     */
+    private JComponent createMethodExplanationBlock(String title, JBTextArea area) {
+        JPanel block = new JPanel(new BorderLayout(0, JBUI.scale(2)));
+        block.setAlignmentX(Component.LEFT_ALIGNMENT);
+        block.setMaximumSize(new Dimension(Integer.MAX_VALUE, JBUI.scale(130)));
+        block.setBorder(JBUI.Borders.emptyBottom(8));
+        JBLabel label = new JBLabel(title);
+        label.setFont(label.getFont().deriveFont(Font.BOLD, 13f));
+        block.add(label, BorderLayout.NORTH);
+        block.add(area, BorderLayout.CENTER);
+        return block;
     }
 
     /**
@@ -1608,6 +1827,7 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
             actionHintLabel.setText("输入类名、方法名或专题名称开始搜索");
             refreshLearningSection(null);
             refreshReadingSession(null);
+            showMethodAssistant(null, null, false);
             refreshBreakpointObservation();
             updateNavigationTabTitles();
             updateActionState();
@@ -1765,6 +1985,226 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
         );
         refreshReadingSession(topic);
         updateNavigationTabTitles();
+    }
+
+    /**
+     * 监听编辑器光标和文件切换，只刷新当前方法讲解，不强制改变用户选择的专题。
+     */
+    private void configureEditorTracking() {
+        EditorFactory.getInstance().getEventMulticaster().addCaretListener(new CaretListener() {
+            /**
+             * 当前项目的光标移动后合并短时间内的连续事件。
+             *
+             * @param event 光标事件
+             */
+            @Override
+            public void caretPositionChanged(@NotNull CaretEvent event) {
+                if (project.equals(event.getEditor().getProject())) {
+                    scheduleMethodContextRefresh();
+                }
+            }
+        }, this);
+        project.getMessageBus().connect(this).subscribe(
+                FileEditorManagerListener.FILE_EDITOR_MANAGER,
+                new FileEditorManagerListener() {
+                    /**
+                     * 切换文件后重新识别当前方法，覆盖没有触发光标事件的编辑器切换场景。
+                     *
+                     * @param event 文件编辑器切换事件
+                     */
+                    @Override
+                    public void selectionChanged(@NotNull FileEditorManagerEvent event) {
+                        scheduleMethodContextRefresh();
+                    }
+                }
+        );
+    }
+
+    /**
+     * 对频繁光标事件进行防抖，避免每次移动都启动 PSI 解析。
+     */
+    private void scheduleMethodContextRefresh() {
+        if (!followEditorCheckBox.isSelected() || project.isDisposed()) {
+            return;
+        }
+        methodContextTimer.restart();
+    }
+
+    /**
+     * 在后台解析当前编辑器方法，并只更新阅读助手区域。
+     *
+     * @param force 是否忽略“跟随编辑器”开关，由手动同步按钮使用
+     */
+    private void refreshMethodAssistantFromEditor(boolean force) {
+        if (!force && !followEditorCheckBox.isSelected()) {
+            return;
+        }
+        // 2026-09-03：原 pending 开关会在解析期间丢弃最后一次光标变化，改由递增版本确保最新请求获胜。
+        // if (methodContextRefreshPending) {
+        //     return;
+        // }
+        // methodContextRefreshPending = true;
+        int generation = ++methodContextRefreshGeneration;
+        AtlasContextResolver.resolveAsync(project, index, this, latest -> {
+            if (generation == methodContextRefreshGeneration
+                    && (force || followEditorCheckBox.isSelected())) {
+                applyMethodAssistantContext(latest);
+            }
+        });
+    }
+
+    /**
+     * 将编辑器上下文映射到当前方法讲解，歧义类优先沿用用户已经选择的专题。
+     *
+     * @param latest 最新编辑器上下文
+     */
+    private void applyMethodAssistantContext(AtlasEditorContext latest) {
+        contextLabel.setText(latest.className() == null
+                ? "当前光标：未识别到 Java 类"
+                : "当前光标：" + latest.className()
+                + (latest.methodName() == null ? "" : "#" + latest.methodName()));
+
+        AtlasTopic topic = resolveMethodAssistantTopic(latest);
+        AtlasEntryPoint entryPoint = resolveMethodAssistantEntry(topic, latest);
+        showMethodAssistant(topic, entryPoint, true);
+        if (topic != null
+                && entryPoint != null
+                && sameTopic(topic, topicList.getSelectedValue())
+                && !entryPoint.equals(entryPointList.getSelectedValue())) {
+            entryPointList.setSelectedValue(entryPoint, true);
+        }
+    }
+
+    /**
+     * 解析当前方法所属专题；共享源码类不明确时仅使用用户当前选择，不主动切换专题。
+     *
+     * @param latest 编辑器上下文
+     * @return 当前版本专题；无法消歧时返回 null
+     */
+    private AtlasTopic resolveMethodAssistantTopic(AtlasEditorContext latest) {
+        if (latest == null) {
+            return null;
+        }
+        AtlasTopic selected = topicList.getSelectedValue();
+        AtlasTopic selectedCandidate = AtlasEditorContextSupport.availableTopics(latest).stream()
+                .filter(candidate -> sameTopic(candidate, selected))
+                .findFirst()
+                .orElse(null);
+        if (selectedCandidate != null) {
+            return selected;
+        }
+        if (latest.topic() != null) {
+            return resolveTopicVersion(latest.topic()).topic();
+        }
+        return latest.topicCandidates().size() == 1
+                ? resolveTopicVersion(latest.topicCandidates().getFirst()).topic()
+                : null;
+    }
+
+    /**
+     * 使用完整 PSI 签名在当前版本专题中匹配源码入口，避免同名重载串讲。
+     *
+     * @param topic  当前版本专题
+     * @param latest 编辑器上下文
+     * @return 精确匹配的入口；当前方法未收录时返回 null
+     */
+    private AtlasEntryPoint resolveMethodAssistantEntry(AtlasTopic topic, AtlasEditorContext latest) {
+        if (topic == null || latest == null || latest.className() == null || latest.methodName() == null) {
+            return null;
+        }
+        return AtlasMethodMatcher.findBestEntryPoint(
+                topic,
+                latest.className(),
+                latest.methodName(),
+                latest.methodSignature()
+        ).orElse(null);
+    }
+
+    /**
+     * 展示当前入口的方法职责、执行过程、设计亮点、易错点和关联方法。
+     *
+     * @param topic      当前专题
+     * @param entryPoint 当前入口
+     * @param fromEditor 是否来自编辑器光标跟随
+     */
+    private void showMethodAssistant(AtlasTopic topic, AtlasEntryPoint entryPoint, boolean fromEditor) {
+        methodAssistantTopic = topic;
+        relatedMethodModel.clear();
+        translationStatusLabel.setText(AtlasTranslationSupport.statusText());
+        if (topic == null || entryPoint == null) {
+            currentMethodTitleLabel.setText(fromEditor
+                    ? "当前方法：尚未收录或需要先选择专题"
+                    : "当前方法：等待选择源码入口");
+            currentMethodLocationLabel.setText(fromEditor
+                    ? "来源：当前编辑器光标"
+                    : "来源：入口列表");
+            methodSummaryArea.setText("选择入口，或把光标放到已经收录的 JDK / Spring 方法中。");
+            methodProcessArea.setText("");
+            methodInsightArea.setText("");
+            methodPitfallArea.setText("");
+            return;
+        }
+
+        AtlasMethodReading reading = AtlasMethodReadingResolver.resolve(topic, entryPoint);
+        currentMethodTitleLabel.setText("当前方法：" + entryPoint.method());
+        currentMethodTitleLabel.setToolTipText(entryPoint.effectiveSourceClass(topic) + "#" + entryPoint.method());
+        currentMethodLocationLabel.setText((fromEditor ? "来源：编辑器跟随" : "来源：入口列表")
+                + "  ·  " + entryPoint.effectiveSourceClass(topic)
+                + "  ·  " + topic.primaryVersion());
+        methodSummaryArea.setText(reading.summary());
+        methodProcessArea.setText(formatNumberedItems(reading.process()));
+        methodInsightArea.setText(formatBulletItems(reading.designInsights()));
+        methodPitfallArea.setText(formatBulletItems(reading.pitfalls()));
+        reading.relatedMethods().forEach(relatedMethodModel::addElement);
+    }
+
+    /**
+     * 把步骤集合格式化为紧凑的编号文本。
+     *
+     * @param items 步骤集合
+     * @return 多行编号文本
+     */
+    private String formatNumberedItems(List<String> items) {
+        StringBuilder text = new StringBuilder();
+        for (int index = 0; index < items.size(); index++) {
+            if (index > 0) {
+                text.append('\n');
+            }
+            text.append(index + 1).append(". ").append(items.get(index));
+        }
+        return text.toString();
+    }
+
+    /**
+     * 把观察项集合格式化为多行圆点文本。
+     *
+     * @param items 观察项
+     * @return 多行圆点文本
+     */
+    private String formatBulletItems(List<String> items) {
+        return items.stream().map(item -> "• " + item).collect(java.util.stream.Collectors.joining("\n"));
+    }
+
+    /**
+     * 双击关联方法后切换到对应入口并定位源码。
+     */
+    private void navigateToRelatedMethod() {
+        AtlasMethodRelation relation = relatedMethodList.getSelectedValue();
+        AtlasEntryPoint target = AtlasMethodReadingResolver.resolveRelatedEntry(
+                methodAssistantTopic,
+                relation
+        ).orElse(null);
+        if (methodAssistantTopic == null || target == null) {
+            Messages.showInfoMessage(project, "当前版本没有找到该关联方法入口。", "Java Source Atlas");
+            return;
+        }
+
+        if (!sameTopic(methodAssistantTopic, topicList.getSelectedValue())) {
+            navigateToTopic(methodAssistantTopic);
+        }
+        entryPointList.setSelectedValue(target, true);
+        entryContentTabs.setSelectedIndex(1);
+        navigateToSource();
     }
 
     /**
@@ -2929,6 +3369,10 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
             navigateSourceButton.setText("定位源码");
             if (navigated) {
                 recordEntryVisit(topic, entryPoint);
+                showMethodAssistant(topic, entryPoint, false);
+                entryContentTabs.setSelectedIndex(1);
+                scheduleMethodContextRefresh();
+                scheduleTranslationAfterNavigation();
             }
             updateActionState();
             if (!navigated) {
@@ -2942,12 +3386,31 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
     }
 
     /**
+     * 定位源码后等待编辑器完成切换，再按用户设置翻译当前方法注释。
+     */
+    private void scheduleTranslationAfterNavigation() {
+        if (!translateAfterNavigationCheckBox.isSelected() || !AtlasTranslationSupport.isAvailable()) {
+            return;
+        }
+        // 2026-09-03：原逻辑每次定位都创建独立计时器，连续导航可能触发多个翻译窗口。
+        // Timer translationTimer = new Timer(
+        //         450,
+        //         ignored -> AtlasTranslationSupport.translateCurrentComment(project, true)
+        // );
+        // translationTimer.setRepeats(false);
+        // translationTimer.start();
+        translationAfterNavigationTimer.restart();
+    }
+
+    /**
      * 工具窗口关闭时释放 JCEF 浏览器资源。
      */
     @Override
     public void dispose() {
         // 2026-08-26：持续跟随编辑器的计时器已经取消，不再需要在关闭时停止。
         // contextTimer.stop();
+        methodContextTimer.stop();
+        translationAfterNavigationTimer.stop();
         if (tutorialBrowser != null) {
             tutorialBrowser.dispose();
         }
@@ -3073,6 +3536,63 @@ public final class AtlasToolWindowPanel extends SimpleToolWindowPanel implements
             setBorder(JBUI.Borders.empty(6, 4));
             setToolTipText(value.label() + " · " + value.topic().title()
                     + " · " + StringUtil.notNullize(value.reason(), "沿学习关系继续阅读"));
+        }
+    }
+
+    /**
+     * 渲染关联方法的关系类型、方法签名和阅读原因。
+     */
+    private static final class RelatedMethodRenderer extends JPanel
+            implements ListCellRenderer<AtlasMethodRelation> {
+
+        private final JBLabel methodLabel = new JBLabel();
+        private final JBLabel reasonLabel = new JBLabel();
+
+        /**
+         * 创建两行关联方法渲染器。
+         */
+        private RelatedMethodRenderer() {
+            setLayout(new javax.swing.BoxLayout(this, javax.swing.BoxLayout.Y_AXIS));
+            setOpaque(true);
+            methodLabel.setFont(methodLabel.getFont().deriveFont(Font.BOLD, 12f));
+            methodLabel.setIcon(AllIcons.Nodes.Method);
+            methodLabel.setIconTextGap(JBUI.scale(6));
+            reasonLabel.setFont(reasonLabel.getFont().deriveFont(Font.PLAIN, 12f));
+            methodLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            reasonLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            add(methodLabel);
+            add(javax.swing.Box.createVerticalStrut(JBUI.scale(3)));
+            add(reasonLabel);
+            setBorder(JBUI.Borders.empty(6, 6));
+        }
+
+        /**
+         * 为关联方法展示关系标签和推荐理由。
+         *
+         * @param list     当前列表
+         * @param value    方法关系
+         * @param index    行号
+         * @param selected 是否选中
+         * @param hasFocus 是否拥有焦点
+         * @return 当前渲染组件
+         */
+        @Override
+        public Component getListCellRendererComponent(
+                @NotNull JList<? extends AtlasMethodRelation> list,
+                AtlasMethodRelation value,
+                int index,
+                boolean selected,
+                boolean hasFocus
+        ) {
+            methodLabel.setText(value.relation() + "  ·  " + value.method());
+            reasonLabel.setText(StringUtil.shortenTextWithEllipsis(value.reason(), 62, 0));
+            setToolTipText(value.relation() + " · " + value.method()
+                    + (value.reason().isBlank() ? "" : " · " + value.reason()));
+            setBackground(selected ? list.getSelectionBackground() : list.getBackground());
+            ColorPair colors = ColorPair.from(list, selected);
+            methodLabel.setForeground(colors.foreground());
+            reasonLabel.setForeground(colors.secondaryForeground());
+            return this;
         }
     }
 

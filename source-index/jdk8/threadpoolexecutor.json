@@ -75,7 +75,40 @@
     {
       "method": "execute(Runnable)",
       "document": "/jdk/concurrent/threadpoolexecutor/#execute-的三步决策",
-      "purpose": "建核心线程、入队复查、扩线程和拒绝的入口"
+      "purpose": "建核心线程、入队复查、扩线程和拒绝的入口",
+      "summary": "线程池提交任务的三阶段决策：优先补核心线程，其次入队并复查状态，最后尝试非核心线程；所有路径失败后才执行拒绝策略。",
+      "process": [
+        "读取 ctl；workerCount 小于 corePoolSize 时尝试 addWorker(command,true)。",
+        "线程池仍为 RUNNING 时调用 workQueue.offer 把任务入队。",
+        "入队成功后重新读取 ctl：若已关闭则移除任务并拒绝；若 workerCount 为 0 则补一个空首任务 Worker。",
+        "无法入队时调用 addWorker(command,false)，允许扩展到 maximumPoolSize。",
+        "新增 Worker 仍失败时调用 reject。"
+      ],
+      "designInsights": [
+        "线程池选择“核心线程优先、队列其次、最大线程最后”的顺序，使队列类型成为吞吐、延迟和最大并发度策略的一部分。",
+        "offer 成功后的二次 ctl 检查关闭了任务入队与 shutdown 并发发生时的接收窗口。"
+      ],
+      "pitfalls": [
+        "maximumPoolSize 只有在队列拒绝入队时才参与扩容；使用无界队列时通常不会创建超过 corePoolSize 的线程。",
+        "execute 本身不包装异常，任务抛出的 RuntimeException 可能导致 Worker 线程异常退出。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "addWorker(Runnable,boolean)",
+          "relation": "线程创建",
+          "reason": "第一阶段和第三阶段都通过它校验状态并预占 workerCount。"
+        },
+        {
+          "method": "remove(Runnable)",
+          "relation": "入队复查",
+          "reason": "任务入队后发现线程池关闭时，尝试撤回刚接收的任务。"
+        },
+        {
+          "method": "reject(Runnable)",
+          "relation": "失败出口",
+          "reason": "关闭、队列饱和或 Worker 上限共同导致接收失败时执行策略。"
+        }
+      ]
     },
     {
       "method": "remove(Runnable)",
@@ -85,7 +118,40 @@
     {
       "method": "addWorker(Runnable,boolean)",
       "document": "/jdk/concurrent/threadpoolexecutor/worker#addworker-的双层检查",
-      "purpose": "预占 workerCount，并在双层状态检查后创建启动线程"
+      "purpose": "预占 workerCount，并在双层状态检查后创建启动线程",
+      "summary": "先在无锁重试中校验线程池状态并 CAS 预占 workerCount，再进入 mainLock 创建、登记和启动真实线程；失败时统一回滚计数。",
+      "process": [
+        "外层循环检查 runState；SHUTDOWN 只允许为排空已有队列创建 firstTask=null 的 Worker。",
+        "内层循环比较 workerCount 与容量上限，并 CAS 增加 ctl 中的工作线程数。",
+        "构造 Worker 和 Thread，在 mainLock 内重新检查运行状态。",
+        "把 Worker 加入 workers，更新 largestPoolSize，再在锁外调用 Thread.start。",
+        "任一步失败都调用 addWorkerFailed 移除 Worker、递减计数并尝试终止。"
+      ],
+      "designInsights": [
+        "昂贵的 Thread 创建与启动被放在 workerCount 预占之后，多个提交线程先通过一个 ctl CAS 决定名额归属。",
+        "无锁状态检查和 mainLock 下二次检查分别保证吞吐与最终一致性。"
+      ],
+      "pitfalls": [
+        "workerCount 表示已经预占或存活的 Worker 数，不等同于 workers 集合在任意瞬间的 size。",
+        "SHUTDOWN 状态仍可能创建 firstTask=null 的 Worker，用于排空关闭前已经进入队列的任务。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "execute(Runnable)",
+          "relation": "调用者",
+          "reason": "提交策略根据核心线程和队列状态两次尝试创建 Worker。"
+        },
+        {
+          "method": "runWorker(Worker)",
+          "relation": "线程入口",
+          "reason": "Thread 启动后通过 Worker.run 进入任务获取与执行主循环。"
+        },
+        {
+          "method": "tryTerminate()",
+          "relation": "失败与关闭收口",
+          "reason": "创建失败回滚或 Worker 退出后都需要重新判断线程池能否终止。"
+        }
+      ]
     },
     {
       "method": "Worker.tryAcquire(int)",
@@ -95,12 +161,77 @@
     {
       "method": "runWorker(Worker)",
       "document": "/jdk/concurrent/threadpoolexecutor/worker#runworker-主循环",
-      "purpose": "持有 Worker 锁运行任务，并调用模板钩子和处理异常"
+      "purpose": "持有 Worker 锁运行任务，并调用模板钩子和处理异常",
+      "summary": "Worker 线程的执行主循环：消费 firstTask 或 getTask 返回的任务，以 Worker 不可重入锁标记忙碌状态，并在模板钩子之间运行用户代码。",
+      "process": [
+        "取出 firstTask 后清空字段，并调用 unlock 允许后续 shutdown 中断空闲 Worker。",
+        "只要当前 task 非空或 getTask 能取得任务，就进入执行循环。",
+        "获取 Worker 锁，按线程池状态修正线程中断标记。",
+        "依次调用 beforeExecute、task.run 和 afterExecute，并区分 RuntimeException、Error、Throwable。",
+        "finally 中清空 task、累计 completedTasks 并释放 Worker 锁；循环退出后调用 processWorkerExit。"
+      ],
+      "designInsights": [
+        "Worker 自身既是 Runnable，又用 AQS 实现不可重入锁；线程池由此能区分正在执行任务和可被关闭流程中断的空闲线程。",
+        "beforeExecute/afterExecute/terminated 组成模板方法扩展点，允许监控与上下文传递而不复制线程池调度骨架。"
+      ],
+      "pitfalls": [
+        "afterExecute 的 Throwable 对 submit 提交的 FutureTask 通常为 null，业务异常被封装在 Future 中，需要显式 get 才能观察。",
+        "task.run 异常会穿出循环并令 completedAbruptly=true，退出清理可能补建替代 Worker。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "getTask()",
+          "relation": "任务来源",
+          "reason": "决定 Worker 阻塞等待、超时回收或因关闭状态退出。"
+        },
+        {
+          "method": "Worker.tryAcquire(int)",
+          "relation": "忙闲标记",
+          "reason": "不可重入锁让 interruptIdleWorkers 只中断未执行任务的 Worker。"
+        },
+        {
+          "method": "processWorkerExit(Worker,boolean)",
+          "relation": "退出收口",
+          "reason": "主循环结束后清理集合、统计并决定是否补充线程。"
+        }
+      ]
     },
     {
       "method": "getTask()",
       "document": "/jdk/concurrent/threadpoolexecutor/worker#gettask-如何决定回收线程",
-      "purpose": "根据状态、超时配置和队列决定阻塞获取或回收 Worker"
+      "purpose": "根据状态、超时配置和队列决定阻塞获取或回收 Worker",
+      "summary": "把关闭状态、队列是否为空、核心线程超时策略和最小存活线程数合并为一次循环决策，返回任务或让当前 Worker 退出。",
+      "process": [
+        "线程池达到 STOP，或 SHUTDOWN 且队列为空时递减 workerCount 并返回 null。",
+        "根据 allowCoreThreadTimeOut 和 workerCount>corePoolSize 计算 timed。",
+        "线程超上限，或上次定时获取已超时且仍可保留至少一个队列消费者时，CAS 递减 workerCount 后退出。",
+        "timed=true 使用 poll(keepAliveTime)，否则使用 take 无限等待。",
+        "poll 返回 null 时记录 timedOut 并重试；中断只清除超时标记后重新判断状态。"
+      ],
+      "designInsights": [
+        "线程回收不是单独定时任务，而是 Worker 在取任务失败后竞争递减 ctl；因此容量状态始终与 Worker 生命周期在同一原子协议中维护。"
+      ],
+      "pitfalls": [
+        "队列非空且 workerCount 为 1 时不会因超时退出最后一个消费者，否则关闭前任务可能永远无人处理。",
+        "返回 null 表示当前 Worker 应退出，不表示整个线程池已经终止。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "runWorker(Worker)",
+          "relation": "调用者",
+          "reason": "每轮任务执行完成后再次调用 getTask 决定等待还是结束主循环。"
+        },
+        {
+          "method": "allowCoreThreadTimeOut(boolean)",
+          "relation": "策略开关",
+          "reason": "决定核心 Worker 是否也使用 keepAliveTime 定时等待。"
+        },
+        {
+          "method": "tryTerminate()",
+          "relation": "退出后续",
+          "reason": "Worker 数量下降后，退出清理会重新检查关闭状态是否可以收口。"
+        }
+      ]
     },
     {
       "method": "processWorkerExit(Worker,boolean)",
@@ -130,7 +261,38 @@
     {
       "method": "tryTerminate()",
       "document": "/jdk/concurrent/threadpoolexecutor/shutdown-reject#tryterminate-如何收口",
-      "purpose": "从 SHUTDOWN 或 STOP 推进到 TIDYING 与 TERMINATED"
+      "purpose": "从 SHUTDOWN 或 STOP 推进到 TIDYING 与 TERMINATED",
+      "summary": "线程池生命周期的统一收口循环：确认状态允许且任务已排空，再唤醒剩余空闲 Worker；最后由唯一线程推进 TIDYING、执行 terminated 钩子并发布 TERMINATED。",
+      "process": [
+        "RUNNING、已经 TIDYING/TERMINATED，或 SHUTDOWN 但队列非空时直接返回。",
+        "仍有 Worker 时只中断一个空闲线程，让退出链逐步传播。",
+        "workerCount 为 0 时获取 mainLock，并 CAS 把 ctl 推进到 TIDYING。",
+        "调用 terminated 模板钩子，finally 中写入 TERMINATED 并 signalAll termination 条件。"
+      ],
+      "designInsights": [
+        "终止权由 ctl CAS 决定，确保 terminated 只由一个线程执行；条件变量只负责通知 awaitTermination 等待者。",
+        "每次只唤醒一个空闲 Worker，避免关闭阶段一次中断全部等待线程形成竞争风暴。"
+      ],
+      "pitfalls": [
+        "SHUTDOWN 不等于 TERMINATED，队列任务和 Worker 必须全部结束后才能进入最终状态。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "shutdown()",
+          "relation": "有序关闭入口",
+          "reason": "推进 SHUTDOWN 并中断空闲 Worker，随后由各退出路径反复调用 tryTerminate。"
+        },
+        {
+          "method": "shutdownNow()",
+          "relation": "立即关闭入口",
+          "reason": "推进 STOP、尝试中断全部 Worker 并排出尚未执行的队列任务。"
+        },
+        {
+          "method": "terminated()",
+          "relation": "最终钩子",
+          "reason": "唯一进入 TIDYING 的线程在发布 TERMINATED 前执行。"
+        }
+      ]
     },
     {
       "method": "beforeExecute(Thread,Runnable)",

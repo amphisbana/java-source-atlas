@@ -54,32 +54,182 @@
     {
       "method": "put(K,V)",
       "document": "/jdk/collections/hashmap/put",
-      "purpose": "公开写入入口"
+      "purpose": "公开写入入口",
+      "summary": "把 key 的原始 hash 经过高位扰动后交给 putVal；自身不处理桶冲突，只负责固定普通 put 的覆盖与驱逐语义。",
+      "process": [
+        "调用 hash(key)，让高 16 位信息参与低位桶索引计算，并为 null key 返回 0。",
+        "把 onlyIfAbsent=false、evict=true 与键值一起交给 putVal。",
+        "返回 putVal 给出的旧值，从而兑现 Map.put 的返回值契约。"
+      ],
+      "designInsights": [
+        "公开 API 与结构修改主流程分离，使 putIfAbsent、反序列化和子类能够复用同一写入协议。"
+      ],
+      "pitfalls": [
+        "hash(key) 只是扰动并缓存 hash，不决定最终桶位置；桶索引要等 table 长度确定后才能计算。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "putVal(int,K,V,boolean,boolean)",
+          "relation": "委派主流程",
+          "reason": "真正的桶定位、覆盖、碰撞处理和扩容判断都在这里完成。"
+        }
+      ]
     },
     {
       "method": "putVal(int,K,V,boolean,boolean)",
       "document": "/jdk/collections/hashmap/put#putval-的五个阶段",
-      "purpose": "桶定位、覆盖、碰撞与新增主流程"
+      "purpose": "桶定位、覆盖、碰撞与新增主流程",
+      "summary": "HashMap 写入协议的核心：先保证 table 可用，再区分空桶、同 key、红黑树和普通链表，最后统一维护访问回调与扩容阈值。",
+      "process": [
+        "table 为空时先调用 resize 完成首次分配，再用 (n - 1) & hash 定位桶。",
+        "空桶直接创建节点；桶首命中同 key 时准备覆盖旧值。",
+        "树桶交给 putTreeVal；链表则向后查找同 key，并在尾部追加新节点。",
+        "链表长度达到阈值时调用 treeifyBin，但容量不足 64 时仍优先扩容。",
+        "新增节点后递增 modCount 和 size；超过 threshold 再调用 resize，并执行 afterNodeInsertion 回调。"
+      ],
+      "designInsights": [
+        "把多种冲突结构压缩进同一个桶协议，同时用 newNode、afterNodeAccess、afterNodeInsertion 等 Hook 支撑 LinkedHashMap 扩展。",
+        "覆盖旧值与新增节点分开收口，因此 size、modCount 和扩容只发生在真正插入时。"
+      ],
+      "pitfalls": [
+        "binCount 表示遍历链表时已经经过的边数量，不是插入完成后的精确节点数。",
+        "onlyIfAbsent 控制是否覆盖已有值；evict 是 LinkedHashMap 回调语义，不代表 HashMap 主动淘汰。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "resize()",
+          "relation": "容量协作者",
+          "reason": "table 未初始化或新增后超过阈值时进入容量分配与节点迁移。"
+        },
+        {
+          "method": "treeifyBin(Node[],int)",
+          "relation": "冲突结构转换",
+          "reason": "长链表是否树化还要结合当前 table 容量判断。"
+        },
+        {
+          "method": "getNode(int,Object)",
+          "relation": "对照阅读",
+          "reason": "读取路径复用相同的桶首、链表和树节点查找顺序。"
+        }
+      ]
     },
     {
       "method": "resize()",
       "document": "/jdk/collections/hashmap/resize",
-      "purpose": "首次分配、容量扩张和节点迁移"
+      "purpose": "首次分配、容量扩张和节点迁移",
+      "summary": "同时承担首次创建 table 和容量翻倍迁移；扩容时利用旧容量对应的 hash 位，把原链表稳定拆成低位链与高位链。",
+      "process": [
+        "根据 oldCap、oldThr 和最大容量边界计算 newCap 与 newThr。",
+        "创建新 table 并立即发布到字段，再逐桶迁移旧节点。",
+        "单节点直接重算新索引，树桶交给 TreeNode.split。",
+        "普通链表按 (e.hash & oldCap) 是否为 0 拆成 lo/hi 两条链，并保持各自原有顺序。",
+        "低位链留在 j，高位链移动到 j + oldCap，完成后旧桶引用被清空。"
+      ],
+      "designInsights": [
+        "容量始终为 2 的幂，因此翻倍后索引只新增一个有效二进制位；检查 hash & oldCap 即可完成迁移，无需重新计算完整 hash。",
+        "稳定拆链保持了每条新链的原顺序，既减少指针操作，也避免 JDK 7 头插迁移可能形成环的问题。"
+      ],
+      "pitfalls": [
+        "resize 既可能扩容，也可能只是首次分配；看到调用点时必须结合 oldCap 与 oldThr 判断。",
+        "threshold 是下一次扩容阈值而不是容量，通常等于 capacity × loadFactor。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "putVal(int,K,V,boolean,boolean)",
+          "relation": "触发者",
+          "reason": "首次写入和 size 超过 threshold 都由 putVal 触发 resize。"
+        },
+        {
+          "method": "treeifyBin(Node[],int)",
+          "relation": "容量边界",
+          "reason": "长链表在容量不足 64 时不会树化，而是再次通过 resize 分散冲突。"
+        }
+      ]
     },
     {
       "method": "treeifyBin(Node[],int)",
       "document": "/jdk/collections/hashmap/treeify#treeifybin-并不总是树化",
-      "purpose": "扩容优先判断与链表树化"
+      "purpose": "扩容优先判断与链表树化",
+      "summary": "在冲突链过长时决定扩容还是树化；只有 table 容量至少为 64，才把普通 Node 链转换为 TreeNode 双向链并建立红黑树。",
+      "process": [
+        "table 为空或容量小于 MIN_TREEIFY_CAPACITY 时直接调用 resize。",
+        "逐个把普通节点替换为 TreeNode，并建立 prev/next 双向链。",
+        "调用 TreeNode.treeify 按 hash、Comparable 或 tieBreakOrder 建立红黑树。"
+      ],
+      "designInsights": [
+        "先扩容后树化体现了成本分层：能够通过更多桶降低冲突时，不急于引入红黑树的对象和维护成本。"
+      ],
+      "pitfalls": [
+        "TREEIFY_THRESHOLD 达到 8 不代表一定树化，容量不足 64 时仍会扩容。",
+        "TreeNode 同时保留 next/prev 链接，树结构并没有替代桶内迭代顺序。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "putVal(int,K,V,boolean,boolean)",
+          "relation": "触发者",
+          "reason": "链表追加时根据 binCount 判断是否进入树化检查。"
+        },
+        {
+          "method": "resize()",
+          "relation": "优先分支",
+          "reason": "容量不足时扩容比树化更可能从根源上降低桶冲突。"
+        }
+      ]
     },
     {
       "method": "getNode(int,Object)",
       "document": "/jdk/collections/hashmap/read-remove#get-与-getnode",
-      "purpose": "桶首、链表与树查询"
+      "purpose": "桶首、链表与树查询",
+      "summary": "按 hash 和 key 从目标桶读取节点，依次尝试桶首、树查找和普通链表遍历，返回节点而不是直接返回 value。",
+      "process": [
+        "确认 table 与目标桶非空，先比较桶首节点的 hash 和 key。",
+        "桶首未命中且存在后继时，TreeNode 交给 getTreeNode。",
+        "普通链表逐节点同时比较 hash 与 equals，直到命中或到达链尾。"
+      ],
+      "designInsights": [
+        "返回 Node 让 get、containsKey 以及需要节点身份的内部逻辑共享一次查找结果。",
+        "先查桶首优化了无冲突和近期插入节点这一最常见路径。"
+      ],
+      "pitfalls": [
+        "key 相等需要 hash 相等并满足引用相同或 equals；只比较 equals 不是源码真实条件。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "putVal(int,K,V,boolean,boolean)",
+          "relation": "结构对照",
+          "reason": "写入和读取对桶首、树桶与链表采用相同的结构分流。"
+        },
+        {
+          "method": "removeNode(int,Object,Object,boolean,boolean)",
+          "relation": "查找复用",
+          "reason": "删除先按相同规则找到节点，再根据节点位置修改桶结构。"
+        }
+      ]
     },
     {
       "method": "removeNode(int,Object,Object,boolean,boolean)",
       "document": "/jdk/collections/hashmap/read-remove#remove-的四个关键参数",
-      "purpose": "按键或键值组合删除节点"
+      "purpose": "按键或键值组合删除节点",
+      "summary": "统一支持 remove(key)、remove(key,value) 及内部删除语义；先定位节点，再按树节点、桶首或链表中间节点分别断链。",
+      "process": [
+        "按 hash 与 key 在桶首、树或链表中定位目标节点，并保留前驱引用。",
+        "matchValue=true 时继续校验节点 value，避免条件删除误删。",
+        "根据节点类型和位置调用 removeTreeNode、替换桶首或修改前驱 next。",
+        "删除成功后递增 modCount、递减 size，并调用 afterNodeRemoval。"
+      ],
+      "designInsights": [
+        "用 matchValue 和 movable 参数把多个公开 API 与 LinkedHashMap/树节点边界统一到一个删除协议。"
+      ],
+      "pitfalls": [
+        "movable=false 会影响红黑树删除后的根节点移动，常用于迭代器删除以保持遍历状态。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "getNode(int,Object)",
+          "relation": "查找对照",
+          "reason": "先理解相同的桶内定位顺序，再关注删除特有的断链与回调。"
+        }
+      ]
     }
   ],
   "evidence": [

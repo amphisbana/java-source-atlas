@@ -12,7 +12,7 @@ val minimumIdeaVersion = "2024.2.5"
 val maximumIdeaVersion = "2026.2"
 
 group = "io.github.java-source-atlas"
-version = "0.2.11"
+version = "0.2.12"
 
 repositories {
     mavenCentral()
@@ -111,12 +111,12 @@ intellijPlatform {
 
         changeNotes = """
             <ul>
-              <li>JDK 专题根据项目 JDK 8、17 或 21 自动切换固定源码 Tag、模块路径、入口签名和推荐断点。</li>
-              <li>命中 Atlas 断点后自动定位源码，记录已验证证据和实际调用路径。</li>
-              <li>新增“添加下一断点并继续”，可连续完成引导式源码调试。</li>
-              <li>Debug 结束后可复制包含断点、证据、结论和源码位置的 Markdown 摘要。</li>
-              <li>复用用户已有断点时保留调试引导，并确保 Atlas 清理操作不会删除用户断点。</li>
-              <li>新增真实 IDEA Project、Java PSI 与 XDebugger 端到端测试，并覆盖全部 JDK 专题版本矩阵。</li>
+              <li>新增“当前方法”阅读助手，展示方法职责、执行过程、设计精妙、易错边界和关联方法。</li>
+              <li>关联方法支持双击定位源码，并根据项目 JDK 版本同步适配方法签名。</li>
+              <li>支持调用 Translation 插件翻译源码注释或方法 Javadoc，缺少插件时提供安装引导。</li>
+              <li>支持跟随编辑器光标刷新讲解和定位源码后自动翻译，不覆盖用户手动选择的专题。</li>
+              <li>优化窄工具窗口布局，将入口导航与当前方法操作拆分到对应子页签。</li>
+              <li>补充 HashMap、ConcurrentHashMap、AQS、ThreadPoolExecutor 和 Spring IoC 主干方法讲解。</li>
             </ul>
         """.trimIndent()
     }

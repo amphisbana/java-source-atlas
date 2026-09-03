@@ -172,22 +172,131 @@
     {
       "method": "AbstractQueuedSynchronizer.acquire(int)",
       "document": "/jdk/concurrent/locks/aqs#acquire-的短路径与慢路径",
-      "purpose": "独占尝试失败后的入队和等待"
+      "purpose": "独占尝试失败后的入队和等待",
+      "summary": "AQS 独占获取的模板入口：子类先尝试一次快速获取，失败才创建队列节点并进入可阻塞、不可中断的排队流程。",
+      "process": [
+        "调用子类 tryAcquire，成功时完全不创建节点。",
+        "失败后通过 addWaiter 创建 EXCLUSIVE 节点并加入同步队列。",
+        "调用 acquireQueued 在队首后继位置反复尝试获取，必要时 park。",
+        "等待期间发生过中断时，在最终获取成功后通过 selfInterrupt 恢复中断标记。"
+      ],
+      "designInsights": [
+        "AQS 不定义锁语义，只固定排队、阻塞与唤醒骨架；state 的含义和 tryAcquire 成功条件完全交给子类。",
+        "先走无队列短路径，让无竞争获取只付出一次子类 CAS 成本。"
+      ],
+      "pitfalls": [
+        "acquire 不会因中断退出等待，但不会吞掉中断：成功返回前会重新设置当前线程中断标记。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "addWaiter(Node)",
+          "relation": "入队阶段",
+          "reason": "快速获取失败后先建立同步队列节点。"
+        },
+        {
+          "method": "acquireQueued(Node,int)",
+          "relation": "等待阶段",
+          "reason": "节点只有成为 head 的直接后继时才有资格再次竞争。"
+        },
+        {
+          "method": "release(int)",
+          "relation": "释放对照",
+          "reason": "完全释放后由 head 唤醒后继，推动获取链继续前进。"
+        }
+      ]
     },
     {
       "method": "addWaiter(Node)",
       "document": "/jdk/concurrent/locks/aqs#addwaiter-与-enq",
-      "purpose": "同步队列快速尾插"
+      "purpose": "同步队列快速尾插",
+      "summary": "先尝试一次无循环的 CAS 尾插；队列尚未初始化或并发竞争失败时，再进入 enq 自旋完成初始化和可靠入队。",
+      "process": [
+        "用当前线程和指定模式创建 Node。",
+        "读取 tail；非空时先写 node.prev=tail，再 CAS 把 tail 指向新节点。",
+        "CAS 成功后补写旧 tail.next=node，形成双向链接。",
+        "快速路径失败时进入 enq，直到初始化空 head 或尾插成功。"
+      ],
+      "designInsights": [
+        "常见情况下只需一次 CAS；低频的初始化与竞争失败由 enq 循环兜底，兼顾短路径和可靠性。",
+        "先发布 prev 再 CAS tail，使并发线程始终能从尾部向前找到已入队节点。"
+      ],
+      "pitfalls": [
+        "CAS tail 成功到 pred.next 写入之间存在短暂窗口，因此 AQS 的唤醒逻辑必要时会从 tail 反向查找有效后继。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "AbstractQueuedSynchronizer.acquire(int)",
+          "relation": "调用者",
+          "reason": "独占快速获取失败后创建并排入 EXCLUSIVE 节点。"
+        },
+        {
+          "method": "acquireQueued(Node,int)",
+          "relation": "后续等待",
+          "reason": "入队完成后开始判断前驱状态、park 和重试获取。"
+        }
+      ]
     },
     {
       "method": "acquireQueued(Node,int)",
       "document": "/jdk/concurrent/locks/aqs#acquire-的短路径与慢路径",
-      "purpose": "队首后继重试、阻塞与中断记录"
+      "purpose": "队首后继重试、阻塞与中断记录",
+      "summary": "AQS 独占等待循环：只有 head 的直接后继可以调用 tryAcquire；其余节点先整理前驱状态，再安全 park，直到获取成功或异常取消。",
+      "process": [
+        "读取有效前驱；若前驱是 head，则调用 tryAcquire 再竞争一次。",
+        "获取成功后把当前节点设为新 head，并断开旧 head.next 帮助回收。",
+        "未成功时通过 shouldParkAfterFailedAcquire 把前驱 waitStatus 建立为 SIGNAL，或跳过已取消节点。",
+        "确认唤醒责任已经建立后调用 parkAndCheckInterrupt，并累计中断事实。",
+        "异常退出时在 finally 中调用 cancelAcquire 修复队列链接。"
+      ],
+      "designInsights": [
+        "把竞争资格限制为 head 的直接后继，避免所有等待线程被唤醒后同时争抢形成惊群。",
+        "先建立 SIGNAL 再 park，关闭了释放线程已经检查完状态而当前线程尚未休眠的丢失唤醒窗口。"
+      ],
+      "pitfalls": [
+        "waitStatus 属于节点，但 SIGNAL 表达的是前驱对后继的唤醒责任，不能理解成当前节点已经收到信号。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "addWaiter(Node)",
+          "relation": "前置入队",
+          "reason": "等待循环依赖已经建立的 prev 链和稳定队列位置。"
+        },
+        {
+          "method": "release(int)",
+          "relation": "唤醒来源",
+          "reason": "释放线程通过 unparkSuccessor 唤醒同步队列中的有效后继。"
+        }
+      ]
     },
     {
       "method": "release(int)",
       "document": "/jdk/concurrent/locks/aqs#release-流程",
-      "purpose": "完全释放后唤醒有效后继"
+      "purpose": "完全释放后唤醒有效后继",
+      "summary": "调用子类 tryRelease 修改同步状态；只有达到完全释放条件时，才检查 head 并唤醒同步队列中的有效后继。",
+      "process": [
+        "调用 tryRelease(arg)，由子类判断本次释放是否让同步器真正可获取。",
+        "未完全释放时直接返回 false，例如可重入锁仍有剩余持有次数。",
+        "完全释放后读取 head；队列存在且 head.waitStatus 非 0 时调用 unparkSuccessor。",
+        "返回 true 表示本次释放触发了同步器可用状态。"
+      ],
+      "designInsights": [
+        "把“状态是否完全释放”交给子类，AQS 只在状态转换完成后执行通用唤醒协议，因此同一骨架能承载重入锁等不同语义。"
+      ],
+      "pitfalls": [
+        "release 返回 true 不代表后继线程已经获得锁，只代表已经完成释放并发出了继续竞争的机会。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "acquireQueued(Node,int)",
+          "relation": "被唤醒者",
+          "reason": "等待线程醒来后仍需确认自己是 head 后继并重新执行 tryAcquire。"
+        },
+        {
+          "method": "AbstractQueuedSynchronizer.acquire(int)",
+          "relation": "获取对照",
+          "reason": "把快速获取、排队等待和完全释放串成完整独占协议。"
+        }
+      ]
     },
     {
       "method": "AbstractQueuedSynchronizer.acquireShared(int)",
@@ -237,7 +346,34 @@
     {
       "method": "ConditionObject.await()",
       "document": "/jdk/concurrent/locks/condition#await-的完整流程",
-      "purpose": "进入条件队列、完全释放并重新获取"
+      "purpose": "进入条件队列、完全释放并重新获取",
+      "summary": "把当前线程从持锁执行者转换为条件等待者：先加入条件队列并完全释放同步状态，被 signal 转移到同步队列后还必须重新竞争原锁。",
+      "process": [
+        "检测中断并通过 addConditionWaiter 把节点加入条件队列。",
+        "调用 fullyRelease 保存原 state 并完全释放锁。",
+        "节点尚未进入同步队列时循环 park，并根据中断模式决定抛出或补中断。",
+        "进入同步队列后调用 acquireQueued(savedState) 恢复原持有状态。",
+        "清理已取消条件节点，并按中断模式报告结果。"
+      ],
+      "designInsights": [
+        "条件队列只负责等待某个业务条件，signal 不直接授予锁，而是把节点转移回统一的同步队列重新遵守锁竞争顺序。"
+      ],
+      "pitfalls": [
+        "await 会完全释放可重入次数，返回前再恢复到原 state；不能只把它理解成一次 unlock 与一次 lock。",
+        "signal 之后线程通常不能立即继续执行，它还要等待当前持锁线程释放并在同步队列重新获取。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "transferForSignal(Node)",
+          "relation": "signal 转移",
+          "reason": "把条件节点从 CONDITION 状态转换并追加到同步队列。"
+        },
+        {
+          "method": "acquireQueued(Node,int)",
+          "relation": "重新获取",
+          "reason": "节点转回同步队列后恢复 await 前保存的独占 state。"
+        }
+      ]
     },
     {
       "method": "transferForSignal(Node)",

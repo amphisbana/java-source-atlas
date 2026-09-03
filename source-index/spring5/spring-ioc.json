@@ -102,22 +102,155 @@
     {
       "method": "AbstractApplicationContext.refresh()",
       "document": "/spring/ioc/refresh",
-      "purpose": "编排上下文准备、工厂扩展、单例预实例化与刷新完成"
+      "purpose": "编排上下文准备、工厂扩展、单例预实例化与刷新完成",
+      "summary": "Spring 容器启动的总模板：在 startupShutdownMonitor 保护下依次准备上下文、刷新 BeanFactory、调用扩展点、注册基础设施并预实例化单例，失败时统一销毁和复位状态。",
+      "process": [
+        "prepareRefresh 初始化启动时间、active/closed 标记、Environment 和早期事件集合。",
+        "obtainFreshBeanFactory 创建或刷新内部 BeanFactory，并加载 BeanDefinition。",
+        "prepareBeanFactory 注册类加载器、表达式解析器、环境依赖和基础 BeanPostProcessor。",
+        "依次执行 postProcessBeanFactory、invokeBeanFactoryPostProcessors 和 registerBeanPostProcessors。",
+        "初始化消息源、事件广播器、子类特殊 Bean，并注册监听器。",
+        "finishBeanFactoryInitialization 冻结配置并预实例化非懒加载单例，最后 finishRefresh 发布完成事件。",
+        "任意异常都会 destroyBeans、cancelRefresh 后重新抛出，finally 清理公共反射缓存。"
+      ],
+      "designInsights": [
+        "refresh 是模板方法与扩展点编排器：固定不可颠倒的生命周期骨架，同时把容器差异留给子类 Hook、BeanFactoryPostProcessor 和 BeanPostProcessor。",
+        "扩展处理器分阶段执行，确保修改 BeanDefinition 的逻辑发生在普通 Bean 实例化之前。"
+      ],
+      "pitfalls": [
+        "refresh 不等同于创建所有 Bean；懒加载、非单例和某些 FactoryBean 产品会在后续真正请求时创建。",
+        "BeanFactoryPostProcessor 修改的是定义元数据，BeanPostProcessor 处理的是实例，两者执行时机完全不同。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(...)",
+          "relation": "定义扩展阶段",
+          "reason": "Bean 实例化前先允许注册和修改 BeanDefinition。"
+        },
+        {
+          "method": "AbstractBeanFactory.doGetBean(String,Class,Object[],boolean)",
+          "relation": "实例获取主线",
+          "reason": "预实例化单例最终会进入统一的 Bean 获取与创建协议。"
+        },
+        {
+          "method": "ConfigurationClassPostProcessor.processConfigBeanDefinitions(BeanDefinitionRegistry)",
+          "relation": "配置解析",
+          "reason": "@Configuration、@ComponentScan 和 @Import 在工厂后处理阶段扩展定义图。",
+          "sourceClass": "org.springframework.context.annotation.ConfigurationClassPostProcessor"
+        }
+      ]
     },
     {
       "method": "AbstractBeanFactory.doGetBean(String,Class,Object[],boolean)",
       "document": "/spring/ioc/bean-creation",
-      "purpose": "处理名称、缓存、父工厂、作用域和 FactoryBean 适配"
+      "purpose": "处理名称、缓存、父工厂、作用域和 FactoryBean 适配",
+      "summary": "Spring 获取 Bean 的统一算法：规范化名称并先查单例缓存，未命中时合并定义、解析依赖和作用域，再把普通实例或 FactoryBean 产品适配为调用者期望的对象。",
+      "process": [
+        "通过 transformedBeanName 去掉 & 前缀并解析别名，得到规范 beanName。",
+        "无显式参数时先调用 getSingleton(beanName) 查询三级缓存；命中后交给 getObjectForBeanInstance 处理 FactoryBean。",
+        "检查当前 Bean 是否正在创建，并在本工厂没有定义时委派父 BeanFactory。",
+        "取得合并后的 RootBeanDefinition，校验抽象状态并先初始化 dependsOn 依赖。",
+        "singleton 通过 getSingleton(beanName,ObjectFactory) 创建，prototype 维护创建前后标记，自定义 scope 委派 Scope.get。",
+        "最后处理 FactoryBean 产品与 requiredType 类型转换。"
+      ],
+      "designInsights": [
+        "名称规范、作用域、循环依赖缓存和 FactoryBean 解引用在一个入口收口，使 getBean 的各种重载共享完全一致的对象语义。",
+        "把创建动作作为 ObjectFactory 传给单例注册表，缓存协议无需依赖具体 Bean 创建实现。"
+      ],
+      "pitfalls": [
+        "&beanName 请求的是 FactoryBean 实例本身，普通 beanName 请求的是它生产的对象。",
+        "三级缓存只解决允许提前暴露的单例依赖环，prototype 循环依赖会直接失败。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "DefaultSingletonBeanRegistry.getSingleton(String,boolean)",
+          "relation": "缓存快路径",
+          "reason": "先查完整单例，并在创建期间按需取得早期引用。"
+        },
+        {
+          "method": "AbstractAutowireCapableBeanFactory.doCreateBean(String,RootBeanDefinition,Object[])",
+          "relation": "创建委派",
+          "reason": "单例、原型或自定义作用域确认需要新实例时进入完整 Bean 生命周期。"
+        },
+        {
+          "method": "FactoryBeanRegistrySupport.getObjectFromFactoryBean(...)",
+          "relation": "产品适配",
+          "reason": "普通名称命中 FactoryBean 时取得并按单例规则缓存其产品。"
+        }
+      ]
     },
     {
       "method": "AbstractAutowireCapableBeanFactory.doCreateBean(String,RootBeanDefinition,Object[])",
       "document": "/spring/ioc/bean-creation#docreatebean-的五段生命周期",
-      "purpose": "实例化、提前暴露、属性填充、初始化和销毁登记"
+      "purpose": "实例化、提前暴露、属性填充、初始化和销毁登记",
+      "summary": "一个 Bean 从定义到可用对象的完整生命周期：选择构造方式创建原始实例，在必要时暴露 ObjectFactory，随后完成属性注入、初始化与代理，并登记销毁回调。",
+      "process": [
+        "从 factoryBeanInstanceCache 复用包装器，或调用 createBeanInstance 选择工厂方法、自动装配构造器或默认构造器。",
+        "执行 MergedBeanDefinitionPostProcessor，让注解注入等处理器缓存元数据。",
+        "单例、允许循环引用且正在创建时，通过 addSingletonFactory 注册 getEarlyBeanReference。",
+        "populateBean 执行 InstantiationAwareBeanPostProcessor、依赖注入和属性应用。",
+        "initializeBean 调用 Aware、初始化前后处理器、初始化方法，并可能返回代理对象。",
+        "比较早期引用与最终对象，检测原始对象被注入后又产生代理的冲突，最后 registerDisposableBeanIfNecessary。"
+      ],
+      "designInsights": [
+        "三级缓存保存的不是固定半成品，而是延迟创建早期引用的 ObjectFactory，使 AOP 能在循环依赖场景提前暴露同一个代理身份。",
+        "实例化、属性填充和初始化被明确分段，BeanPostProcessor 可以在不同阶段插入注解注入、代理和生命周期逻辑。"
+      ],
+      "pitfalls": [
+        "早期暴露只表示允许另一个 Bean 取得引用，不表示当前 Bean 已完成属性填充和初始化。",
+        "构造器循环依赖发生在 addSingletonFactory 之前，因此无法依靠三级缓存解决。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "AbstractBeanFactory.doGetBean(String,Class,Object[],boolean)",
+          "relation": "调用者",
+          "reason": "作用域确认缓存未命中后，通过 ObjectFactory 进入实际创建。"
+        },
+        {
+          "method": "DefaultSingletonBeanRegistry.getSingleton(String,boolean)",
+          "relation": "循环依赖协议",
+          "reason": "其他 Bean 请求当前单例时可能触发 singletonFactory 生成早期引用。"
+        },
+        {
+          "method": "DefaultListableBeanFactory.resolveDependency(DependencyDescriptor,String,Set,TypeConverter)",
+          "relation": "属性注入",
+          "reason": "populateBean 期间解析字段、方法参数或构造参数对应的候选对象。",
+          "sourceClass": "org.springframework.beans.factory.support.DefaultListableBeanFactory"
+        }
+      ]
     },
     {
       "method": "DefaultSingletonBeanRegistry.getSingleton(String,boolean)",
       "document": "/spring/ioc/circular-dependency",
-      "purpose": "读取完整单例或按需生成早期引用"
+      "purpose": "读取完整单例或按需生成早期引用",
+      "summary": "Spring 三级单例缓存的读取入口：先查完整单例，只有 Bean 正在创建时才进入早期缓存；必要时在锁内调用 singletonFactory 创建并提升早期引用。",
+      "process": [
+        "从 singletonObjects 一级缓存读取已经完成创建的单例。",
+        "未命中且 isSingletonCurrentlyInCreation 为 true 时读取 earlySingletonObjects。",
+        "仍未命中且 allowEarlyReference=true 时进入 singletonObjects 监视器。",
+        "再次检查早期缓存后，从 singletonFactories 取得 ObjectFactory。",
+        "调用工厂生成早期引用，写入二级缓存并删除三级工厂。"
+      ],
+      "designInsights": [
+        "三级缓存的关键不是缓存层数，而是第三级保存延迟工厂：只有真实发生循环依赖时才生成早期引用或早期代理。",
+        "早期对象一旦生成就从三级提升到二级，保证后续依赖者看到相同对象身份。"
+      ],
+      "pitfalls": [
+        "allowEarlyReference=false 的查询不会触发三级工厂，常用于只观察当前是否已有可用缓存。",
+        "只有 singletonCurrentlyInCreation 才允许读取早期层，普通缓存未命中不会无条件创建半成品。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "AbstractAutowireCapableBeanFactory.doCreateBean(String,RootBeanDefinition,Object[])",
+          "relation": "早期工厂来源",
+          "reason": "Bean 实例化后、属性填充前调用 addSingletonFactory 注册延迟早期引用。"
+        },
+        {
+          "method": "AbstractBeanFactory.doGetBean(String,Class,Object[],boolean)",
+          "relation": "缓存调用者",
+          "reason": "每次获取 Bean 都先尝试单例与早期引用快路径。"
+        }
+      ]
     },
     {
       "method": "PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(...)",
@@ -163,7 +296,44 @@
       "method": "DefaultListableBeanFactory.doResolveDependency(DependencyDescriptor,String,Set,TypeConverter)",
       "document": "/spring/ioc/dependency-resolution#doresolvedependency-的主线",
       "purpose": "处理快捷值、建议值、名称匹配、多值分流、候选收集和唯一性裁决",
-      "sourceClass": "org.springframework.beans.factory.support.DefaultListableBeanFactory"
+      "sourceClass": "org.springframework.beans.factory.support.DefaultListableBeanFactory",
+      "summary": "普通依赖解析的决策管线：先处理快捷引用和 @Value，再尝试名称与集合注入，最后收集候选并按 @Primary、优先级和名称裁决唯一 Bean。",
+      "process": [
+        "让 DependencyDescriptor.resolveShortcut 尝试框架或用户提供的快捷结果。",
+        "读取 AutowireCandidateResolver 建议值，解析占位符和表达式并转换为目标类型。",
+        "按 dependencyName 或 suggestedName 尝试名称直达，同时校验类型、自动装配资格和自引用边界。",
+        "通过 resolveMultipleBeans 分流数组、Collection、Map 和 Stream 等多值依赖。",
+        "调用 findAutowireCandidates 收集候选；为空时根据 required 和 fallback 规则处理。",
+        "多个候选通过 determineAutowireCandidate 按 Primary、优先级和名称选择，最后 resolveCandidate 并登记依赖关系。"
+      ],
+      "designInsights": [
+        "依赖解析不是简单的按类型查 Map，而是一条可扩展决策链；DependencyDescriptor 与 AutowireCandidateResolver 把注入点语义和候选资格封装起来。",
+        "单值和多值依赖在同一入口尽早分流，使集合注入可以保留排序信息而单值注入执行唯一性裁决。"
+      ],
+      "pitfalls": [
+        "@Qualifier 主要参与候选资格过滤，不是所有候选产生后才进行的最终排序。",
+        "@Primary 只能解决单值候选冲突；集合注入通常会保留全部合格候选。"
+      ],
+      "relatedMethods": [
+        {
+          "method": "DefaultListableBeanFactory.findAutowireCandidates(String,Class,DependencyDescriptor)",
+          "relation": "候选收集",
+          "reason": "从类型候选名出发应用自动装配资格、泛型和限定符规则。",
+          "sourceClass": "org.springframework.beans.factory.support.DefaultListableBeanFactory"
+        },
+        {
+          "method": "GenericTypeAwareAutowireCandidateResolver.checkGenericTypeMatch(BeanDefinitionHolder,DependencyDescriptor)",
+          "relation": "泛型过滤",
+          "reason": "候选资格阶段比较注入点和 BeanDefinition 的 ResolvableType。",
+          "sourceClass": "org.springframework.beans.factory.support.GenericTypeAwareAutowireCandidateResolver"
+        },
+        {
+          "method": "QualifierAnnotationAutowireCandidateResolver.checkQualifiers(BeanDefinitionHolder,Annotation[])",
+          "relation": "限定符过滤",
+          "reason": "校验 @Qualifier 属性、候选元数据和 Bean 名称回退。",
+          "sourceClass": "org.springframework.beans.factory.annotation.QualifierAnnotationAutowireCandidateResolver"
+        }
+      ]
     },
     {
       "method": "DefaultListableBeanFactory.findAutowireCandidates(String,Class,DependencyDescriptor)",

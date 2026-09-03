@@ -38,6 +38,10 @@ class AtlasTopicVersionResolverTest {
                 .anyMatch(entry -> "getNode(Object)".equals(entry.method())));
         assertFalse(version.topic().entryPoints().stream()
                 .anyMatch(entry -> "getNode(int,Object)".equals(entry.method())));
+        assertTrue(version.topic().entryPoints().stream()
+                .filter(entry -> "putVal(int,K,V,boolean,boolean)".equals(entry.method()))
+                .flatMap(entry -> entry.relatedMethods().stream())
+                .anyMatch(relation -> "getNode(Object)".equals(relation.method())));
     }
 
     /**
